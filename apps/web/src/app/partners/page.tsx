@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Partner } from '@/shared';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PartnersPage() {
   const supabase = createSupabaseServerComponentClient();
   const {

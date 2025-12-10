@@ -12,6 +12,8 @@ export const metadata: Metadata = {
   title: 'Profile',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function ProfilePage() {
   const supabase = createSupabaseServerComponentClient();
   const {

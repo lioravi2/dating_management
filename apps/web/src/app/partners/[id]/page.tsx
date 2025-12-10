@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { Partner, PartnerNote } from '@/shared';
 import PartnerNotes from '@/components/PartnerNotes';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PartnerDetailPage({
   params,
 }: {

@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   title: 'Upgrade to Pro',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function UpgradePage() {
   const supabase = createSupabaseServerComponentClient();
   const {

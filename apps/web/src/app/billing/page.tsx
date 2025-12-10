@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   title: 'Billing',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function BillingPage() {
   const supabase = createSupabaseServerComponentClient();
   const {

@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   title: 'Dating Assistant',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   const supabase = createSupabaseServerComponentClient();
   const {
