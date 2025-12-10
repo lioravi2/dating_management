@@ -6,8 +6,9 @@ const nextConfig = {
   },
   env: {
     // Build number - set by CI/CD or generated for local dev
-    // In GitHub Actions, use: NEXT_PUBLIC_BUILD_NUMBER=${{ github.run_number }}
-    // Or use commit SHA: NEXT_PUBLIC_BUILD_NUMBER=${{ github.sha }}
+    // Vercel automatically provides VERCEL_GIT_COMMIT_SHA
+    // We expose it as NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA for client-side use
+    NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA || null,
     NEXT_PUBLIC_BUILD_NUMBER: process.env.NEXT_PUBLIC_BUILD_NUMBER || 
       process.env.NEXT_PUBLIC_GITHUB_RUN_NUMBER ||
       `local-${Date.now().toString(36).slice(-8)}`,
