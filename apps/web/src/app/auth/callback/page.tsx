@@ -1,15 +1,22 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const hasProcessed = useRef(false);
 
   useEffect(() => {
+    // Prevent multiple executions
+    if (hasProcessed.current) {
+      return;
+    }
+
     const handleCallback = async () => {
+      hasProcessed.current = true;
       const supabase = createSupabaseClient();
 
       // Check for hash fragment (access_token, etc.)
@@ -58,8 +65,20 @@ export default function AuthCallbackPage() {
           // Don't fail login if profile update fails
         }
 
-        // Success - redirect to dashboard
-        router.push('/dashboard');
+        // Update user profile (last_login, email_verified_at, create if needed)
+        try {
+          await fetch('/api/auth/update-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch (error) {
+          console.error('Error updating profile:', error);
+          // Don't fail login if profile update fails
+        }
+
+        // Clear hash and redirect to dashboard with full page reload
+        window.location.hash = '';
+        window.location.href = '/dashboard';
         return;
       }
 
@@ -72,7 +91,7 @@ export default function AuthCallbackPage() {
 
         if (sessionError) {
           console.error('Error setting session:', sessionError);
-          router.push(`/auth/signin?error=${encodeURIComponent(sessionError.message)}`);
+          window.location.href = `/auth/signin?error=${encodeURIComponent(sessionError.message)}`;
           return;
         }
 
@@ -87,13 +106,14 @@ export default function AuthCallbackPage() {
           // Don't fail login if profile update fails
         }
 
-        // Success - redirect to dashboard
-        router.push('/dashboard');
+        // Clear hash and redirect to dashboard with full page reload
+        window.location.hash = '';
+        window.location.href = '/dashboard';
         return;
       }
 
       // No valid auth data found
-      router.push('/auth/signin?error=No authorization code provided');
+      window.location.href = '/auth/signin?error=No authorization code provided';
     };
 
     handleCallback();
