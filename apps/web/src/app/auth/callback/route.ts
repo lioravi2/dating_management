@@ -18,11 +18,11 @@ export async function GET(request: Request) {
     );
   }
 
-  // If no code, redirect to client-side page which can handle hash fragments
+  // If no code, the client-side page will handle hash fragments
+  // Return the page HTML instead of redirecting to avoid loops
   if (!code) {
-    // Check if there's a hash fragment (client-side only)
-    // If so, let the client page handle it
-    return NextResponse.redirect(new URL('/auth/callback', requestUrl.origin));
+    // Let Next.js serve the page.tsx which can handle hash fragments on client
+    return NextResponse.next();
   }
 
   const supabase = createSupabaseRouteHandlerClient();
