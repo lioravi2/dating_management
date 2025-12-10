@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -14,11 +14,17 @@ export default function SignUpPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const supabase = createSupabaseClient();
+  // Use useMemo to create supabase client only once
+  const supabase = useMemo(() => createSupabaseClient(), []);
   const router = useRouter();
+  const hasCheckedSession = useRef(false);
 
   // Check if user is already logged in
   useEffect(() => {
+    // Only check once to prevent infinite loops
+    if (hasCheckedSession.current) return;
+    hasCheckedSession.current = true;
+
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
