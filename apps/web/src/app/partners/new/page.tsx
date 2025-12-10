@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 export default function NewPartnerPage() {
   const router = useRouter();
   const supabase = createSupabaseClient();

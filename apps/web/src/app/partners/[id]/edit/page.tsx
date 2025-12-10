@@ -6,6 +6,8 @@ import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { Partner } from '@/shared';
 
+export const dynamic = 'force-dynamic';
+
 export default function EditPartnerPage() {
   const router = useRouter();
   const params = useParams();

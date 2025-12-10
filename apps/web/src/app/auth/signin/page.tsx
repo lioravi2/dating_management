@@ -5,6 +5,8 @@ import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+
 export default function SignInPage() {
   useEffect(() => {
     document.title = 'Sign In | Dating Assistant';
