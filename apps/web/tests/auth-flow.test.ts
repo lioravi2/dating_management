@@ -42,11 +42,17 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   if (!SUPABASE_URL) missing.push('NEXT_PUBLIC_SUPABASE_URL');
   if (!SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
   
-  throw new Error(
-    `Missing required environment variables: ${missing.join(', ')}\n` +
-    `Please add them to your .env.local file.\n` +
-    `You can find SUPABASE_SERVICE_ROLE_KEY in your Supabase Dashboard → Settings → API`
-  );
+  const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+  const errorMessage = isCI
+    ? `Missing required environment variables: ${missing.join(', ')}\n` +
+      `Please add them as GitHub Secrets in your repository settings:\n` +
+      `Settings → Secrets and variables → Actions → New repository secret\n` +
+      `You can find SUPABASE_SERVICE_ROLE_KEY in your Supabase Dashboard → Settings → API`
+    : `Missing required environment variables: ${missing.join(', ')}\n` +
+      `Please add them to your .env.local file.\n` +
+      `You can find SUPABASE_SERVICE_ROLE_KEY in your Supabase Dashboard → Settings → API`;
+  
+  throw new Error(errorMessage);
 }
 
 // Create admin client for database checks
