@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
 
-// Validate and initialize Stripe
+// Validate and initialize Stripe (lazy initialization to avoid build-time errors)
 const getStripeInstance = () => {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   
@@ -23,10 +23,18 @@ const getStripeInstance = () => {
   }
 };
 
-const stripe = getStripeInstance();
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
-
 export async function POST(request: NextRequest) {
+  // Initialize Stripe and webhook secret only when the route is called
+  const stripe = getStripeInstance();
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  
+  if (!webhookSecret) {
+    return NextResponse.json(
+      { error: 'STRIPE_WEBHOOK_SECRET is not set in environment variables.' },
+      { status: 500 }
+    );
+  }
+
   const body = await request.text();
   const signature = request.headers.get('stripe-signature')!;
 
