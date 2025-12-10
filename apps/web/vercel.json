@@ -1,4 +1,5 @@
 {
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "installCommand": "cd ../../packages/shared && npm install && cd ../../apps/web && npm install"
 }
 
