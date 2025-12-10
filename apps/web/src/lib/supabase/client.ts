@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 // Client-side Supabase client
-// Uses createClient directly to avoid build-time issues with createClientComponentClient
+// Uses createClientComponentClient to sync sessions to cookies for server-side access
 export const createSupabaseClient = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -17,12 +18,25 @@ export const createSupabaseClient = () => {
     throw new Error('Supabase environment variables are required');
   }
   
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-    },
-  });
+  // Use createClientComponentClient in browser to sync sessions to cookies
+  // This allows server components to read the session
+  if (typeof window !== 'undefined') {
+    try {
+      return createClientComponentClient();
+    } catch (error) {
+      // Fallback to createClient if createClientComponentClient fails
+      console.warn('Failed to create client component client, using fallback:', error);
+      return createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+        },
+      });
+    }
+  }
+  
+  // Server-side fallback (shouldn't be used, but just in case)
+  return createClient(supabaseUrl, supabaseAnonKey);
 };
 
 // Server-side Supabase client (for API routes)

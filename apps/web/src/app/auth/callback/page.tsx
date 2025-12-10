@@ -44,38 +44,43 @@ export default function AuthCallbackPage() {
         
         if (exchangeError) {
           console.error('Error exchanging code for session:', exchangeError);
-          router.push(`/auth/signin?error=${encodeURIComponent(exchangeError.message)}`);
+          window.location.href = `/auth/signin?error=${encodeURIComponent(exchangeError.message)}`;
           return;
         }
 
         if (!data.session) {
           console.error('No session created after code exchange');
-          router.push('/auth/signin?error=Failed to create session');
+          window.location.href = '/auth/signin?error=Failed to create session';
           return;
         }
 
-        // Update user profile (last_login, email_verified_at, create if needed)
+        // Verify session is set by checking it again
+        const { data: { session: verifiedSession } } = await supabase.auth.getSession();
+        if (!verifiedSession) {
+          console.error('Session not found after exchange');
+          window.location.href = '/auth/signin?error=Session verification failed';
+          return;
+        }
+
+        // Update user profile and verify session is accessible from server
+        // This ensures cookies are properly set before redirecting
         try {
-          await fetch('/api/auth/update-profile', {
+          const profileResponse = await fetch('/api/auth/update-profile', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
           });
+          
+          if (!profileResponse.ok) {
+            console.error('Profile update failed, but continuing with login');
+          }
         } catch (error) {
           console.error('Error updating profile:', error);
           // Don't fail login if profile update fails
         }
 
-        // Update user profile (last_login, email_verified_at, create if needed)
-        try {
-          await fetch('/api/auth/update-profile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          });
-        } catch (error) {
-          console.error('Error updating profile:', error);
-          // Don't fail login if profile update fails
-        }
-
+        // Wait a moment for cookies to sync, then redirect
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
         // Clear hash and redirect to dashboard with full page reload
         window.location.hash = '';
         window.location.href = '/dashboard';
@@ -95,17 +100,33 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        // Update user profile (last_login, email_verified_at, create if needed)
+        // Verify session is set by checking it again
+        const { data: { session: verifiedSession } } = await supabase.auth.getSession();
+        if (!verifiedSession) {
+          console.error('Session not found after setSession');
+          window.location.href = '/auth/signin?error=Session verification failed';
+          return;
+        }
+
+        // Update user profile and verify session is accessible from server
+        // This ensures cookies are properly set before redirecting
         try {
-          await fetch('/api/auth/update-profile', {
+          const profileResponse = await fetch('/api/auth/update-profile', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
           });
+          
+          if (!profileResponse.ok) {
+            console.error('Profile update failed, but continuing with login');
+          }
         } catch (error) {
           console.error('Error updating profile:', error);
           // Don't fail login if profile update fails
         }
 
+        // Wait a moment for cookies to sync, then redirect
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
         // Clear hash and redirect to dashboard with full page reload
         window.location.hash = '';
         window.location.href = '/dashboard';
