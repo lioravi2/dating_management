@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Large, bold theatre masks for visibility -->
+  
+  <!-- Left mask (comedy) - larger and bolder -->
+  <circle cx="70" cy="100" r="50" fill="#FFD700" stroke="#FFA500" stroke-width="4"/>
+  <circle cx="70" cy="100" r="45" fill="#FFE4B5"/>
+  <!-- Eyes - larger -->
+  <circle cx="60" cy="90" r="6" fill="#000"/>
+  <circle cx="80" cy="90" r="6" fill="#000"/>
+  <!-- Smile - bolder -->
+  <path d="M 55 110 Q 70 125 85 110" stroke="#000" stroke-width="5" fill="none" stroke-linecap="round"/>
+  
+  <!-- Right mask (tragedy) - larger and bolder -->
+  <circle cx="130" cy="100" r="50" fill="#FFD700" stroke="#FFA500" stroke-width="4"/>
+  <circle cx="130" cy="100" r="45" fill="#FFE4B5"/>
+  <!-- Eyes - larger -->
+  <circle cx="120" cy="95" r="6" fill="#000"/>
+  <circle cx="140" cy="95" r="6" fill="#000"/>
+  <!-- Frown - bolder -->
+  <path d="M 115 115 Q 130 105 145 115" stroke="#000" stroke-width="5" fill="none" stroke-linecap="round"/>
+  
+  <!-- Connecting element - bolder -->
+  <line x1="100" y1="100" x2="100" y2="100" stroke="#8B4513" stroke-width="3" stroke-linecap="round"/>
+</svg>

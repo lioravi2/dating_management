@@ -1,0 +1,38 @@
+# Example GitHub Actions workflow showing how to set build number
+# This is just a reference - you can integrate this into your actual workflow
+
+name: Build Example
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Build
+        env:
+          # Use GitHub Actions run number as build number
+          NEXT_PUBLIC_BUILD_NUMBER: ${{ github.run_number }}
+          # Or use short commit SHA
+          # NEXT_PUBLIC_BUILD_NUMBER: ${{ github.sha }}
+        run: npm run build
+      
+      - name: Deploy
+        run: echo "Deploy your app here"
+
+
