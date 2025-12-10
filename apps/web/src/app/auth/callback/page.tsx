@@ -47,6 +47,17 @@ export default function AuthCallbackPage() {
           return;
         }
 
+        // Update user profile (last_login, email_verified_at, create if needed)
+        try {
+          await fetch('/api/auth/update-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch (error) {
+          console.error('Error updating profile:', error);
+          // Don't fail login if profile update fails
+        }
+
         // Success - redirect to dashboard
         router.push('/dashboard');
         return;
@@ -63,6 +74,17 @@ export default function AuthCallbackPage() {
           console.error('Error setting session:', sessionError);
           router.push(`/auth/signin?error=${encodeURIComponent(sessionError.message)}`);
           return;
+        }
+
+        // Update user profile (last_login, email_verified_at, create if needed)
+        try {
+          await fetch('/api/auth/update-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch (error) {
+          console.error('Error updating profile:', error);
+          // Don't fail login if profile update fails
         }
 
         // Success - redirect to dashboard
