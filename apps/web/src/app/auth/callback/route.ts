@@ -18,11 +18,11 @@ export async function GET(request: Request) {
     );
   }
 
+  // If no code, redirect to client-side page which can handle hash fragments
   if (!code) {
-    console.error('No authorization code provided');
-    return NextResponse.redirect(
-      new URL('/auth/signin?error=No authorization code provided', requestUrl.origin)
-    );
+    // Check if there's a hash fragment (client-side only)
+    // If so, let the client page handle it
+    return NextResponse.redirect(new URL('/auth/callback', requestUrl.origin));
   }
 
   const supabase = createSupabaseRouteHandlerClient();
