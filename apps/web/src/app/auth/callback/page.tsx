@@ -31,10 +31,24 @@ export default function AuthCallbackPage() {
         return;
       }
 
-      // If we have a code, let the server handle it (PKCE flow)
+      // If we have a code, exchange it for a session (PKCE flow)
       if (code) {
-        // Redirect to server route which will handle the code exchange
-        window.location.href = `/auth/callback?code=${code}`;
+        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        
+        if (exchangeError) {
+          console.error('Error exchanging code for session:', exchangeError);
+          router.push(`/auth/signin?error=${encodeURIComponent(exchangeError.message)}`);
+          return;
+        }
+
+        if (!data.session) {
+          console.error('No session created after code exchange');
+          router.push('/auth/signin?error=Failed to create session');
+          return;
+        }
+
+        // Success - redirect to dashboard
+        router.push('/dashboard');
         return;
       }
 
