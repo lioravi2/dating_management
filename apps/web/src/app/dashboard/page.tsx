@@ -82,11 +82,18 @@ export default async function DashboardPage() {
           <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Link
-              href="/profile"
+              href="/partners"
               className="bg-primary-50 border-2 border-primary-200 rounded-lg p-4 hover:bg-primary-100 transition-colors"
             >
-              <h2 className="font-semibold text-lg mb-2">Profile</h2>
-              <p className="text-sm text-gray-600">Update your profile</p>
+              <h2 className="font-semibold text-lg mb-2">View Partners</h2>
+              <p className="text-sm text-gray-600">See all your partners</p>
+            </Link>
+            <Link
+              href="/partners/new"
+              className="bg-green-50 border-2 border-green-200 rounded-lg p-4 hover:bg-green-100 transition-colors"
+            >
+              <h2 className="font-semibold text-lg mb-2">Add Partner</h2>
+              <p className="text-sm text-gray-600">Add a new partner</p>
             </Link>
             {user?.account_type === 'pro' && (
               <Link
@@ -112,4 +119,5 @@ export default async function DashboardPage() {
     </div>
   );
 }
+
 

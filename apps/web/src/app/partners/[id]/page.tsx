@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Partner, PartnerNote } from '@/shared';
 import PartnerNotes from '@/components/PartnerNotes';
+import Header from '@/components/Header';
+import Breadcrumbs from '@/components/Breadcrumbs';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +21,12 @@ export default async function PartnerDetailPage({
   if (!session) {
     redirect('/auth/signin');
   }
+
+  const { data: user } = await supabase
+    .from('users')
+    .select('account_type')
+    .eq('id', session.user.id)
+    .single();
 
   const { data: partner } = await supabase
     .from('partners')
@@ -39,28 +47,8 @@ export default async function PartnerDetailPage({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <Link href="/dashboard" className="text-2xl mr-2">
-                🎭
-              </Link>
-              <Link href="/dashboard" className="text-xl font-semibold">
-                Dating Assistant
-              </Link>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/partners"
-                className="text-gray-700 hover:text-gray-900"
-              >
-                Partners
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Header accountType={user?.account_type} />
+      <Breadcrumbs />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow p-6 mb-6">

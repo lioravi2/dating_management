@@ -217,7 +217,15 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       </div>
 
       {message && (
-        <div className="bg-red-50 text-red-800 p-3 rounded">{message}</div>
+        <div
+          className={`mb-4 p-3 rounded ${
+            message.includes('Error') || message.includes('error') || message.includes('violates') || message.includes('Not authenticated')
+              ? 'bg-red-50 text-red-800'
+              : 'bg-green-50 text-green-800'
+          }`}
+        >
+          {message}
+        </div>
       )}
 
       <div className="flex space-x-4">

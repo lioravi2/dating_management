@@ -2,6 +2,8 @@ import { createSupabaseServerComponentClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Partner } from '@/shared';
+import Header from '@/components/Header';
+import Breadcrumbs from '@/components/Breadcrumbs';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +17,12 @@ export default async function PartnersPage() {
     redirect('/auth/signin');
   }
 
+  const { data: user } = await supabase
+    .from('users')
+    .select('account_type')
+    .eq('id', session.user.id)
+    .single();
+
   const { data: partners } = await supabase
     .from('partners')
     .select('*')
@@ -23,34 +31,8 @@ export default async function PartnersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <Link href="/dashboard" className="text-2xl mr-2">
-                🎭
-              </Link>
-              <Link href="/dashboard" className="text-xl font-semibold">
-                Dating Assistant
-              </Link>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/dashboard"
-                className="text-gray-700 hover:text-gray-900"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/profile"
-                className="text-gray-700 hover:text-gray-900"
-              >
-                Profile
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Header accountType={user?.account_type} />
+      <Breadcrumbs />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-6">
