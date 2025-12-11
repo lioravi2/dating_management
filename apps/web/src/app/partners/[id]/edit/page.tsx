@@ -64,7 +64,7 @@ export default function EditPartnerPage() {
   const partnerDisplayName = partner
     ? (partner.first_name && partner.last_name
         ? `${partner.first_name} ${partner.last_name}`
-        : partner.first_name || partner.last_name || partner.internal_id || 'Unnamed Partner')
+        : partner.first_name || partner.last_name || 'Unnamed Partner')
     : 'Partner';
 
   return (

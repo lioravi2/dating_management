@@ -45,10 +45,9 @@ export default async function PartnerDetailPage({
     .eq('partner_id', params.id)
     .order('start_time', { ascending: false });
 
-  const partnerName = partner.first_name || partner.last_name || partner.internal_id || 'Unnamed Partner';
-  const partnerDisplayName = partner.first_name && partner.last_name 
+  const partnerDisplayName = partner.first_name && partner.last_name
     ? `${partner.first_name} ${partner.last_name}`
-    : partnerName;
+    : partner.first_name || partner.last_name || 'Unnamed Partner';
 
   return (
     <div className="min-h-screen bg-gray-50">
