@@ -38,12 +38,27 @@ export interface User {
 export interface Partner {
   id: string;
   user_id: string;
-  first_name: string;
+  internal_id: string | null;
+  first_name: string | null;
   last_name: string | null;
   email: string | null;
   phone_number: string | null;
   description: string | null;
   description_time: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PartnerPhoto {
+  id: string;
+  partner_id: string;
+  storage_path: string;
+  file_name: string;
+  file_size: number | null;
+  mime_type: string | null;
+  width: number | null;
+  height: number | null;
+  uploaded_at: string;
   created_at: string;
   updated_at: string;
 }
@@ -76,7 +91,8 @@ export interface Subscription {
 
 // Validation Schemas
 export const PartnerSchema = z.object({
-  first_name: z.string().min(1, 'First name is required'),
+  internal_id: z.string().optional(),
+  first_name: z.string().optional(),
   last_name: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   phone_number: z.string().optional(),

@@ -17,6 +17,7 @@ export default function EditPartnerPage() {
   const [saving, setSaving] = useState(false);
   const [partner, setPartner] = useState<Partner | null>(null);
   const [formData, setFormData] = useState({
+    internal_id: '',
     first_name: '',
     last_name: '',
     email: '',
@@ -39,7 +40,8 @@ export default function EditPartnerPage() {
 
       setPartner(data);
       setFormData({
-        first_name: data.first_name,
+        internal_id: data.internal_id || '',
+        first_name: data.first_name || '',
         last_name: data.last_name || '',
         email: data.email || '',
         phone_number: data.phone_number || '',
@@ -113,15 +115,36 @@ export default function EditPartnerPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label
+                htmlFor="internal_id"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Internal ID (optional identifier)
+              </label>
+              <input
+                id="internal_id"
+                type="text"
+                value={formData.internal_id}
+                onChange={(e) =>
+                  setFormData({ ...formData, internal_id: e.target.value })
+                }
+                placeholder="e.g., Partner-001"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Optional user-friendly identifier for this partner
+              </p>
+            </div>
+
+            <div>
+              <label
                 htmlFor="first_name"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                First Name *
+                First Name
               </label>
               <input
                 id="first_name"
                 type="text"
-                required
                 value={formData.first_name}
                 onChange={(e) =>
                   setFormData({ ...formData, first_name: e.target.value })

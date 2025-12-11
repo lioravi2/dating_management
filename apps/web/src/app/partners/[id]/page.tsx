@@ -67,7 +67,8 @@ export default async function PartnerDetailPage({
           <div className="flex justify-between items-start mb-4">
             <div>
               <h1 className="text-3xl font-bold">
-                {partner.first_name} {partner.last_name || ''}
+                {partner.first_name || partner.last_name || partner.internal_id || 'Unnamed Partner'}
+                {partner.first_name && partner.last_name && ` ${partner.last_name}`}
               </h1>
               <p className="text-gray-600 mt-2">
                 Added {new Date(partner.created_at).toLocaleDateString()}

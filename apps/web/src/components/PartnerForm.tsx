@@ -12,6 +12,7 @@ interface PartnerFormProps {
 export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   const router = useRouter();
   const [formData, setFormData] = useState({
+    internal_id: partner?.internal_id || '',
     first_name: partner?.first_name || '',
     last_name: partner?.last_name || '',
     email: partner?.email || '',
@@ -43,13 +44,15 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     const partnerData = {
       ...formData,
       user_id: user.id,
+      internal_id: formData.internal_id || null,
+      first_name: formData.first_name || null,
+      last_name: formData.last_name || null,
       description_time: formData.description_time
         ? new Date(formData.description_time).toISOString()
         : null,
       email: formData.email || null,
       phone_number: formData.phone_number || null,
       description: formData.description || null,
-      last_name: formData.last_name || null,
     };
 
     if (partner) {
@@ -85,10 +88,32 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label
+          htmlFor="internal_id"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Internal ID (optional identifier)
+        </label>
+        <input
+          id="internal_id"
+          type="text"
+          value={formData.internal_id}
+          onChange={(e) =>
+            setFormData({ ...formData, internal_id: e.target.value })
+          }
+          placeholder="e.g., Partner-001"
+          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Optional user-friendly identifier for this partner
+        </p>
+      </div>
+
+      <div>
+        <label
           htmlFor="first_name"
           className="block text-sm font-medium text-gray-700 mb-1"
         >
-          First Name *
+          First Name
         </label>
         <input
           id="first_name"
@@ -97,7 +122,6 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           onChange={(e) =>
             setFormData({ ...formData, first_name: e.target.value })
           }
-          required
           className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
         />
       </div>

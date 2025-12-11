@@ -1,5 +1,5 @@
 // App version - update this when you make significant changes
-export const APP_VERSION = '0.6.0';
+export const APP_VERSION = '0.7.0';
 
 // Build number - set via environment variable
 // Priority:

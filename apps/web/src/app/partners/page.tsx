@@ -72,7 +72,8 @@ export default async function PartnersPage() {
                 className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
               >
                 <h2 className="text-xl font-semibold mb-2">
-                  {partner.first_name} {partner.last_name || ''}
+                  {partner.first_name || partner.last_name || partner.internal_id || 'Unnamed Partner'}
+                  {partner.first_name && partner.last_name && ` ${partner.last_name}`}
                 </h2>
                 {partner.email && (
                   <p className="text-sm text-gray-600 mb-1">{partner.email}</p>
