@@ -150,7 +150,6 @@ async function changeToDaily(email: string) {
       },
       product_data: {
         name: 'Dating Assistant Pro (Daily)',
-        description: 'Premium features - Daily billing (Testing)',
       },
     });
 
