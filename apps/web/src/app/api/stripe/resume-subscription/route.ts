@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import Stripe from 'stripe';
 
 // Lazy initialization to avoid build-time errors
@@ -18,6 +19,7 @@ const getStripeInstance = () => {
 export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseRouteHandlerClient();
+    const supabaseAdmin = createSupabaseAdminClient();
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -26,12 +28,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's subscription
-    const { data: subscription, error: subError } = await supabase
+    // Get user's subscription (use admin client to bypass RLS)
+    const { data: subscription, error: subError } = await supabaseAdmin
       .from('subscriptions')
       .select('stripe_subscription_id, status, cancel_at_period_end')
       .eq('user_id', session.user.id)
-      .single();
+      .maybeSingle();
 
     if (subError || !subscription) {
       return NextResponse.json(
@@ -65,17 +67,26 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Update database
-    await supabase
+    // Update database (use admin client to bypass RLS and reset cancellation_reason)
+    const { error: updateError } = await supabaseAdmin
       .from('subscriptions')
       .update({
         cancel_at_period_end: false,
+        cancellation_reason: null, // Reset cancellation reason when resuming
         status: 'active',
         current_period_end: new Date(
           resumedSubscription.current_period_end * 1000
         ).toISOString(),
       })
       .eq('user_id', session.user.id);
+
+    if (updateError) {
+      console.error('Error updating subscription:', updateError);
+      return NextResponse.json(
+        { error: `Failed to update subscription: ${updateError.message}` },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       message: 'Subscription has been resumed',

@@ -34,13 +34,15 @@ export default function CancelSubscriptionPage() {
         throw new Error(data.error || 'Failed to cancel subscription');
       }
 
+      // Show success briefly, then redirect
       setMessage({ type: 'success', text: data.message || 'Subscription will be canceled at the end of the billing period.' });
+      setLoading(true); // Keep loading state to show loader during redirect
       
-      // Redirect to billing page after 2 seconds
+      // Redirect to billing page after 1 second
       setTimeout(() => {
         router.push('/billing');
         router.refresh();
-      }, 2000);
+      }, 1000);
     } catch (error: any) {
       console.error('Cancel subscription error:', error);
       setMessage({ type: 'error', text: error.message || 'Error canceling subscription' });
@@ -67,19 +69,19 @@ export default function CancelSubscriptionPage() {
             </p>
           </div>
 
-          {message && (
-            <div
-              className={`mb-4 p-3 rounded ${
-                message.type === 'success'
-                  ? 'bg-green-50 text-green-800'
-                  : 'bg-red-50 text-red-800'
-              }`}
-            >
+          {message && message.type === 'error' && (
+            <div className="mb-4 p-3 rounded bg-red-50 text-red-800">
               {message.text}
             </div>
           )}
 
-          <form onSubmit={handleCancel} className="space-y-4">
+          {loading && message?.type === 'success' ? (
+            <div className="mb-4 flex flex-col items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
+              <p className="text-gray-600">Processing...</p>
+            </div>
+          ) : (
+            <form onSubmit={handleCancel} className="space-y-4">
             <div>
               <label
                 htmlFor="reason"
@@ -114,6 +116,7 @@ export default function CancelSubscriptionPage() {
               </button>
             </div>
           </form>
+          )}
         </div>
       </main>
     </div>
