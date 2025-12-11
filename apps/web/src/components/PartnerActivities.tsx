@@ -367,9 +367,15 @@ function ActivityForm({
               <input
                 type="date"
                 value={formData.start_date}
-                onChange={(e) =>
-                  setFormData({ ...formData, start_date: e.target.value })
-                }
+                onChange={(e) => {
+                  const newStartDate = e.target.value;
+                  setFormData({
+                    ...formData,
+                    start_date: newStartDate,
+                    // Auto-populate end_date if it's empty
+                    end_date: formData.end_date || newStartDate,
+                  });
+                }}
                 required
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
@@ -383,9 +389,15 @@ function ActivityForm({
                 <input
                   type="time"
                   value={formData.start_time}
-                  onChange={(e) =>
-                    setFormData({ ...formData, start_time: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const newStartTime = e.target.value;
+                    setFormData({
+                      ...formData,
+                      start_time: newStartTime,
+                      // Auto-populate end_time if it's empty
+                      end_time: formData.end_time || newStartTime,
+                    });
+                  }}
                   required
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
@@ -404,6 +416,12 @@ function ActivityForm({
                 onChange={(e) =>
                   setFormData({ ...formData, end_date: e.target.value })
                 }
+                onFocus={(e) => {
+                  // When user clicks/focuses on end_date, populate with start_date if empty
+                  if (!formData.end_date && formData.start_date) {
+                    setFormData({ ...formData, end_date: formData.start_date });
+                  }
+                }}
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
@@ -419,6 +437,12 @@ function ActivityForm({
                   onChange={(e) =>
                     setFormData({ ...formData, end_time: e.target.value })
                   }
+                  onFocus={(e) => {
+                    // When user clicks/focuses on end_time, populate with start_time if empty
+                    if (!formData.end_time && formData.start_time) {
+                      setFormData({ ...formData, end_time: formData.start_time });
+                    }
+                  }}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
