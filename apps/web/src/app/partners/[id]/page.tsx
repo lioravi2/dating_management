@@ -1,8 +1,8 @@
 import { createSupabaseServerComponentClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Partner, PartnerNote } from '@/shared';
-import PartnerNotes from '@/components/PartnerNotes';
+import { Partner, PartnerActivity } from '@/shared';
+import PartnerActivities from '@/components/PartnerActivities';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
 
@@ -39,7 +39,7 @@ export default async function PartnerDetailPage({
     redirect('/partners');
   }
 
-  const { data: notes } = await supabase
+  const { data: activities } = await supabase
     .from('partner_notes')
     .select('*')
     .eq('partner_id', params.id)
@@ -162,7 +162,7 @@ export default async function PartnerDetailPage({
           )}
         </div>
 
-        <PartnerNotes partnerId={params.id} initialNotes={notes || []} />
+        <PartnerActivities partnerId={params.id} initialActivities={activities || []} />
       </main>
     </div>
   );

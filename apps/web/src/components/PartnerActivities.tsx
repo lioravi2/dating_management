@@ -1,0 +1,416 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { createSupabaseClient } from '@/lib/supabase/client';
+import { PartnerActivity, PartnerActivityType, FREE_TIER_ACTIVITY_LIMIT } from '@/shared';
+import Link from 'next/link';
+import { format } from 'date-fns';
+
+interface PartnerActivitiesProps {
+  partnerId: string;
+  initialActivities: PartnerActivity[];
+}
+
+export default function PartnerActivities({
+  partnerId,
+  initialActivities,
+}: PartnerActivitiesProps) {
+  const [activities, setActivities] = useState<PartnerActivity[]>(initialActivities);
+  const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [userAccountType, setUserAccountType] = useState<'free' | 'pro'>('free');
+  const supabase = createSupabaseClient();
+
+  useEffect(() => {
+    // Get user account type
+    const fetchUserAccountType = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('users')
+          .select('account_type')
+          .eq('id', user.id)
+          .single();
+        if (data) {
+          setUserAccountType(data.account_type);
+        }
+      }
+    };
+    fetchUserAccountType();
+  }, [supabase]);
+
+  const canAddActivity =
+    userAccountType === 'pro' || activities.length < FREE_TIER_ACTIVITY_LIMIT;
+
+  const handleAddActivity = async (formData: {
+    start_time: string;
+    end_time?: string;
+    type: PartnerActivityType;
+    location?: string;
+    description?: string;
+  }) => {
+    if (!canAddActivity) {
+      setMessage({
+        type: 'error',
+        text: `Free accounts are limited to ${FREE_TIER_ACTIVITY_LIMIT} activities. Please upgrade to Pro for unlimited activities.`
+      });
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+    const { data: activity, error } = await supabase
+      .from('partner_notes')
+      .insert([{ ...formData, partner_id: partnerId }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating activity:', error);
+      setMessage({
+        type: 'error',
+        text: `Error creating activity: ${error.message}`
+      });
+    } else {
+      setActivities([activity, ...activities]);
+      setShowForm(false);
+      setMessage({
+        type: 'success',
+        text: 'Activity created successfully!'
+      });
+      // Clear success message after 3 seconds
+      setTimeout(() => setMessage(null), 3000);
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteActivity = async (activityId: string) => {
+    if (!confirm('Are you sure you want to delete this activity?')) return;
+
+    const { error } = await supabase
+      .from('partner_notes')
+      .delete()
+      .eq('id', activityId);
+
+    if (error) {
+      console.error('Error deleting activity:', error);
+      setMessage({
+        type: 'error',
+        text: `Error deleting activity: ${error.message}`
+      });
+    } else {
+      setActivities(activities.filter((a) => a.id !== activityId));
+      setMessage({
+        type: 'success',
+        text: 'Activity deleted successfully!'
+      });
+      setTimeout(() => setMessage(null), 3000);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Activities</h2>
+        {canAddActivity ? (
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            + Add Activity
+          </button>
+        ) : (
+          <Link
+            href="/upgrade"
+            className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors"
+          >
+            Upgrade to Add More Activities
+          </Link>
+        )}
+      </div>
+
+      {message && (
+        <div
+          className={`mb-4 p-3 rounded ${
+            message.type === 'error'
+              ? 'bg-red-50 text-red-800'
+              : 'bg-green-50 text-green-800'
+          }`}
+        >
+          {message.text}
+        </div>
+      )}
+
+      {userAccountType === 'free' && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+          <p className="text-sm text-yellow-800">
+            Free account: {activities.length} / {FREE_TIER_ACTIVITY_LIMIT} activities used
+          </p>
+        </div>
+      )}
+
+      {showForm && (
+        <ActivityForm
+          onSubmit={handleAddActivity}
+          onCancel={() => setShowForm(false)}
+          loading={loading}
+        />
+      )}
+
+      <div className="space-y-4 mt-6">
+        {activities.length > 0 ? (
+          activities.map((activity) => (
+            <div
+              key={activity.id}
+              className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <span className="bg-primary-100 text-primary-800 text-xs font-semibold px-2 py-1 rounded">
+                      {activity.type.replace('_', ' ').toUpperCase()}
+                    </span>
+                    {activity.google_calendar_event_id && (
+                      <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">
+                        🎭 Synced
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {format(new Date(activity.start_time), 'PPp')}
+                    {activity.end_time &&
+                      ` - ${format(new Date(activity.end_time), 'PPp')}`}
+                  </p>
+                  {activity.location && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      📍 {activity.location}
+                    </p>
+                  )}
+                  {activity.description && (
+                    <p className="text-gray-900 mt-2">{activity.description}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDeleteActivity(activity.id)}
+                  className="text-red-600 hover:text-red-800 ml-4"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-gray-600 text-center py-8">No activities yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ActivityForm({
+  onSubmit,
+  onCancel,
+  loading,
+}: {
+  onSubmit: (data: {
+    start_time: string;
+    end_time?: string;
+    type: PartnerActivityType;
+    location?: string;
+    description?: string;
+  }) => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  const [formData, setFormData] = useState({
+    start_date: new Date().toISOString().split('T')[0],
+    start_time: new Date().toTimeString().slice(0, 5),
+    end_date: '',
+    end_time: '',
+    all_day: false,
+    type: 'actual_date' as PartnerActivityType,
+    location: '',
+    description: '',
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const startDateTime = formData.all_day
+      ? new Date(`${formData.start_date}T00:00:00`).toISOString()
+      : new Date(`${formData.start_date}T${formData.start_time}:00`).toISOString();
+    
+    const endDateTime = formData.end_date
+      ? (formData.all_day
+          ? new Date(`${formData.end_date}T23:59:59`).toISOString()
+          : formData.end_time
+          ? new Date(`${formData.end_date}T${formData.end_time}:00`).toISOString()
+          : undefined)
+      : undefined;
+
+    onSubmit({
+      start_time: startDateTime,
+      end_time: endDateTime,
+      type: formData.type,
+      location: formData.location || undefined,
+      description: formData.description || undefined,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="border border-gray-200 rounded-lg p-4 mb-6">
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Type *
+          </label>
+          <select
+            value={formData.type}
+            onChange={(e) =>
+              setFormData({ ...formData, type: e.target.value as PartnerActivityType })
+            }
+            required
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          >
+            <option value="in-app_chat">In-App Chat</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="phone">Phone</option>
+            <option value="actual_date">Actual Date</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div className="border-t pt-4">
+          <div className="flex items-center mb-4">
+            <input
+              type="checkbox"
+              id="all_day"
+              checked={formData.all_day}
+              onChange={(e) => setFormData({ ...formData, all_day: e.target.checked })}
+              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+            />
+            <label htmlFor="all_day" className="ml-2 block text-sm text-gray-700">
+              All day
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Start Date *
+              </label>
+              <input
+                type="date"
+                value={formData.start_date}
+                onChange={(e) =>
+                  setFormData({ ...formData, start_date: e.target.value })
+                }
+                required
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+
+            {!formData.all_day && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Time *
+                </label>
+                <input
+                  type="time"
+                  value={formData.start_time}
+                  onChange={(e) =>
+                    setFormData({ ...formData, start_time: e.target.value })
+                  }
+                  required
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                End Date (optional)
+              </label>
+              <input
+                type="date"
+                value={formData.end_date}
+                onChange={(e) =>
+                  setFormData({ ...formData, end_date: e.target.value })
+                }
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+
+            {!formData.all_day && formData.end_date && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  End Time (optional)
+                </label>
+                <input
+                  type="time"
+                  value={formData.end_time}
+                  onChange={(e) =>
+                    setFormData({ ...formData, end_time: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Location
+          </label>
+          <input
+            type="text"
+            value={formData.location}
+            onChange={(e) =>
+              setFormData({ ...formData, location: e.target.value })
+            }
+            placeholder="e.g., Restaurant Name, Address"
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Description
+          </label>
+          <textarea
+            rows={3}
+            value={formData.description}
+            onChange={(e) =>
+              setFormData({ ...formData, description: e.target.value })
+            }
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+        </div>
+
+        <div className="flex space-x-4">
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 bg-primary-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Creating...' : 'Create Activity'}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
