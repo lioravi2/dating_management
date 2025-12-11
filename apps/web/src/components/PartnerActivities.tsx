@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { PartnerActivity, PartnerActivityType, FREE_TIER_ACTIVITY_LIMIT } from '@/shared';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import { format, isSameDay, parseISO, startOfDay } from 'date-fns';
 
 interface PartnerActivitiesProps {
   partnerId: string;
@@ -111,10 +111,34 @@ export default function PartnerActivities({
     }
   };
 
+  // Group activities by date
+  const activitiesByDate = useMemo(() => {
+    const grouped: { [key: string]: PartnerActivity[] } = {};
+    activities.forEach((activity) => {
+      const dateKey = format(parseISO(activity.start_time), 'yyyy-MM-dd');
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(activity);
+    });
+    
+    // Sort dates descending (newest first)
+    const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+    
+    // Sort activities within each date by start_time descending
+    sortedDates.forEach((date) => {
+      grouped[date].sort((a, b) => 
+        new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+      );
+    });
+    
+    return { grouped, sortedDates };
+  }, [activities]);
+
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Activities</h2>
+        <h2 className="text-2xl font-bold">Activity Timeline</h2>
         {canAddActivity ? (
           <button
             onClick={() => setShowForm(!showForm)}
@@ -160,48 +184,86 @@ export default function PartnerActivities({
         />
       )}
 
-      <div className="space-y-4 mt-6">
+      <div className="mt-6">
         {activities.length > 0 ? (
-          activities.map((activity) => (
-            <div
-              key={activity.id}
-              className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-            >
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <span className="bg-primary-100 text-primary-800 text-xs font-semibold px-2 py-1 rounded">
-                      {activity.type.replace('_', ' ').toUpperCase()}
-                    </span>
-                    {activity.google_calendar_event_id && (
-                      <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">
-                        🎭 Synced
-                      </span>
-                    )}
+          <div className="space-y-8">
+            {activitiesByDate.sortedDates.map((dateKey) => {
+              const dateActivities = activitiesByDate.grouped[dateKey];
+              const date = parseISO(dateKey);
+              const isToday = isSameDay(date, new Date());
+              const isYesterday = isSameDay(date, new Date(Date.now() - 86400000));
+              
+              let dateLabel: string;
+              if (isToday) {
+                dateLabel = 'Today';
+              } else if (isYesterday) {
+                dateLabel = 'Yesterday';
+              } else {
+                dateLabel = format(date, 'EEEE, MMMM d, yyyy');
+              }
+
+              return (
+                <div key={dateKey} className="relative">
+                  {/* Date Separator */}
+                  <div className="sticky top-0 z-10 bg-white py-3 mb-4 border-b border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-800">
+                      {dateLabel}
+                    </h3>
                   </div>
-                  <p className="text-sm text-gray-600">
-                    {format(new Date(activity.start_time), 'PPp')}
-                    {activity.end_time &&
-                      ` - ${format(new Date(activity.end_time), 'PPp')}`}
-                  </p>
-                  {activity.location && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      📍 {activity.location}
-                    </p>
-                  )}
-                  {activity.description && (
-                    <p className="text-gray-900 mt-2">{activity.description}</p>
-                  )}
+
+                  {/* Activities for this date */}
+                  <div className="space-y-3 pl-4 border-l-2 border-gray-200">
+                    {dateActivities.map((activity, index) => (
+                      <div
+                        key={activity.id}
+                        className="relative -ml-2"
+                      >
+                        {/* Timeline dot */}
+                        <div className="absolute -left-[9px] top-2 w-4 h-4 bg-primary-500 rounded-full border-2 border-white shadow-sm"></div>
+                        
+                        {/* Activity card */}
+                        <div className="ml-6 bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-2">
+                                <span className="bg-primary-100 text-primary-800 text-xs font-semibold px-2 py-1 rounded">
+                                  {activity.type.replace('_', ' ').toUpperCase()}
+                                </span>
+                                {activity.google_calendar_event_id && (
+                                  <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">
+                                    🎭 Synced
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-600 font-medium">
+                                {format(parseISO(activity.start_time), 'h:mm a')}
+                                {activity.end_time &&
+                                  ` - ${format(parseISO(activity.end_time), 'h:mm a')}`}
+                              </p>
+                              {activity.location && (
+                                <p className="text-sm text-gray-600 mt-1">
+                                  📍 {activity.location}
+                                </p>
+                              )}
+                              {activity.description && (
+                                <p className="text-gray-900 mt-2 text-sm">{activity.description}</p>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => handleDeleteActivity(activity.id)}
+                              className="text-red-600 hover:text-red-800 ml-4 text-sm"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleDeleteActivity(activity.id)}
-                  className="text-red-600 hover:text-red-800 ml-4"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))
+              );
+            })}
+          </div>
         ) : (
           <p className="text-gray-600 text-center py-8">No activities yet.</p>
         )}
