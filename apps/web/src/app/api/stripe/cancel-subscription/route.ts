@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import Stripe from 'stripe';
 
 // Lazy initialization to avoid build-time errors
@@ -20,9 +21,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const cancellationReason = body.reason || null;
     
-    // TODO: Store cancellation reason in database for analytics
-    
     const supabase = createSupabaseRouteHandlerClient();
+    const supabaseAdmin = createSupabaseAdminClient();
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -70,11 +70,12 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Update database
-    await supabase
+    // Update database (use admin client to bypass RLS)
+    await supabaseAdmin
       .from('subscriptions')
       .update({
         cancel_at_period_end: true,
+        cancellation_reason: cancellationReason,
         current_period_end: new Date(
           canceledSubscription.current_period_end * 1000
         ).toISOString(),

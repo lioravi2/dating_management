@@ -95,18 +95,19 @@ export default function CancelSubscriptionPage() {
 
             <div className="flex gap-4">
               <button
+                type="button"
+                onClick={() => router.push('/billing')}
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Keep Subscription
+              </button>
+              <button
                 type="submit"
                 disabled={loading}
                 className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Processing...' : 'Cancel Subscription'}
               </button>
-              <Link
-                href="/billing"
-                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors text-center"
-              >
-                Keep Subscription
-              </Link>
             </div>
           </form>
         </div>

@@ -19,9 +19,12 @@ export default function Header({ accountType }: HeaderProps) {
           </div>
           <div className="flex items-center space-x-4">
             {accountType === 'pro' && (
-              <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
+              <Link
+                href="/billing"
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-semibold hover:opacity-90 transition-opacity"
+              >
                 PRO
-              </span>
+              </Link>
             )}
             {(!accountType || accountType === 'free') && (
               <span className="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs font-semibold">
@@ -30,14 +33,14 @@ export default function Header({ accountType }: HeaderProps) {
             )}
             <Link
               href="/profile"
-              className="text-gray-700 hover:text-gray-900"
+              className="text-gray-700 hover:text-gray-900 whitespace-nowrap"
             >
               Profile
             </Link>
             <form action="/auth/signout" method="post">
               <button
                 type="submit"
-                className="text-gray-700 hover:text-gray-900"
+                className="text-gray-700 hover:text-gray-900 whitespace-nowrap"
               >
                 Sign Out
               </button>
@@ -48,4 +51,5 @@ export default function Header({ accountType }: HeaderProps) {
     </nav>
   );
 }
+
 
