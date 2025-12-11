@@ -1,16 +1,23 @@
--- Add internal_id to partners table (user-friendly identifier)
-ALTER TABLE public.partners
-ADD COLUMN internal_id TEXT;
+-- Add internal_id to partners table (user-friendly identifier) if it doesn't exist
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'partners') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'partners' AND column_name = 'internal_id') THEN
+      ALTER TABLE public.partners ADD COLUMN internal_id TEXT;
+    END IF;
+    
+    -- Make first_name optional (no mandatory fields) - only if it's currently NOT NULL
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'partners' AND column_name = 'first_name' AND is_nullable = 'NO') THEN
+      ALTER TABLE public.partners ALTER COLUMN first_name DROP NOT NULL;
+    END IF;
+  END IF;
+END $$;
 
--- Make first_name optional (no mandatory fields)
-ALTER TABLE public.partners
-ALTER COLUMN first_name DROP NOT NULL;
+-- Create index for internal_id lookups (if it doesn't exist)
+CREATE INDEX IF NOT EXISTS idx_partners_internal_id ON public.partners(user_id, internal_id);
 
--- Create index for internal_id lookups
-CREATE INDEX idx_partners_internal_id ON public.partners(user_id, internal_id);
-
--- Partner photos table
-CREATE TABLE public.partner_photos (
+-- Partner photos table (only if it doesn't exist)
+CREATE TABLE IF NOT EXISTS public.partner_photos (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   partner_id UUID REFERENCES public.partners(id) ON DELETE CASCADE NOT NULL,
   storage_path TEXT NOT NULL, -- Path in Supabase Storage
@@ -24,13 +31,20 @@ CREATE TABLE public.partner_photos (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Indexes for partner photos
-CREATE INDEX idx_partner_photos_partner_id ON public.partner_photos(partner_id);
-CREATE INDEX idx_partner_photos_uploaded_at ON public.partner_photos(uploaded_at);
+-- Indexes for partner photos (only if they don't exist)
+CREATE INDEX IF NOT EXISTS idx_partner_photos_partner_id ON public.partner_photos(partner_id);
+CREATE INDEX IF NOT EXISTS idx_partner_photos_uploaded_at ON public.partner_photos(uploaded_at);
 
 -- RLS policies for partner_photos
-ALTER TABLE public.partner_photos ENABLE ROW LEVEL SECURITY;
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'partner_photos') THEN
+    ALTER TABLE public.partner_photos ENABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;
 
+-- Drop policies if they exist, then recreate (to avoid conflicts)
+DROP POLICY IF EXISTS "Users can view own partner photos" ON public.partner_photos;
 CREATE POLICY "Users can view own partner photos"
   ON public.partner_photos FOR SELECT
   USING (
@@ -41,6 +55,7 @@ CREATE POLICY "Users can view own partner photos"
     )
   );
 
+DROP POLICY IF EXISTS "Users can insert own partner photos" ON public.partner_photos;
 CREATE POLICY "Users can insert own partner photos"
   ON public.partner_photos FOR INSERT
   WITH CHECK (
@@ -51,6 +66,7 @@ CREATE POLICY "Users can insert own partner photos"
     )
   );
 
+DROP POLICY IF EXISTS "Users can update own partner photos" ON public.partner_photos;
 CREATE POLICY "Users can update own partner photos"
   ON public.partner_photos FOR UPDATE
   USING (
@@ -61,6 +77,7 @@ CREATE POLICY "Users can update own partner photos"
     )
   );
 
+DROP POLICY IF EXISTS "Users can delete own partner photos" ON public.partner_photos;
 CREATE POLICY "Users can delete own partner photos"
   ON public.partner_photos FOR DELETE
   USING (
@@ -71,7 +88,8 @@ CREATE POLICY "Users can delete own partner photos"
     )
   );
 
--- Trigger for updated_at on partner_photos
+-- Trigger for updated_at on partner_photos (drop and recreate to avoid conflicts)
+DROP TRIGGER IF EXISTS update_partner_photos_updated_at ON public.partner_photos;
 CREATE TRIGGER update_partner_photos_updated_at BEFORE UPDATE ON public.partner_photos
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
