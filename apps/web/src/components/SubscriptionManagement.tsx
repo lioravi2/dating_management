@@ -24,32 +24,8 @@ export default function SubscriptionManagement({
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const router = useRouter();
 
-  const handleCancel = async () => {
-    if (!confirm('Are you sure you want to cancel your subscription? You will remain on Pro until the end of your billing period.')) {
-      return;
-    }
-
-    setLoading(true);
-    setMessage(null);
-
-    try {
-      const response = await fetch('/api/stripe/cancel-subscription', {
-        method: 'POST',
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to cancel subscription');
-      }
-
-      setMessage({ type: 'success', text: data.message || 'Subscription will be canceled at the end of the billing period.' });
-      router.refresh();
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || 'Error canceling subscription' });
-    } finally {
-      setLoading(false);
-    }
+  const handleCancel = () => {
+    router.push('/billing/cancel');
   };
 
   const handleResume = async () => {

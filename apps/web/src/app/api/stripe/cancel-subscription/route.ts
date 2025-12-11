@@ -17,6 +17,11 @@ const getStripeInstance = () => {
 
 export async function POST(request: NextRequest) {
   try {
+    const body = await request.json().catch(() => ({}));
+    const cancellationReason = body.reason || null;
+    
+    // TODO: Store cancellation reason in database for analytics
+    
     const supabase = createSupabaseRouteHandlerClient();
     const {
       data: { session },

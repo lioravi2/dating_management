@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import Header from '@/components/Header';
 import SubscriptionManagement from '@/components/SubscriptionManagement';
+import SyncPaymentsButton from '@/components/SyncPaymentsButton';
 import { formatPrice, getMonthlyPriceDisplay } from '@/lib/pricing';
 import type { Metadata } from 'next';
 
@@ -69,7 +70,12 @@ export default async function BillingPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold mb-4">Payment History</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Payment History</h2>
+            {(!payments || payments.length === 0) && user?.account_type === 'pro' && (
+              <SyncPaymentsButton />
+            )}
+          </div>
           {payments && payments.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">

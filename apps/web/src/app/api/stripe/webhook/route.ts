@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import Stripe from 'stripe';
 
 // Validate and initialize Stripe (lazy initialization to avoid build-time errors)
@@ -51,6 +52,8 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createSupabaseRouteHandlerClient();
+  // Use admin client for database writes to bypass RLS
+  const supabaseAdmin = createSupabaseAdminClient();
 
   try {
     switch (event.type) {
@@ -194,8 +197,8 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        // Get user by subscription ID
-        const { data: subData } = await supabase
+        // Get user by subscription ID (use admin client to bypass RLS)
+        const { data: subData } = await supabaseAdmin
           .from('subscriptions')
           .select('user_id')
           .eq('stripe_subscription_id', subscriptionId)
@@ -206,8 +209,8 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        // Store payment record
-        await supabase
+        // Store payment record (use admin client to bypass RLS)
+        const { error: paymentError } = await supabaseAdmin
           .from('payments')
           .insert({
             user_id: subData.user_id,
@@ -218,6 +221,10 @@ export async function POST(request: NextRequest) {
             status: 'succeeded',
             paid_at: new Date(invoice.created * 1000).toISOString(),
           });
+
+        if (paymentError) {
+          console.error('Error storing payment:', paymentError);
+        }
 
         break;
       }
