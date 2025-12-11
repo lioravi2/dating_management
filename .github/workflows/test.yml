@@ -48,4 +48,12 @@ jobs:
         working-directory: apps/web
         run: npm run build
         continue-on-error: true  # Don't fail if build has issues, we just want to verify it compiles
+      
+      - name: Cleanup test users
+        if: success()  # Only run if all previous steps succeeded
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        working-directory: apps/web
+        run: npx tsx scripts/cleanup-test-users.ts
 

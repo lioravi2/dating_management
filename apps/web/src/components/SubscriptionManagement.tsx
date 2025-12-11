@@ -90,13 +90,57 @@ export default function SubscriptionManagement({
     );
   }
 
+  const handleVerifySubscription = async () => {
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch('/api/stripe/verify-subscription', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to verify subscription');
+      }
+
+      setMessage({ type: 'success', text: data.message || 'Subscription verified successfully!' });
+      router.refresh();
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message || 'Error verifying subscription' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!subscription && accountType === 'pro') {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <p className="text-yellow-800 mb-2">Subscription information not available.</p>
-        <p className="text-sm text-yellow-700">
-          Your account is set to Pro, but subscription details are missing. Please contact support or try verifying your subscription.
-        </p>
+      <div className="space-y-4">
+        {message && (
+          <div
+            className={`p-3 rounded ${
+              message.type === 'success'
+                ? 'bg-green-50 text-green-800'
+                : 'bg-red-50 text-red-800'
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-yellow-800 mb-2">Subscription information not available.</p>
+          <p className="text-sm text-yellow-700 mb-4">
+            Your account is set to Pro, but subscription details are missing. This usually happens if the webhook didn't fire. Click below to sync your subscription from Stripe.
+          </p>
+          <button
+            onClick={handleVerifySubscription}
+            disabled={loading}
+            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Verifying...' : 'Sync Subscription from Stripe'}
+          </button>
+        </div>
       </div>
     );
   }
