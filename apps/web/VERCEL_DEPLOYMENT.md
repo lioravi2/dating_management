@@ -234,3 +234,4 @@ NEXT_PUBLIC_AMPLITUDE_API_KEY
 
 **Need help?** Check Vercel logs or Stripe webhook logs for detailed error messages.
 
+

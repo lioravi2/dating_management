@@ -12,15 +12,15 @@ interface PartnerFormProps {
 export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    internal_id: partner?.internal_id || '',
     first_name: partner?.first_name || '',
     last_name: partner?.last_name || '',
     email: partner?.email || '',
     phone_number: partner?.phone_number || '',
     description: partner?.description || '',
-    description_time: partner?.description_time
-      ? new Date(partner.description_time).toISOString().slice(0, 16)
-      : '',
+    facebook_profile: partner?.facebook_profile || '',
+    x_profile: partner?.x_profile || '',
+    linkedin_profile: partner?.linkedin_profile || '',
+    instagram_profile: partner?.instagram_profile || '',
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -41,19 +41,26 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       return;
     }
 
-    const partnerData = {
-      ...formData,
+    // Auto-update description_time if description changed
+    const descriptionChanged = partner && formData.description !== (partner.description || '');
+    
+    const partnerData: any = {
       user_id: user.id,
-      internal_id: formData.internal_id || null,
       first_name: formData.first_name || null,
       last_name: formData.last_name || null,
-      description_time: formData.description_time
-        ? new Date(formData.description_time).toISOString()
-        : null,
       email: formData.email || null,
       phone_number: formData.phone_number || null,
       description: formData.description || null,
+      facebook_profile: formData.facebook_profile || null,
+      x_profile: formData.x_profile || null,
+      linkedin_profile: formData.linkedin_profile || null,
+      instagram_profile: formData.instagram_profile || null,
     };
+
+    // Update description_time if description changed (only on update, not create)
+    if (partner && descriptionChanged && formData.description) {
+      partnerData.description_time = new Date().toISOString();
+    }
 
     if (partner) {
       // Update existing partner
@@ -88,32 +95,10 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label
-          htmlFor="internal_id"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
-          Internal ID (optional identifier)
-        </label>
-        <input
-          id="internal_id"
-          type="text"
-          value={formData.internal_id}
-          onChange={(e) =>
-            setFormData({ ...formData, internal_id: e.target.value })
-          }
-          placeholder="e.g., Partner-001"
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          Optional user-friendly identifier for this partner
-        </p>
-      </div>
-
-      <div>
-        <label
           htmlFor="first_name"
           className="block text-sm font-medium text-gray-700 mb-1"
         >
-          First Name
+          First Name *
         </label>
         <input
           id="first_name"
@@ -122,6 +107,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           onChange={(e) =>
             setFormData({ ...formData, first_name: e.target.value })
           }
+          required
           className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
         />
       </div>
@@ -196,24 +182,93 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           rows={4}
           className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
         />
+        {partner?.description_time && (
+          <p className="text-xs text-gray-500 mt-1">
+            Last updated: {new Date(partner.description_time).toLocaleString()}
+          </p>
+        )}
       </div>
 
-      <div>
-        <label
-          htmlFor="description_time"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
-          Description Time
-        </label>
-        <input
-          id="description_time"
-          type="datetime-local"
-          value={formData.description_time}
-          onChange={(e) =>
-            setFormData({ ...formData, description_time: e.target.value })
-          }
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-        />
+      <div className="border-t pt-4 mt-4">
+        <h3 className="text-lg font-semibold mb-4">Social Media Profiles</h3>
+        
+        <div className="space-y-4">
+          <div>
+            <label
+              htmlFor="facebook_profile"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Facebook Profile
+            </label>
+            <input
+              id="facebook_profile"
+              type="url"
+              value={formData.facebook_profile}
+              onChange={(e) =>
+                setFormData({ ...formData, facebook_profile: e.target.value })
+              }
+              placeholder="https://facebook.com/..."
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="x_profile"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              X (Twitter) Profile
+            </label>
+            <input
+              id="x_profile"
+              type="url"
+              value={formData.x_profile}
+              onChange={(e) =>
+                setFormData({ ...formData, x_profile: e.target.value })
+              }
+              placeholder="https://x.com/..."
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="linkedin_profile"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              LinkedIn Profile
+            </label>
+            <input
+              id="linkedin_profile"
+              type="url"
+              value={formData.linkedin_profile}
+              onChange={(e) =>
+                setFormData({ ...formData, linkedin_profile: e.target.value })
+              }
+              placeholder="https://linkedin.com/in/..."
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="instagram_profile"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Instagram Profile
+            </label>
+            <input
+              id="instagram_profile"
+              type="url"
+              value={formData.instagram_profile}
+              onChange={(e) =>
+                setFormData({ ...formData, instagram_profile: e.target.value })
+              }
+              placeholder="https://instagram.com/..."
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+        </div>
       </div>
 
       {message && (

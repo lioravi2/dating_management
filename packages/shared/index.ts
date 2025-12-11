@@ -38,13 +38,16 @@ export interface User {
 export interface Partner {
   id: string;
   user_id: string;
-  internal_id: string | null;
   first_name: string | null;
   last_name: string | null;
   email: string | null;
   phone_number: string | null;
   description: string | null;
   description_time: string | null;
+  facebook_profile: string | null;
+  x_profile: string | null;
+  linkedin_profile: string | null;
+  instagram_profile: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -91,13 +94,15 @@ export interface Subscription {
 
 // Validation Schemas
 export const PartnerSchema = z.object({
-  internal_id: z.string().optional(),
-  first_name: z.string().optional(),
+  first_name: z.string().min(1, 'First name is required'),
   last_name: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   phone_number: z.string().optional(),
   description: z.string().optional(),
-  description_time: z.string().optional(),
+  facebook_profile: z.string().url().optional().or(z.literal('')),
+  x_profile: z.string().url().optional().or(z.literal('')),
+  linkedin_profile: z.string().url().optional().or(z.literal('')),
+  instagram_profile: z.string().url().optional().or(z.literal('')),
 });
 
 export const PartnerNoteSchema = z.object({

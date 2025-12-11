@@ -55,7 +55,7 @@ export default async function PartnerDetailPage({
           <div className="flex justify-between items-start mb-4">
             <div>
               <h1 className="text-3xl font-bold">
-                {partner.first_name || partner.last_name || partner.internal_id || 'Unnamed Partner'}
+                {partner.first_name || partner.last_name || 'Unnamed Partner'}
                 {partner.first_name && partner.last_name && ` ${partner.last_name}`}
               </h1>
               <p className="text-gray-600 mt-2">
@@ -100,6 +100,64 @@ export default async function PartnerDetailPage({
                   Updated {new Date(partner.description_time).toLocaleString()}
                 </p>
               )}
+            </div>
+          )}
+
+          {(partner.facebook_profile || partner.x_profile || partner.linkedin_profile || partner.instagram_profile) && (
+            <div className="mt-6 pt-6 border-t">
+              <label className="text-sm font-medium text-gray-700 mb-3 block">
+                Social Media Profiles
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {partner.facebook_profile && (
+                  <div>
+                    <a
+                      href={partner.facebook_profile}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Facebook Profile
+                    </a>
+                  </div>
+                )}
+                {partner.x_profile && (
+                  <div>
+                    <a
+                      href={partner.x_profile}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 underline"
+                    >
+                      X (Twitter) Profile
+                    </a>
+                  </div>
+                )}
+                {partner.linkedin_profile && (
+                  <div>
+                    <a
+                      href={partner.linkedin_profile}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 underline"
+                    >
+                      LinkedIn Profile
+                    </a>
+                  </div>
+                )}
+                {partner.instagram_profile && (
+                  <div>
+                    <a
+                      href={partner.instagram_profile}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Instagram Profile
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
