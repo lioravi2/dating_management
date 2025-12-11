@@ -290,6 +290,7 @@ function ActivityForm({
   const [formData, setFormData] = useState({
     start_date: new Date().toISOString().split('T')[0],
     start_time: new Date().toTimeString().slice(0, 5),
+    has_end_time: false,
     end_date: '',
     end_time: '',
     all_day: false,
@@ -305,7 +306,7 @@ function ActivityForm({
       ? new Date(`${formData.start_date}T00:00:00`).toISOString()
       : new Date(`${formData.start_date}T${formData.start_time}:00`).toISOString();
     
-    const endDateTime = formData.end_date
+    const endDateTime = formData.has_end_time && formData.end_date
       ? (formData.all_day
           ? new Date(`${formData.end_date}T23:59:59`).toISOString()
           : formData.end_time
@@ -367,15 +368,9 @@ function ActivityForm({
               <input
                 type="date"
                 value={formData.start_date}
-                onChange={(e) => {
-                  const newStartDate = e.target.value;
-                  setFormData({
-                    ...formData,
-                    start_date: newStartDate,
-                    // Auto-populate end_date if it's empty
-                    end_date: formData.end_date || newStartDate,
-                  });
-                }}
+                onChange={(e) =>
+                  setFormData({ ...formData, start_date: e.target.value })
+                }
                 required
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
@@ -389,15 +384,9 @@ function ActivityForm({
                 <input
                   type="time"
                   value={formData.start_time}
-                  onChange={(e) => {
-                    const newStartTime = e.target.value;
-                    setFormData({
-                      ...formData,
-                      start_time: newStartTime,
-                      // Auto-populate end_time if it's empty
-                      end_time: formData.end_time || newStartTime,
-                    });
-                  }}
+                  onChange={(e) =>
+                    setFormData({ ...formData, start_time: e.target.value })
+                  }
                   required
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
@@ -405,48 +394,77 @@ function ActivityForm({
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                End Date (optional)
-              </label>
+          <div className="mt-4">
+            <div className="flex items-center mb-4">
               <input
-                type="date"
-                value={formData.end_date}
-                onChange={(e) =>
-                  setFormData({ ...formData, end_date: e.target.value })
-                }
-                onFocus={(e) => {
-                  // When user clicks/focuses on end_date, populate with start_date if empty
-                  if (!formData.end_date && formData.start_date) {
-                    setFormData({ ...formData, end_date: formData.start_date });
-                  }
+                type="checkbox"
+                id="has_end_time"
+                checked={formData.has_end_time}
+                onChange={(e) => {
+                  const hasEndTime = e.target.checked;
+                  setFormData({
+                    ...formData,
+                    has_end_time: hasEndTime,
+                    // Prefill with start values when checkbox is checked
+                    end_date: hasEndTime && !formData.end_date ? formData.start_date : formData.end_date,
+                    end_time: hasEndTime && !formData.end_time ? formData.start_time : formData.end_time,
+                  });
                 }}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
               />
+              <label htmlFor="has_end_time" className="ml-2 block text-sm text-gray-700">
+                Has end time
+              </label>
             </div>
 
-            {!formData.all_day && formData.end_date && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  End Time (optional)
-                </label>
-                <input
-                  type="time"
-                  value={formData.end_time}
-                  onChange={(e) =>
-                    setFormData({ ...formData, end_time: e.target.value })
-                  }
-                  onFocus={(e) => {
-                    // When user clicks/focuses on end_time, populate with start_time if empty
-                    if (!formData.end_time && formData.start_time) {
-                      setFormData({ ...formData, end_time: formData.start_time });
+            {formData.has_end_time && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    End Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.end_date}
+                    onChange={(e) =>
+                      setFormData({ ...formData, end_date: e.target.value })
                     }
-                  }}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
+                    onFocus={(e) => {
+                      // When user clicks/focuses on end_date, populate with start_date if empty
+                      if (!formData.end_date && formData.start_date) {
+                        setFormData({ ...formData, end_date: formData.start_date });
+                      }
+                    }}
+                    required
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+
+                {!formData.all_day && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      End Time *
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.end_time}
+                      onChange={(e) =>
+                        setFormData({ ...formData, end_time: e.target.value })
+                      }
+                      onFocus={(e) => {
+                        // When user clicks/focuses on end_time, populate with start_time if empty
+                        if (!formData.end_time && formData.start_time) {
+                          setFormData({ ...formData, end_time: formData.start_time });
+                        }
+                      }}
+                      required
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+                )}
               </div>
             )}
+          </div>
           </div>
         </div>
 
