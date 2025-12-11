@@ -94,7 +94,9 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           setMessage(result.error || 'Error creating partner');
         }
       } else {
-        router.push(`/partners/${result.data.id}`);
+        // Refresh the router to ensure fresh data, then redirect to partners list
+        router.refresh();
+        router.push('/partners');
       }
     }
     setLoading(false);
