@@ -61,12 +61,30 @@ export default function EditPartnerPage() {
     );
   }
 
+  const partnerDisplayName = partner
+    ? (partner.first_name && partner.last_name
+        ? `${partner.first_name} ${partner.last_name}`
+        : partner.first_name || partner.last_name || partner.internal_id || 'Unnamed Partner')
+    : 'Partner';
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header accountType={accountType} />
-      <Breadcrumbs />
+      <Breadcrumbs customItems={[
+        { label: partnerDisplayName, href: `/partners/${partnerId}` },
+        { label: 'Edit', href: `/partners/${partnerId}/edit` }
+      ]} />
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-4">
+          <Link
+            href={`/partners/${partnerId}`}
+            className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <span className="mr-2">←</span>
+            Back to Partner
+          </Link>
+        </div>
         <div className="bg-white rounded-lg shadow p-6">
           <h1 className="text-2xl font-bold mb-6">Edit Partner</h1>
           {loading ? (

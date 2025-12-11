@@ -8,7 +8,11 @@ interface BreadcrumbItem {
   href: string;
 }
 
-export default function Breadcrumbs() {
+interface BreadcrumbsProps {
+  customItems?: BreadcrumbItem[];
+}
+
+export default function Breadcrumbs({ customItems }: BreadcrumbsProps = {}) {
   const pathname = usePathname();
   
   // Don't show breadcrumbs on home page or auth pages
@@ -33,6 +37,21 @@ export default function Breadcrumbs() {
   // Add billing breadcrumb
   if (pathname === '/billing') {
     breadcrumbs.push({ label: 'Billing', href: '/billing' });
+  }
+
+  // Add partners breadcrumb
+  if (pathname.startsWith('/partners')) {
+    breadcrumbs.push({ label: 'Partners', href: '/partners' });
+    
+    // Add partner detail breadcrumb if customItems provided
+    if (customItems && customItems.length > 0) {
+      breadcrumbs.push(...customItems);
+    }
+  }
+
+  // Use custom items if provided (for dynamic routes)
+  if (customItems && customItems.length > 0 && !pathname.startsWith('/partners')) {
+    breadcrumbs.push(...customItems);
   }
 
   return (
