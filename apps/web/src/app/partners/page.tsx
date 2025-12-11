@@ -23,11 +23,15 @@ export default async function PartnersPage() {
     .eq('id', session.user.id)
     .single();
 
-  const { data: partners } = await supabase
+  const { data: partners, error: partnersError } = await supabase
     .from('partners')
     .select('*')
     .eq('user_id', session.user.id)
     .order('created_at', { ascending: false });
+
+  if (partnersError) {
+    console.error('Error fetching partners:', partnersError);
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -45,6 +49,13 @@ export default async function PartnersPage() {
           </Link>
         </div>
 
+        {partnersError && (
+          <div className="bg-red-50 text-red-800 p-4 rounded-lg mb-4">
+            <p className="font-semibold">Error loading partners:</p>
+            <p className="text-sm">{partnersError.message}</p>
+          </div>
+        )}
+        
         {partners && partners.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {partners.map((partner: Partner) => (
