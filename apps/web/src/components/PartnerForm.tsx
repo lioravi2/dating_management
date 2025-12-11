@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import Link from 'next/link';
 import type { Partner } from '@/shared';
 
 interface PartnerFormProps {
@@ -75,17 +76,25 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         router.push(`/partners/${partner.id}`);
       }
     } else {
-      // Create new partner
-      const { data, error } = await supabase
-        .from('partners')
-        .insert(partnerData)
-        .select()
-        .single();
+      // Create new partner via API route (for server-side validation)
+      const response = await fetch('/api/partners', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(partnerData),
+      });
 
-      if (error) {
-        setMessage(error.message);
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (result.error === 'PARTNER_LIMIT_REACHED') {
+          setMessage(result.message);
+        } else {
+          setMessage(result.error || 'Error creating partner');
+        }
       } else {
-        router.push(`/partners/${data.id}`);
+        router.push(`/partners/${result.data.id}`);
       }
     }
     setLoading(false);
@@ -274,12 +283,22 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       {message && (
         <div
           className={`mb-4 p-3 rounded ${
-            message.includes('Error') || message.includes('error') || message.includes('violates') || message.includes('Not authenticated')
+            message.includes('Error') || message.includes('error') || message.includes('violates') || message.includes('Not authenticated') || message.includes('limited')
               ? 'bg-red-50 text-red-800'
               : 'bg-green-50 text-green-800'
           }`}
         >
-          {message}
+          <div className="flex flex-col gap-2">
+            <span>{message}</span>
+            {message.includes('limited') && (
+              <Link
+                href="/upgrade"
+                className="inline-block mt-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors text-center"
+              >
+                Upgrade to Pro
+              </Link>
+            )}
+          </div>
         </div>
       )}
 
