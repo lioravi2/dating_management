@@ -284,3 +284,4 @@ DROP TRIGGER IF EXISTS update_partner_photos_updated_at ON public.partner_photos
 CREATE TRIGGER update_partner_photos_updated_at BEFORE UPDATE ON public.partner_photos
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+

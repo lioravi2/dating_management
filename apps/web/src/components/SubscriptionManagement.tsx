@@ -2,13 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getMonthlyPriceDisplay } from '@/lib/pricing';
+import { formatPrice } from '@/lib/pricing';
 
 interface Subscription {
   id: string;
   status: string;
   cancel_at_period_end: boolean;
   current_period_end: string | null;
+  price_amount: number | null;
+  billing_interval: 'day' | 'month' | 'year' | null;
 }
 
 interface SubscriptionManagementProps {
@@ -183,9 +185,12 @@ export default function SubscriptionManagement({
                 day: 'numeric',
               })}
             </p>
-            {!isCanceled && (
+            {!isCanceled && subscription.price_amount && subscription.billing_interval && (
               <p className="text-sm text-gray-600 mt-1">
-                Your subscription will automatically renew on this date for {getMonthlyPriceDisplay()}.
+                Your subscription will automatically renew on this date for {formatPrice(subscription.price_amount)}
+                {subscription.billing_interval === 'day' && ' per day'}
+                {subscription.billing_interval === 'month' && ' per month'}
+                {subscription.billing_interval === 'year' && ' per year'}.
               </p>
             )}
             {isCanceled && (
@@ -196,7 +201,7 @@ export default function SubscriptionManagement({
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {isActive && (
             <button
               onClick={handleCancel}
@@ -215,6 +220,13 @@ export default function SubscriptionManagement({
               {loading ? 'Processing...' : 'Resume Subscription'}
             </button>
           )}
+          <button
+            onClick={handleVerifySubscription}
+            disabled={loading}
+            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Syncing...' : 'Sync Subscription from Stripe'}
+          </button>
         </div>
       </div>
     </div>

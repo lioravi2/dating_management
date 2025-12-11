@@ -70,3 +70,4 @@ DROP TRIGGER IF EXISTS update_partner_notes_updated_at ON public.partner_notes;
 CREATE TRIGGER update_partner_notes_updated_at BEFORE UPDATE ON public.partner_notes
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+

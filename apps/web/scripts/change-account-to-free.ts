@@ -132,3 +132,4 @@ changeAccountToFree(email)
     process.exit(1);
   });
 
+

@@ -92,6 +92,8 @@ export interface Subscription {
   plan_type: 'pro';
   current_period_start: string | null;
   current_period_end: string | null;
+  price_amount: number | null;
+  billing_interval: 'day' | 'month' | 'year' | null;
   created_at: string;
   updated_at: string;
 }

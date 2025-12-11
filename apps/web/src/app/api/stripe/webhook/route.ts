@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import Stripe from 'stripe';
+import { extractSubscriptionPrice } from '@/lib/stripe-helpers';
 
 // Validate and initialize Stripe (lazy initialization to avoid build-time errors)
 const getStripeInstance = () => {
@@ -71,8 +72,11 @@ export async function POST(request: NextRequest) {
         if (subscriptionId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
           
-          // Update subscription status
-          await supabase
+          // Extract price information
+          const { price_amount, billing_interval } = extractSubscriptionPrice(subscription);
+          
+          // Update subscription status (use admin client to bypass RLS)
+          await supabaseAdmin
             .from('subscriptions')
             .update({
               status: 'active',
@@ -84,6 +88,8 @@ export async function POST(request: NextRequest) {
               current_period_end: new Date(
                 subscription.current_period_end * 1000
               ).toISOString(),
+              price_amount,
+              billing_interval,
             })
             .eq('user_id', userId);
 
@@ -116,8 +122,11 @@ export async function POST(request: NextRequest) {
         const isCanceled = subscription.cancel_at_period_end || subscription.status === 'canceled';
         const isActive = subscription.status === 'active' && !subscription.cancel_at_period_end;
 
-        // Update subscription
-        await supabase
+        // Extract price information
+        const { price_amount, billing_interval } = extractSubscriptionPrice(subscription);
+
+        // Update subscription (use admin client to bypass RLS)
+        await supabaseAdmin
           .from('subscriptions')
           .update({
             status: subscription.status === 'active' ? 'active' : 'canceled',
@@ -128,6 +137,8 @@ export async function POST(request: NextRequest) {
             current_period_end: new Date(
               subscription.current_period_end * 1000
             ).toISOString(),
+            price_amount,
+            billing_interval,
           })
           .eq('user_id', subData.user_id);
 

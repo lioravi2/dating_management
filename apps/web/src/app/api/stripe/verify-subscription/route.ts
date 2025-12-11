@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import Stripe from 'stripe';
+import { extractSubscriptionPrice } from '@/lib/stripe-helpers';
 
 // Validate and initialize Stripe
 const getStripeInstance = () => {
@@ -92,6 +93,9 @@ export async function POST(request: NextRequest) {
                 // Get customer ID from subscription
                 customerId = stripeSubscription.customer as string;
                 
+                // Extract price information
+                const { price_amount, billing_interval } = extractSubscriptionPrice(stripeSubscription);
+                
                 // Store everything in database
                 const subscriptionData = {
                   user_id: userId,
@@ -105,6 +109,8 @@ export async function POST(request: NextRequest) {
                   current_period_end: new Date(
                     stripeSubscription.current_period_end * 1000
                   ).toISOString(),
+                  price_amount,
+                  billing_interval,
                 };
                 
                 console.log('Upserting subscription data:', JSON.stringify(subscriptionData, null, 2));
@@ -192,6 +198,9 @@ export async function POST(request: NextRequest) {
               if (activeSubscription) {
                 console.log('Found active subscription:', activeSubscription.id);
                 
+                // Extract price information
+                const { price_amount, billing_interval } = extractSubscriptionPrice(activeSubscription);
+                
                 // Update database
                 const { error: upsertError } = await supabaseAdmin
                   .from('subscriptions')
@@ -207,6 +216,8 @@ export async function POST(request: NextRequest) {
                     current_period_end: new Date(
                       activeSubscription.current_period_end * 1000
                     ).toISOString(),
+                    price_amount,
+                    billing_interval,
                   }, {
                     onConflict: 'user_id'
                   });
@@ -269,8 +280,11 @@ export async function POST(request: NextRequest) {
           .find(sub => sub.status === 'active' || sub.status === 'trialing');
 
         if (activeSubscription) {
+          // Extract price information
+          const { price_amount, billing_interval } = extractSubscriptionPrice(activeSubscription);
+          
           // Update database with subscription
-          const { error: updateError } = await supabase
+          const { error: updateError } = await supabaseAdmin
             .from('subscriptions')
             .upsert({
               user_id: userId,
@@ -284,6 +298,8 @@ export async function POST(request: NextRequest) {
               current_period_end: new Date(
                 activeSubscription.current_period_end * 1000
               ).toISOString(),
+              price_amount,
+              billing_interval,
             }, {
               onConflict: 'user_id'
             });
@@ -324,6 +340,9 @@ export async function POST(request: NextRequest) {
         );
 
         if (stripeSubscription.status === 'active' || stripeSubscription.status === 'trialing') {
+          // Extract price information
+          const { price_amount, billing_interval } = extractSubscriptionPrice(stripeSubscription);
+          
           // Update database
           await supabaseAdmin
             .from('subscriptions')
@@ -336,6 +355,8 @@ export async function POST(request: NextRequest) {
               current_period_end: new Date(
                 stripeSubscription.current_period_end * 1000
               ).toISOString(),
+              price_amount,
+              billing_interval,
             })
             .eq('user_id', userId);
 

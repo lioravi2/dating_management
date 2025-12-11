@@ -2,3 +2,4 @@
 ALTER TABLE public.subscriptions
 ADD COLUMN cancellation_reason TEXT;
 
+

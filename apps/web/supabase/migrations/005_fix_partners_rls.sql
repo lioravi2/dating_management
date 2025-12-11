@@ -25,3 +25,4 @@ CREATE POLICY "Users can delete own partners"
   ON public.partners FOR DELETE
   USING (auth.uid() = user_id);
 
+

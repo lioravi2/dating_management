@@ -112,3 +112,4 @@ npx tsx scripts/change-subscription-to-daily.ts user@example.com
 - Make sure `.env.local` exists in `apps/web/`
 - Verify all required variables are set
 
+
