@@ -30,28 +30,55 @@ This document tracks the phased development approach for the Dating Management A
 - [x] Change detection for save button
 - [x] Notification system (replaces popups)
 
-## 🔜 Phase 4: Subscription Infrastructure
+## ✅ Phase 4: Subscription Infrastructure
 
-- [ ] Subscription table in database
-- [ ] Account type column in users table
-- [ ] Upgrade page UI (currently shows but not functional)
-- [ ] Account type switching logic
-- [ ] Subscription status display
+- [x] Subscription table in database
+- [x] Account type column in users table
+- [x] Upgrade page UI
+- [x] Account type switching logic
+- [x] Subscription status display
+- [x] Billing page with subscription management
+- [x] Cancel/Resume subscription functionality
 
-## 🔜 Phase 5: Payment Integration
+## ✅ Phase 5: Payment Integration
 
-- [ ] Stripe account setup
-- [ ] Stripe Checkout integration (code exists but requires Phase 4)
-- [ ] Webhook handling (code exists but requires Phase 4)
-- [ ] Subscription status management
-- [ ] Test payment flow
+- [x] Stripe account setup
+- [x] Stripe Checkout integration
+- [x] Webhook handling
+- [x] Subscription status management
+- [x] Payment history sync
+- [x] Test payment flow
 
-## 🔜 Phase 6: Core Features
+## 🔄 Phase 6: Partners Management (In Progress)
 
-- [ ] Partners CRUD
-- [ ] Partner Notes (with free tier limit)
+### 6.1: Basic Partner Management
+- [ ] Update partners schema (remove mandatory fields, add internal_id)
+- [ ] Create partner_photos table
+- [ ] Partner CRUD with photo support
+- [ ] Add/delete photos functionality
+- [ ] Photo upload and storage (Supabase Storage)
+
+### 6.2: Subscription Limits
+- [ ] Enforce 10 partners limit for free tier
+- [ ] Upgrade prompt when limit reached
+
+### 6.3: Photo Sharing & Face Recognition
+- [ ] Research face recognition solutions
+- [ ] Implement photo sharing from other apps
+- [ ] Face matching across partner photos
+- [ ] Merge/create/view partner flow
+
+## 🔜 Phase 7: Partner Notes & Integrations
+
+- [ ] Partner Notes (with free tier limit) - partially implemented
 - [ ] Google Calendar sync
-- [ ] Analytics integration
+- [ ] Amplitude analytics integration
+
+## 🔜 Phase 8: Mobile App
+
+- [ ] React Native app setup
+- [ ] Core features port
+- [ ] Mobile-specific optimizations
 
 ## Notes
 
