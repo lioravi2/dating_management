@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import Stripe from 'stripe';
 
 // Validate and initialize Stripe
@@ -41,8 +42,11 @@ export async function POST(request: NextRequest) {
 
     console.log('Verifying subscription for user:', userId, 'email:', userEmail);
 
-    // First, try to get customer ID from database
-    const { data: dbSubscription } = await supabase
+    // Use admin client for database writes to bypass RLS
+    const supabaseAdmin = createSupabaseAdminClient();
+
+    // First, try to get customer ID from database (use admin client for reads too to be consistent)
+    const { data: dbSubscription } = await supabaseAdmin
       .from('subscriptions')
       .select('stripe_subscription_id, stripe_customer_id')
       .eq('user_id', userId)
@@ -105,7 +109,7 @@ export async function POST(request: NextRequest) {
                 
                 console.log('Upserting subscription data:', JSON.stringify(subscriptionData, null, 2));
                 
-                const { data: upsertedData, error: upsertError } = await supabase
+                const { data: upsertedData, error: upsertError } = await supabaseAdmin
                   .from('subscriptions')
                   .upsert(subscriptionData, {
                     onConflict: 'user_id'
@@ -123,7 +127,7 @@ export async function POST(request: NextRequest) {
                 console.log('Subscription upserted successfully:', upsertedData);
 
                 // Update user account type
-                const { error: userUpdateError } = await supabase
+                const { error: userUpdateError } = await supabaseAdmin
                   .from('users')
                   .update({ account_type: 'pro' })
                   .eq('id', userId);
@@ -189,7 +193,7 @@ export async function POST(request: NextRequest) {
                 console.log('Found active subscription:', activeSubscription.id);
                 
                 // Update database
-                const { error: upsertError } = await supabase
+                const { error: upsertError } = await supabaseAdmin
                   .from('subscriptions')
                   .upsert({
                     user_id: userId,
@@ -216,7 +220,7 @@ export async function POST(request: NextRequest) {
                 }
 
                 // Update user account type
-                const { error: userUpdateError } = await supabase
+                const { error: userUpdateError } = await supabaseAdmin
                   .from('users')
                   .update({ account_type: 'pro' })
                   .eq('id', userId);
@@ -234,7 +238,7 @@ export async function POST(request: NextRequest) {
             
             // If we found customers but no active subscription, store the first customer ID
             customerId = customers.data[0].id;
-            await supabase
+            await supabaseAdmin
               .from('subscriptions')
               .upsert({
                 user_id: userId,
@@ -293,7 +297,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Update user account type
-          const { error: userUpdateError } = await supabase
+          const { error: userUpdateError } = await supabaseAdmin
             .from('users')
             .update({ account_type: 'pro' })
             .eq('id', userId);
@@ -321,7 +325,7 @@ export async function POST(request: NextRequest) {
 
         if (stripeSubscription.status === 'active' || stripeSubscription.status === 'trialing') {
           // Update database
-          await supabase
+          await supabaseAdmin
             .from('subscriptions')
             .update({
               status: 'active',
@@ -336,7 +340,7 @@ export async function POST(request: NextRequest) {
             .eq('user_id', userId);
 
           // Update user account type
-          await supabase
+          await supabaseAdmin
             .from('users')
             .update({ account_type: 'pro' })
             .eq('id', userId);
