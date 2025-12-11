@@ -20,6 +20,7 @@ export default function CancelSubscriptionPage() {
     setMessage(null);
 
     try {
+      console.log('Canceling subscription with reason:', cancellationReason);
       const response = await fetch('/api/stripe/cancel-subscription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -27,6 +28,7 @@ export default function CancelSubscriptionPage() {
       });
 
       const data = await response.json();
+      console.log('Cancel subscription response:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to cancel subscription');
@@ -37,8 +39,10 @@ export default function CancelSubscriptionPage() {
       // Redirect to billing page after 2 seconds
       setTimeout(() => {
         router.push('/billing');
+        router.refresh();
       }, 2000);
     } catch (error: any) {
+      console.error('Cancel subscription error:', error);
       setMessage({ type: 'error', text: error.message || 'Error canceling subscription' });
     } finally {
       setLoading(false);

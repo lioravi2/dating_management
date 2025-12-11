@@ -31,23 +31,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's subscription
-    const { data: subscription, error: subError } = await supabase
+    // Get user's subscription (use admin client to bypass RLS)
+    const { data: subscription, error: subError } = await supabaseAdmin
       .from('subscriptions')
-      .select('stripe_subscription_id, status')
+      .select('stripe_subscription_id, status, cancel_at_period_end')
       .eq('user_id', session.user.id)
-      .single();
+      .maybeSingle();
 
-    if (subError || !subscription) {
+    if (subError) {
+      console.error('Error fetching subscription:', subError);
       return NextResponse.json(
-        { error: 'No active subscription found' },
+        { error: `Failed to fetch subscription: ${subError.message}` },
+        { status: 500 }
+      );
+    }
+
+    if (!subscription) {
+      return NextResponse.json(
+        { error: 'No subscription found' },
         { status: 404 }
       );
     }
 
-    if (subscription.status !== 'active') {
+    // Check if already canceled
+    if (subscription.cancel_at_period_end) {
       return NextResponse.json(
-        { error: 'Subscription is not active' },
+        { error: 'Subscription is already scheduled for cancellation' },
+        { status: 400 }
+      );
+    }
+
+    if (subscription.status !== 'active' && subscription.status !== 'trialing') {
+      return NextResponse.json(
+        { error: `Subscription is not active (status: ${subscription.status})` },
         { status: 400 }
       );
     }
@@ -71,7 +87,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Update database (use admin client to bypass RLS)
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from('subscriptions')
       .update({
         cancel_at_period_end: true,
@@ -81,6 +97,14 @@ export async function POST(request: NextRequest) {
         ).toISOString(),
       })
       .eq('user_id', session.user.id);
+
+    if (updateError) {
+      console.error('Error updating subscription:', updateError);
+      return NextResponse.json(
+        { error: `Failed to update subscription: ${updateError.message}` },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       message: 'Subscription will be canceled at the end of the billing period',
