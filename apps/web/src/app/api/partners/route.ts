@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { FREE_TIER_PARTNER_LIMIT } from '@/lib/pricing';
@@ -78,9 +77,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    // Revalidate the partners page to show the new partner
-    revalidatePath('/partners');
 
     return NextResponse.json({ data: partner }, { status: 201 });
   } catch (error: any) {
