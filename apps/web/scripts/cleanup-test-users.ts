@@ -62,6 +62,18 @@ async function cleanupTestUsers() {
     let deletedCount = 0;
     for (const user of testUsers) {
       try {
+        // First, delete from public.users table if it exists
+        const { error: profileError } = await supabaseAdmin
+          .from('users')
+          .delete()
+          .eq('id', user.id);
+        
+        if (profileError) {
+          console.warn(`⚠ Could not delete profile for ${user.email}:`, profileError.message);
+          // Continue anyway - profile might not exist
+        }
+
+        // Then delete from auth.users
         const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
         if (deleteError) {
           console.error(`✗ Error deleting ${user.email}:`, deleteError.message);
@@ -91,4 +103,5 @@ cleanupTestUsers()
     console.error('Fatal error:', error);
     process.exit(1);
   });
+
 

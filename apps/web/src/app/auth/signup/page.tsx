@@ -132,7 +132,17 @@ export default function SignUpPage() {
                 : 'bg-red-50 text-red-800'
             }`}
           >
-            {message}
+            {message.includes('A user with this email already exists') ? (
+              <>
+                A user with this email already exists. Would you like to{' '}
+                <Link href="/auth/signin" className="underline font-semibold">
+                  sign in
+                </Link>{' '}
+                instead?
+              </>
+            ) : (
+              message
+            )}
           </div>
         )}
 
