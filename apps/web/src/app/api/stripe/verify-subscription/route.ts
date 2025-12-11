@@ -89,29 +89,48 @@ export async function POST(request: NextRequest) {
                 customerId = stripeSubscription.customer as string;
                 
                 // Store everything in database
-                await supabase
+                const subscriptionData = {
+                  user_id: userId,
+                  stripe_subscription_id: subscriptionId,
+                  stripe_customer_id: customerId,
+                  status: 'active',
+                  cancel_at_period_end: stripeSubscription.cancel_at_period_end || false,
+                  current_period_start: new Date(
+                    stripeSubscription.current_period_start * 1000
+                  ).toISOString(),
+                  current_period_end: new Date(
+                    stripeSubscription.current_period_end * 1000
+                  ).toISOString(),
+                };
+                
+                console.log('Upserting subscription data:', JSON.stringify(subscriptionData, null, 2));
+                
+                const { data: upsertedData, error: upsertError } = await supabase
                   .from('subscriptions')
-                  .upsert({
-                    user_id: userId,
-                    stripe_subscription_id: subscriptionId,
-                    stripe_customer_id: customerId,
-                    status: 'active',
-                    cancel_at_period_end: stripeSubscription.cancel_at_period_end || false,
-                    current_period_start: new Date(
-                      stripeSubscription.current_period_start * 1000
-                    ).toISOString(),
-                    current_period_end: new Date(
-                      stripeSubscription.current_period_end * 1000
-                    ).toISOString(),
-                  }, {
+                  .upsert(subscriptionData, {
                     onConflict: 'user_id'
-                  });
+                  })
+                  .select();
+
+                if (upsertError) {
+                  console.error('Error upserting subscription:', upsertError);
+                  return NextResponse.json({ 
+                    success: false,
+                    error: `Failed to save subscription: ${upsertError.message}`,
+                  }, { status: 500 });
+                }
+
+                console.log('Subscription upserted successfully:', upsertedData);
 
                 // Update user account type
-                await supabase
+                const { error: userUpdateError } = await supabase
                   .from('users')
                   .update({ account_type: 'pro' })
                   .eq('id', userId);
+
+                if (userUpdateError) {
+                  console.error('Error updating user account type:', userUpdateError);
+                }
 
                 console.log('Subscription verified and updated from checkout session');
                 return NextResponse.json({ 
@@ -170,7 +189,7 @@ export async function POST(request: NextRequest) {
                 console.log('Found active subscription:', activeSubscription.id);
                 
                 // Update database
-                await supabase
+                const { error: upsertError } = await supabase
                   .from('subscriptions')
                   .upsert({
                     user_id: userId,
@@ -188,11 +207,23 @@ export async function POST(request: NextRequest) {
                     onConflict: 'user_id'
                   });
 
+                if (upsertError) {
+                  console.error('Error upserting subscription:', upsertError);
+                  return NextResponse.json({ 
+                    success: false,
+                    error: `Failed to save subscription: ${upsertError.message}`,
+                  }, { status: 500 });
+                }
+
                 // Update user account type
-                await supabase
+                const { error: userUpdateError } = await supabase
                   .from('users')
                   .update({ account_type: 'pro' })
                   .eq('id', userId);
+
+                if (userUpdateError) {
+                  console.error('Error updating user account type:', userUpdateError);
+                }
 
                 return NextResponse.json({ 
                   success: true,
@@ -255,6 +286,10 @@ export async function POST(request: NextRequest) {
 
           if (updateError) {
             console.error('Error updating subscription:', updateError);
+            return NextResponse.json({ 
+              success: false,
+              error: `Failed to save subscription: ${updateError.message}`,
+            }, { status: 500 });
           }
 
           // Update user account type
