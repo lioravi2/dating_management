@@ -405,9 +405,9 @@ function ActivityForm({
                   setFormData({
                     ...formData,
                     has_end_time: hasEndTime,
-                    // Prefill with start values when checkbox is checked
-                    end_date: hasEndTime && !formData.end_date ? formData.start_date : formData.end_date,
-                    end_time: hasEndTime && !formData.end_time ? formData.start_time : formData.end_time,
+                    // Always copy start values when checkbox is checked
+                    end_date: hasEndTime ? formData.start_date : formData.end_date,
+                    end_time: hasEndTime ? formData.start_time : formData.end_time,
                   });
                 }}
                 className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
