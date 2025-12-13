@@ -27,9 +27,12 @@ export default function Header({ accountType }: HeaderProps) {
               </Link>
             )}
             {(!accountType || accountType === 'free') && (
-              <span className="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs font-semibold">
+              <Link
+                href="/upgrade"
+                className="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs font-semibold hover:bg-gray-300 transition-colors"
+              >
                 FREE
-              </span>
+              </Link>
             )}
             <Link
               href="/profile"
