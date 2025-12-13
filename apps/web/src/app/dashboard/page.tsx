@@ -1,4 +1,5 @@
 import { createSupabaseServerComponentClient } from '@/lib/supabase/server';
+import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import Breadcrumbs from '@/components/Breadcrumbs';
@@ -33,6 +34,38 @@ export default async function DashboardPage() {
     .select('*')
     .eq('user_id', session.user.id)
     .maybeSingle();
+
+  // Check if subscription has expired and update user account type if needed
+  if (subscription && user?.account_type === 'pro') {
+    const now = new Date();
+    const periodEnd = subscription.current_period_end 
+      ? new Date(subscription.current_period_end)
+      : null;
+
+    // If subscription is canceled at period end and period has passed, set user to free
+    if (
+      subscription.cancel_at_period_end &&
+      periodEnd &&
+      now >= periodEnd
+    ) {
+      const supabaseAdmin = createSupabaseAdminClient();
+      await supabaseAdmin
+        .from('users')
+        .update({ account_type: 'free' })
+        .eq('id', session.user.id);
+      
+      // Refresh user data
+      const { data: updatedUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+      
+      if (updatedUser) {
+        user.account_type = updatedUser.account_type;
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
