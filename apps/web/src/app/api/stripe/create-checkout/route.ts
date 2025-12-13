@@ -50,14 +50,53 @@ export async function POST(request: NextRequest) {
       .from('subscriptions')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'active')
-      .single();
+      .maybeSingle();
 
-    if (existingSubscription) {
-      return NextResponse.json(
-        { error: 'User already has an active subscription' },
-        { status: 400 }
-      );
+    // If subscription exists, verify it's actually still active
+    if (existingSubscription && existingSubscription.status === 'active') {
+      const now = new Date();
+      const periodEnd = existingSubscription.current_period_end
+        ? new Date(existingSubscription.current_period_end)
+        : null;
+
+      // If subscription was canceled at period end and period has passed, allow new subscription
+      const isExpired = existingSubscription.cancel_at_period_end &&
+        periodEnd &&
+        now >= periodEnd;
+
+      if (!isExpired) {
+        // Check with Stripe to verify subscription is truly active
+        if (existingSubscription.stripe_subscription_id) {
+          try {
+            const stripeSubscription = await stripe.subscriptions.retrieve(
+              existingSubscription.stripe_subscription_id
+            );
+            
+            // If Stripe says it's active and not canceled, block checkout
+            if (stripeSubscription.status === 'active' && !stripeSubscription.cancel_at_period_end) {
+              return NextResponse.json(
+                { error: 'User already has an active subscription' },
+                { status: 400 }
+              );
+            }
+          } catch (error) {
+            // If we can't retrieve from Stripe, fall back to database check
+            // If not expired based on database, block checkout
+            if (!isExpired) {
+              return NextResponse.json(
+                { error: 'User already has an active subscription' },
+                { status: 400 }
+              );
+            }
+          }
+        } else {
+          // No Stripe subscription ID, but status is active - block checkout
+          return NextResponse.json(
+            { error: 'User already has an active subscription' },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // Get or create Stripe customer
