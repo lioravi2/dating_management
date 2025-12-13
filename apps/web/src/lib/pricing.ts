@@ -23,6 +23,11 @@ export function getMonthlyPriceDisplay(): string {
   return formatPrice(PRO_MONTHLY_PRICE);
 }
 
+// Helper function to get daily price display
+export function getDailyPriceDisplay(): string {
+  return formatPrice(PRO_DAILY_PRICE);
+}
+
 
 
 

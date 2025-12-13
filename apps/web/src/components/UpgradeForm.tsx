@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { getStripe } from '@/lib/stripe';
-import { getMonthlyPriceDisplay } from '@/lib/pricing';
+import { getDailyPriceDisplay } from '@/lib/pricing';
 import { User } from '@/shared';
 
 interface UpgradeFormProps {
@@ -72,8 +72,8 @@ export default function UpgradeForm({ user }: UpgradeFormProps) {
   return (
     <div>
       <div className="text-center mb-6">
-        <div className="text-4xl font-bold mb-2">{getMonthlyPriceDisplay()}</div>
-        <div className="text-gray-600">per month</div>
+        <div className="text-4xl font-bold mb-2">{getDailyPriceDisplay()}</div>
+        <div className="text-gray-600">per day</div>
       </div>
 
       <button
