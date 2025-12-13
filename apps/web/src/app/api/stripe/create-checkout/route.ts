@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerComponentClient } from '@/lib/supabase/server';
-import { PRO_MONTHLY_PRICE } from '@/lib/pricing';
+import { PRO_DAILY_PRICE } from '@/lib/pricing';
 import Stripe from 'stripe';
 
 // Validate and initialize Stripe
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    // Create checkout session
+    // Create checkout session with daily pricing for testing
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
@@ -141,9 +141,9 @@ export async function POST(request: NextRequest) {
               description: 'Premium features and advanced functionality',
             },
             recurring: {
-              interval: 'month',
+              interval: 'day',
             },
-            unit_amount: PRO_MONTHLY_PRICE, // $9.99 (configurable)
+            unit_amount: PRO_DAILY_PRICE, // $0.10/day for testing
           },
           quantity: 1,
         },

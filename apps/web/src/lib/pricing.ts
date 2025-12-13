@@ -7,6 +7,9 @@
 // Pro subscription monthly price in cents (999 = $9.99)
 export const PRO_MONTHLY_PRICE = 999;
 
+// Pro subscription daily price in cents (10 = $0.10) - for testing
+export const PRO_DAILY_PRICE = 10;
+
 // Free tier partner limit (not used in current phase, but defined for future)
 export const FREE_TIER_PARTNER_LIMIT = 10;
 
