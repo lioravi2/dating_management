@@ -49,10 +49,15 @@ export async function POST(request: NextRequest) {
       }
 
       if (count !== null && count >= FREE_TIER_PARTNER_LIMIT) {
+        const message = count === FREE_TIER_PARTNER_LIMIT
+          ? `Your free subscription is limited to ${FREE_TIER_PARTNER_LIMIT} partners. Please upgrade to Pro to add more partners.`
+          : `With a free subscription you can't add partners if you already have more than ${FREE_TIER_PARTNER_LIMIT} partners. Please upgrade to Pro and try again.`;
+        
         return NextResponse.json(
           {
             error: 'PARTNER_LIMIT_REACHED',
-            message: `Your free subscription is limited to ${FREE_TIER_PARTNER_LIMIT} partners. Please upgrade to Pro to add more partners.`,
+            message,
+            partnerCount: count,
           },
           { status: 403 }
         );

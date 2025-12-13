@@ -25,6 +25,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [isLimitReached, setIsLimitReached] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,8 +91,10 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       if (!response.ok) {
         if (result.error === 'PARTNER_LIMIT_REACHED') {
           setMessage(result.message);
+          setIsLimitReached(true);
         } else {
           setMessage(result.error || 'Error creating partner');
+          setIsLimitReached(false);
         }
       } else {
         // Use full page reload to ensure fresh data from server
@@ -284,14 +287,14 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       {message && (
         <div
           className={`mb-4 p-3 rounded ${
-            message.includes('Error') || message.includes('error') || message.includes('violates') || message.includes('Not authenticated') || message.includes('limited')
+            message.includes('Error') || message.includes('error') || message.includes('violates') || message.includes('Not authenticated') || message.includes('limited') || message.includes("can't add")
               ? 'bg-red-50 text-red-800'
               : 'bg-green-50 text-green-800'
           }`}
         >
           <div className="flex flex-col gap-2">
             <span>{message}</span>
-            {message.includes('limited') && (
+            {(message.includes('limited') || message.includes("can't add")) && (
               <Link
                 href="/upgrade"
                 className="inline-block mt-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors text-center"
@@ -306,8 +309,8 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       <div className="flex space-x-4">
         <button
           type="submit"
-          disabled={loading}
-          className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+          disabled={loading || isLimitReached}
+          className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Saving...' : partner ? 'Update Partner' : 'Create Partner'}
         </button>
