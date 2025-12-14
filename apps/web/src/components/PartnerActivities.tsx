@@ -535,7 +535,9 @@ export default function PartnerActivities({
                               </button>
                               {/* Delete button */}
                               <button
-                                onClick={() => handleDeleteActivity(activity.id)}
+                                onClick={async () => {
+                                  await handleDeleteActivity(activity.id);
+                                }}
                                 className="text-red-600 hover:text-red-800 text-sm"
                               >
                                 Delete
