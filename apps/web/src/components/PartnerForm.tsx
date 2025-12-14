@@ -306,21 +306,31 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         </div>
       )}
 
-      <div className="flex space-x-4">
-        <button
-          type="submit"
-          disabled={loading || isLimitReached}
-          className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Saving...' : partner ? 'Update Partner' : 'Create Partner'}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-        >
-          Cancel
-        </button>
+      <div className="flex flex-col gap-4">
+        <div className="flex space-x-4">
+          <button
+            type="submit"
+            disabled={loading || isLimitReached}
+            className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Saving...' : partner ? 'Update Partner' : 'Create Partner'}
+          </button>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+        {partner && (
+          <Link
+            href={`/partners/${partner.id}/delete`}
+            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-center"
+          >
+            Delete Partner
+          </Link>
+        )}
       </div>
     </form>
   );
