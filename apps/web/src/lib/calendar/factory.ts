@@ -6,7 +6,7 @@
 import type { CalendarProvider, CalendarProviderType } from './types';
 import { googleCalendarProvider } from './providers/google';
 
-const providers: Record<CalendarProviderType, CalendarProvider> = {
+const providers: Partial<Record<CalendarProviderType, CalendarProvider>> = {
   google: googleCalendarProvider,
   // outlook: outlookCalendarProvider, // TODO: Implement when adding Outlook support
 };
