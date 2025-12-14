@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { FaceDetectionResult } from '@/lib/face-detection/types';
 
 interface FaceSelectionUIProps {
@@ -17,9 +17,66 @@ export function FaceSelectionUI({
   onCancel,
 }: FaceSelectionUIProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [blinkOpacity, setBlinkOpacity] = useState(1);
+
+  // Draw function that can be called without reloading the image
+  // Defined early using useCallback so it can be used in effects
+  const drawCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const img = imageRef.current;
+    if (!canvas || !img || !imageLoaded) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw image (from ref, no reload needed)
+    ctx.drawImage(img, 0, 0);
+
+    // Draw bounding boxes for all faces
+    detections.forEach((detection, index) => {
+      if (!detection.boundingBox) return;
+
+      const { x, y, width, height } = detection.boundingBox;
+      const isSelected = selectedIndex === index;
+      const opacity = isSelected ? 1 : blinkOpacity;
+
+      // Draw bounding box with thicker lines for better visibility (especially on mobile)
+      ctx.strokeStyle = isSelected ? '#10b981' : `rgba(239, 68, 68, ${opacity})`;
+      ctx.lineWidth = isSelected ? 6 : 5; // Increased from 4/2 to 6/5 for better visibility
+      ctx.strokeRect(x, y, width, height);
+
+      // Draw a second outer stroke for even better visibility on mobile (only for unselected)
+      if (!isSelected) {
+        ctx.strokeStyle = `rgba(239, 68, 68, ${opacity * 0.6})`;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x - 3, y - 3, width + 6, height + 6);
+      }
+
+      // Draw label with background for better readability
+      const labelText = `Face ${index + 1}`;
+      ctx.font = 'bold 18px Arial'; // Increased font size
+      const textMetrics = ctx.measureText(labelText);
+      const textWidth = textMetrics.width;
+      const textHeight = 18;
+      
+      // Draw label background
+      ctx.fillStyle = isSelected 
+        ? 'rgba(16, 185, 129, 0.8)' 
+        : `rgba(239, 68, 68, ${0.8 * opacity})`;
+      ctx.fillRect(x, y - textHeight - 8, textWidth + 8, textHeight + 4);
+      
+      // Draw label text
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(labelText, x + 4, y - 6);
+    });
+  }, [imageLoaded, detections, selectedIndex, blinkOpacity]);
 
   // Blinking animation for unselected faces (better visibility on mobile)
   useEffect(() => {
@@ -33,6 +90,7 @@ export function FaceSelectionUI({
     }
   }, [selectedIndex, detections.length]);
 
+  // Load image only when imageUrl changes (not on every opacity change)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !imageUrl) return;
@@ -41,55 +99,16 @@ export function FaceSelectionUI({
     img.crossOrigin = 'anonymous';
     
     img.onload = () => {
+      // Store image in ref to avoid reloading
+      imageRef.current = img;
+      
       // Set canvas size to match image
       canvas.width = img.width;
       canvas.height = img.height;
       
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      // Draw image
-      ctx.drawImage(img, 0, 0);
-
-      // Draw bounding boxes for all faces
-      detections.forEach((detection, index) => {
-        if (!detection.boundingBox) return;
-
-        const { x, y, width, height } = detection.boundingBox;
-        const isSelected = selectedIndex === index;
-        const opacity = isSelected ? 1 : blinkOpacity;
-
-        // Draw bounding box with thicker lines for better visibility (especially on mobile)
-        ctx.strokeStyle = isSelected ? '#10b981' : `rgba(239, 68, 68, ${opacity})`;
-        ctx.lineWidth = isSelected ? 6 : 5; // Increased from 4/2 to 6/5 for better visibility
-        ctx.strokeRect(x, y, width, height);
-
-        // Draw a second outer stroke for even better visibility on mobile (only for unselected)
-        if (!isSelected) {
-          ctx.strokeStyle = `rgba(239, 68, 68, ${opacity * 0.6})`;
-          ctx.lineWidth = 3;
-          ctx.strokeRect(x - 3, y - 3, width + 6, height + 6);
-        }
-
-        // Draw label with background for better readability
-        const labelText = `Face ${index + 1}`;
-        ctx.font = 'bold 18px Arial'; // Increased font size
-        const textMetrics = ctx.measureText(labelText);
-        const textWidth = textMetrics.width;
-        const textHeight = 18;
-        
-        // Draw label background
-        ctx.fillStyle = isSelected 
-          ? 'rgba(16, 185, 129, 0.8)' 
-          : `rgba(239, 68, 68, ${0.8 * opacity})`;
-        ctx.fillRect(x, y - textHeight - 8, textWidth + 8, textHeight + 4);
-        
-        // Draw label text
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(labelText, x + 4, y - 6);
-      });
-
       setImageLoaded(true);
+      // Trigger initial draw
+      drawCanvas();
     };
 
     img.onerror = () => {
@@ -97,7 +116,38 @@ export function FaceSelectionUI({
     };
 
     img.src = imageUrl;
-  }, [imageUrl, detections, selectedIndex, blinkOpacity]);
+
+    return () => {
+      // Cleanup: cancel any pending animation frame
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [imageUrl, drawCanvas]); // Only depend on imageUrl and drawCanvas, not blinkOpacity directly
+
+  // Redraw canvas when detections, selectedIndex, or blinkOpacity changes
+  // But NOT when imageUrl changes (that's handled by the image loading effect)
+  useEffect(() => {
+    if (!imageLoaded) return;
+
+    // Cancel any pending animation frame
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    // Use requestAnimationFrame for smooth rendering
+    animationFrameRef.current = requestAnimationFrame(() => {
+      drawCanvas();
+      animationFrameRef.current = null;
+    });
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [imageLoaded, drawCanvas]); // Only depend on imageLoaded and drawCanvas (which already includes blinkOpacity)
 
   const handleCanvasInteraction = (
     clientX: number,
