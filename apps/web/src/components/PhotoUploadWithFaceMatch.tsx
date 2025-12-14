@@ -157,6 +157,7 @@ export function PhotoUploadWithFaceMatch({
     setSelectedFile(file);
     fileRef.current = file; // Store in ref immediately
     setUploadError(null);
+    setPhotoLimitMessage(null); // Clear any previous photo limit messages
     setDetectionResult(null);
     setMultipleDetections(null);
     setAnalysis(null);
