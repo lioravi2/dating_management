@@ -83,18 +83,29 @@ export function PhotoUploadWithFaceMatch({
       const supabase = createSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { count, error: countError } = await supabase
-          .from('partner_photos')
-          .select('*', { count: 'exact', head: true })
+        // Get all partner IDs for this user
+        const { data: partners, error: partnersError } = await supabase
+          .from('partners')
+          .select('id')
           .eq('user_id', user.id);
 
-        if (!countError && count !== null && count >= FREE_TIER_PHOTO_LIMIT) {
-          setShowPhotoLimitModal(true);
-          // Reset file input
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
+        if (!partnersError && partners && partners.length > 0) {
+          const partnerIds = partners.map(p => p.id);
+          const { count, error: countError } = await supabase
+            .from('partner_photos')
+            .select('*', { count: 'exact', head: true })
+            .in('partner_id', partnerIds);
+
+          if (!countError && count !== null && count >= FREE_TIER_PHOTO_LIMIT) {
+            setShowPhotoLimitModal(true);
+            // Reset file input
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+            return;
           }
-          return;
+        } else if (!partnersError && (!partners || partners.length === 0)) {
+          // No partners yet, so count is 0 - allow upload
         }
       }
     }
