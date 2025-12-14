@@ -67,6 +67,7 @@ export function findFaceMatches(
         photo_id: photo.id,
         partner_id: photo.partner_id,
         partner_name: null, // Will be populated by caller
+        partner_profile_picture: null, // Will be populated by caller
         similarity,
         confidence: similarity * 100, // Convert to percentage
       });
