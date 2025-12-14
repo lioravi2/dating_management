@@ -20,16 +20,19 @@ export function FaceSelectionUI({
   const imageRef = useRef<HTMLImageElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const drawCanvasRef = useRef<(() => void) | null>(null);
+  const imageLoadedRef = useRef<boolean>(false);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [blinkOpacity, setBlinkOpacity] = useState(1);
 
   // Draw function that can be called without reloading the image
   // Defined early using useCallback so it can be used in effects
+  // FIXED: Check imageRef.current instead of imageLoaded state to avoid async state issue
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const img = imageRef.current;
-    if (!canvas || !img || !imageLoaded) return;
+    // Use ref instead of state to avoid async state update issue
+    if (!canvas || !img || !imageLoadedRef.current) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -113,9 +116,13 @@ export function FaceSelectionUI({
       canvas.width = img.width;
       canvas.height = img.height;
       
+      // Set ref immediately (synchronous) so drawCanvas can use it
+      imageLoadedRef.current = true;
+      // Also update state for other effects that depend on it
       setImageLoaded(true);
       
       // Trigger initial draw using ref to avoid dependency
+      // FIXED: Now imageLoadedRef.current is true, so drawCanvas won't return early
       // This breaks the circular dependency: image effect -> drawCanvas (via ref) -> imageLoaded -> drawCanvas recreation -> image effect
       if (drawCanvasRef.current) {
         drawCanvasRef.current();
@@ -129,6 +136,8 @@ export function FaceSelectionUI({
     img.src = imageUrl;
 
     return () => {
+      // Reset image loaded ref on cleanup
+      imageLoadedRef.current = false;
       // Cleanup: cancel any pending animation frame
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
