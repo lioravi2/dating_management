@@ -74,7 +74,8 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       if (error) {
         setMessage(error.message);
       } else {
-        router.push(`/partners/${partner.id}`);
+        // Use full page reload to ensure fresh data from server
+        window.location.href = `/partners/${partner.id}`;
       }
     } else {
       // Create new partner via API route (for server-side validation)

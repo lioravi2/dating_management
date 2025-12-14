@@ -2,10 +2,9 @@ import { z } from 'zod';
 
 // Partner Activity Types
 export const PartnerActivityType = z.enum([
-  'in-app_chat',
-  'whatsapp',
+  'date',
+  'chat',
   'phone',
-  'actual_date',
   'other',
 ]);
 
@@ -31,6 +30,7 @@ export interface User {
   email: string | null;
   full_name: string | null;
   account_type: AccountType;
+  timezone?: string;
   created_at: string;
   updated_at: string;
 }

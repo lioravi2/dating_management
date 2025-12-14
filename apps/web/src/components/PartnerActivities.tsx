@@ -1,10 +1,14 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { PartnerActivity, PartnerActivityType, FREE_TIER_ACTIVITY_LIMIT } from '@/shared';
 import Link from 'next/link';
 import { format, isSameDay, parseISO, startOfDay } from 'date-fns';
+import { useLoadScript, Autocomplete } from '@react-google-maps/api';
+
+// Move libraries array outside component to prevent LoadScript reload warning
+const GOOGLE_MAPS_LIBRARIES: ('places')[] = ['places'];
 
 interface PartnerActivitiesProps {
   partnerId: string;
@@ -17,9 +21,12 @@ export default function PartnerActivities({
 }: PartnerActivitiesProps) {
   const [activities, setActivities] = useState<PartnerActivity[]>(initialActivities);
   const [showForm, setShowForm] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<PartnerActivity | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [userAccountType, setUserAccountType] = useState<'free' | 'pro'>('free');
+  const [syncingActivities, setSyncingActivities] = useState<Set<string>>(new Set());
+  const [syncErrors, setSyncErrors] = useState<Map<string, string>>(new Map());
   const supabase = createSupabaseClient();
 
   useEffect(() => {
@@ -93,8 +100,148 @@ export default function PartnerActivities({
     setLoading(false);
   };
 
+  const handleUpdateActivity = async (activityId: string, formData: {
+    start_time: string;
+    end_time?: string;
+    type: PartnerActivityType;
+    location?: string;
+    description?: string;
+  }) => {
+    setLoading(true);
+    setMessage(null);
+
+    const { data: updatedActivity, error } = await supabase
+      .from('partner_notes')
+      .update(formData)
+      .eq('id', activityId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating activity:', error);
+      setMessage({
+        type: 'error',
+        text: `Error updating activity: ${error.message}`
+      });
+    } else {
+      // Update partner's updated_at timestamp
+      await supabase
+        .from('partners')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', partnerId);
+
+      // Update activity in state
+      setActivities((prev) =>
+        prev.map((a) => (a.id === activityId ? updatedActivity : a))
+      );
+
+      // If activity is synced, update calendar event
+      if (updatedActivity.google_calendar_event_id) {
+        try {
+          await fetch('/api/calendar/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              activityId: updatedActivity.id,
+              partnerId,
+            }),
+          });
+        } catch (error) {
+          console.error('Error syncing updated activity to calendar:', error);
+          // Don't show error to user, just log it
+        }
+      }
+
+      setEditingActivity(null);
+      setMessage({
+        type: 'success',
+        text: 'Activity updated successfully!'
+      });
+      setTimeout(() => setMessage(null), 3000);
+    }
+    setLoading(false);
+  };
+
+  const handleSyncActivity = async (activityId: string) => {
+    const activity = activities.find((a) => a.id === activityId);
+    if (!activity) return;
+
+    const isSynced = !!activity.google_calendar_event_id;
+    
+    setSyncingActivities((prev) => new Set(prev).add(activityId));
+    setSyncErrors((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(activityId);
+      return newMap;
+    });
+
+    try {
+      const endpoint = isSynced ? '/api/calendar/unsync' : '/api/calendar/sync';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activityId,
+          partnerId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to sync activity');
+      }
+
+      // Update activity in state
+      if (isSynced) {
+        // Unsynced - clear event ID
+        setActivities((prev) =>
+          prev.map((a) =>
+            a.id === activityId
+              ? { ...a, google_calendar_event_id: null }
+              : a
+          )
+        );
+      } else {
+        // Synced - add event ID
+        setActivities((prev) =>
+          prev.map((a) =>
+            a.id === activityId
+              ? { ...a, google_calendar_event_id: data.event_id }
+              : a
+          )
+        );
+      }
+    } catch (error: any) {
+      console.error('Error syncing activity:', error);
+      setSyncErrors((prev) => new Map(prev).set(activityId, error.message));
+    } finally {
+      setSyncingActivities((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(activityId);
+        return newSet;
+      });
+    }
+  };
+
   const handleDeleteActivity = async (activityId: string) => {
     if (!confirm('Are you sure you want to delete this activity?')) return;
+
+    const activity = activities.find((a) => a.id === activityId);
+    
+    // If activity is synced, unsync it first
+    if (activity?.google_calendar_event_id) {
+      try {
+        await fetch('/api/calendar/unsync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activityId }),
+        });
+      } catch (error) {
+        console.error('Error unsyncing before delete:', error);
+        // Continue with delete even if unsync fails
+      }
+    }
 
     const { error } = await supabase
       .from('partner_notes')
@@ -182,10 +329,17 @@ export default function PartnerActivities({
         </div>
       )}
 
-      {showForm && (
+      {(showForm || editingActivity) && (
         <ActivityForm
-          onSubmit={handleAddActivity}
-          onCancel={() => setShowForm(false)}
+          activity={editingActivity || undefined}
+          onSubmit={editingActivity 
+            ? (data) => handleUpdateActivity(editingActivity.id, data)
+            : handleAddActivity
+          }
+          onCancel={() => {
+            setShowForm(false);
+            setEditingActivity(null);
+          }}
           loading={loading}
         />
       )}
@@ -233,13 +387,8 @@ export default function PartnerActivities({
                             <div className="flex-1">
                               <div className="flex items-center space-x-2 mb-2">
                                 <span className="bg-primary-100 text-primary-800 text-xs font-semibold px-2 py-1 rounded">
-                                  {activity.type.replace('_', ' ').toUpperCase()}
+                                  {activity.type.charAt(0).toUpperCase() + activity.type.slice(1)}
                                 </span>
-                                {activity.google_calendar_event_id && (
-                                  <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">
-                                    🎭 Synced
-                                  </span>
-                                )}
                               </div>
                               <p className="text-sm text-gray-600 font-medium">
                                 {format(parseISO(activity.start_time), 'h:mm a')}
@@ -255,12 +404,98 @@ export default function PartnerActivities({
                                 <p className="text-gray-900 mt-2 text-sm">{activity.description}</p>
                               )}
                             </div>
-                            <button
-                              onClick={() => handleDeleteActivity(activity.id)}
-                              className="text-red-600 hover:text-red-800 ml-4 text-sm"
-                            >
-                              Delete
-                            </button>
+                            <div className="flex items-center space-x-2 ml-4">
+                              {/* Edit button */}
+                              <button
+                                onClick={() => {
+                                  setEditingActivity(activity);
+                                  setShowForm(false);
+                                }}
+                                className="text-blue-600 hover:text-blue-800 text-sm"
+                                title="Edit activity"
+                              >
+                                Edit
+                              </button>
+                              {/* Sync button */}
+                              <button
+                                onClick={() => handleSyncActivity(activity.id)}
+                                disabled={syncingActivities.has(activity.id)}
+                                className={`p-2 rounded transition-colors ${
+                                  activity.google_calendar_event_id
+                                    ? 'text-green-600 hover:text-green-800 hover:bg-green-50'
+                                    : syncErrors.has(activity.id)
+                                    ? 'text-red-600 hover:text-red-800 hover:bg-red-50'
+                                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                title={
+                                  syncingActivities.has(activity.id)
+                                    ? 'Syncing...'
+                                    : activity.google_calendar_event_id
+                                    ? 'Unsync from calendar'
+                                    : syncErrors.has(activity.id)
+                                    ? `Retry sync (${syncErrors.get(activity.id)})`
+                                    : 'Sync to calendar'
+                                }
+                              >
+                                {syncingActivities.has(activity.id) ? (
+                                  <svg
+                                    className="animate-spin h-5 w-5"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <circle
+                                      className="opacity-25"
+                                      cx="12"
+                                      cy="12"
+                                      r="10"
+                                      stroke="currentColor"
+                                      strokeWidth="4"
+                                    ></circle>
+                                    <path
+                                      className="opacity-75"
+                                      fill="currentColor"
+                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    ></path>
+                                  </svg>
+                                ) : activity.google_calendar_event_id ? (
+                                  <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                                    />
+                                  </svg>
+                                )}
+                              </button>
+                              {/* Delete button */}
+                              <button
+                                onClick={() => handleDeleteActivity(activity.id)}
+                                className="text-red-600 hover:text-red-800 text-sm"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -279,10 +514,12 @@ export default function PartnerActivities({
 }
 
 function ActivityForm({
+  activity,
   onSubmit,
   onCancel,
   loading,
 }: {
+  activity?: PartnerActivity;
   onSubmit: (data: {
     start_time: string;
     end_time?: string;
@@ -293,17 +530,56 @@ function ActivityForm({
   onCancel: () => void;
   loading: boolean;
 }) {
-  const [formData, setFormData] = useState({
-    start_date: new Date().toISOString().split('T')[0],
-    start_time: new Date().toTimeString().slice(0, 5),
-    has_end_time: false,
-    end_date: '',
-    end_time: '',
-    all_day: false,
-    type: 'actual_date' as PartnerActivityType,
-    location: '',
-    description: '',
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY || '',
+    libraries: GOOGLE_MAPS_LIBRARIES,
   });
+
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  // Initialize form data from activity if editing, otherwise use defaults
+  const getInitialFormData = () => {
+    if (activity) {
+      const startDate = parseISO(activity.start_time);
+      const endDate = activity.end_time ? parseISO(activity.end_time) : null;
+      const allDay = startDate.getHours() === 0 && startDate.getMinutes() === 0 && 
+                     (!endDate || (endDate.getHours() === 23 && endDate.getMinutes() === 59));
+      
+      return {
+        start_date: format(startDate, 'yyyy-MM-dd'),
+        start_time: allDay ? '00:00' : format(startDate, 'HH:mm'),
+        has_end_time: !!activity.end_time,
+        end_date: endDate ? format(endDate, 'yyyy-MM-dd') : format(startDate, 'yyyy-MM-dd'),
+        end_time: endDate && !allDay ? format(endDate, 'HH:mm') : '',
+        all_day: allDay,
+        type: activity.type,
+        location: activity.location || '',
+        description: activity.description || '',
+      };
+    }
+    
+    return {
+      start_date: new Date().toISOString().split('T')[0],
+      start_time: new Date().toTimeString().slice(0, 5),
+      has_end_time: false,
+      end_date: '',
+      end_time: '',
+      all_day: false,
+      type: 'date' as PartnerActivityType,
+      location: '',
+      description: '',
+    };
+  };
+
+  const [formData, setFormData] = useState(getInitialFormData());
+
+  // Update form data when activity changes (for edit mode)
+  useEffect(() => {
+    if (activity) {
+      setFormData(getInitialFormData());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activity?.id]); // Only update when activity ID changes
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -344,10 +620,9 @@ function ActivityForm({
             required
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           >
-            <option value="in-app_chat">In-App Chat</option>
-            <option value="whatsapp">WhatsApp</option>
+            <option value="date">Date</option>
+            <option value="chat">Chat</option>
             <option value="phone">Phone</option>
-            <option value="actual_date">Actual Date</option>
             <option value="other">Other</option>
           </select>
         </div>
@@ -477,15 +752,45 @@ function ActivityForm({
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Location
           </label>
-          <input
-            type="text"
-            value={formData.location}
-            onChange={(e) =>
-              setFormData({ ...formData, location: e.target.value })
-            }
-            placeholder="e.g., Restaurant Name, Address"
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
+          {isLoaded && !loadError ? (
+            <Autocomplete
+              onLoad={(autocomplete) => {
+                autocompleteRef.current = autocomplete;
+              }}
+              onPlaceChanged={() => {
+                if (autocompleteRef.current) {
+                  const place = autocompleteRef.current.getPlace();
+                  const address = place.formatted_address || place.name || '';
+                  setFormData({ ...formData, location: address });
+                }
+              }}
+            >
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) =>
+                  setFormData({ ...formData, location: e.target.value })
+                }
+                placeholder="Search for a place or enter address manually"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </Autocomplete>
+          ) : (
+            <input
+              type="text"
+              value={formData.location}
+              onChange={(e) =>
+                setFormData({ ...formData, location: e.target.value })
+              }
+              placeholder="e.g., Restaurant Name, Address"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          )}
+          {loadError && (
+            <p className="text-xs text-gray-500 mt-1">
+              Google Places API not available. You can still enter location manually.
+            </p>
+          )}
         </div>
 
         <div>
@@ -508,7 +813,10 @@ function ActivityForm({
             disabled={loading}
             className="flex-1 bg-primary-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50"
           >
-            {loading ? 'Creating...' : 'Create Activity'}
+            {loading 
+              ? (activity ? 'Updating...' : 'Creating...') 
+              : (activity ? 'Update Activity' : 'Create Activity')
+            }
           </button>
           <button
             type="button"
