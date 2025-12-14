@@ -370,6 +370,13 @@ export default function PartnerActivities({
             setShowForm(false);
             setEditingActivity(null);
           }}
+          onDelete={editingActivity 
+            ? () => {
+                handleDeleteActivity(editingActivity.id);
+                setEditingActivity(null);
+              }
+            : undefined
+          }
           loading={loading}
         />
       )}
@@ -403,7 +410,9 @@ export default function PartnerActivities({
 
                   {/* Activities for this date */}
                   <div className="space-y-3 pl-4 border-l-2 border-gray-200">
-                    {dateActivities.map((activity, index) => (
+                    {dateActivities
+                      .filter((activity) => editingActivity?.id !== activity.id)
+                      .map((activity, index) => (
                       <div
                         key={activity.id}
                         className="relative -ml-2"
@@ -411,8 +420,14 @@ export default function PartnerActivities({
                         {/* Timeline dot */}
                         <div className="absolute -left-[9px] top-2 w-4 h-4 bg-primary-500 rounded-full border-2 border-white shadow-sm"></div>
                         
-                        {/* Activity card */}
-                        <div className="ml-6 bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                        {/* Activity card - clickable to edit */}
+                        <div 
+                          className="ml-6 bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer"
+                          onClick={() => {
+                            setEditingActivity(activity);
+                            setShowForm(false);
+                          }}
+                        >
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                               <div className="flex items-center space-x-2 mb-2">
@@ -434,18 +449,10 @@ export default function PartnerActivities({
                                 <p className="text-gray-900 mt-2 text-sm">{activity.description}</p>
                               )}
                             </div>
-                            <div className="flex items-center space-x-2 ml-4">
-                              {/* Edit button */}
-                              <button
-                                onClick={() => {
-                                  setEditingActivity(activity);
-                                  setShowForm(false);
-                                }}
-                                className="text-blue-600 hover:text-blue-800 text-sm"
-                                title="Edit activity"
-                              >
-                                Edit
-                              </button>
+                            <div 
+                              className="flex items-center space-x-2 ml-4"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               {/* Sync button */}
                               <button
                                 onClick={() => handleSyncActivity(activity.id)}
@@ -551,6 +558,7 @@ function ActivityForm({
   activity,
   onSubmit,
   onCancel,
+  onDelete,
   loading,
 }: {
   activity?: PartnerActivity;
@@ -562,6 +570,7 @@ function ActivityForm({
     description?: string;
   }) => void;
   onCancel: () => void;
+  onDelete?: () => void;
   loading: boolean;
 }) {
   const { isLoaded, loadError } = useLoadScript({
@@ -842,6 +851,16 @@ function ActivityForm({
         </div>
 
         <div className="flex space-x-4">
+          {activity && onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={loading}
+              className="bg-red-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              Delete
+            </button>
+          )}
           <button
             type="submit"
             disabled={loading}
