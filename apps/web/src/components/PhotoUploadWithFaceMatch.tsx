@@ -42,6 +42,7 @@ export function PhotoUploadWithFaceMatch({
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [userAccountType, setUserAccountType] = useState<'free' | 'pro' | null>(null);
   const [photoLimitMessage, setPhotoLimitMessage] = useState<{ type: 'error'; text: string | React.ReactNode } | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   // Modal states
   const [showNoFaceModal, setShowNoFaceModal] = useState(false);
@@ -523,6 +524,11 @@ export function PhotoUploadWithFaceMatch({
     }
   };
 
+  // Set mounted state to prevent hydration errors
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Check authentication on mount
   useEffect(() => {
     const checkAuth = async () => {
@@ -552,7 +558,8 @@ export function PhotoUploadWithFaceMatch({
     setShowCreateNewPartnerModal(false);
   };
 
-  if (isAuthenticated === null) {
+  // Prevent hydration errors by not rendering until mounted
+  if (!mounted || isAuthenticated === null) {
     return (
       <div className="p-4">
         <p>Checking authentication...</p>
