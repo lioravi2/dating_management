@@ -19,6 +19,7 @@ export function FaceSelectionUI({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const drawCanvasRef = useRef<(() => void) | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [blinkOpacity, setBlinkOpacity] = useState(1);
@@ -78,6 +79,11 @@ export function FaceSelectionUI({
     });
   }, [imageLoaded, detections, selectedIndex, blinkOpacity]);
 
+  // Store drawCanvas in ref so it can be called from image loading effect without dependency
+  useEffect(() => {
+    drawCanvasRef.current = drawCanvas;
+  }, [drawCanvas]);
+
   // Blinking animation for unselected faces (better visibility on mobile)
   useEffect(() => {
     if (selectedIndex === null && detections.length > 0) {
@@ -91,6 +97,7 @@ export function FaceSelectionUI({
   }, [selectedIndex, detections.length]);
 
   // Load image only when imageUrl changes (not on every opacity change)
+  // FIXED: Removed drawCanvas from dependency array to break circular dependency
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !imageUrl) return;
@@ -107,8 +114,12 @@ export function FaceSelectionUI({
       canvas.height = img.height;
       
       setImageLoaded(true);
-      // Trigger initial draw
-      drawCanvas();
+      
+      // Trigger initial draw using ref to avoid dependency
+      // This breaks the circular dependency: image effect -> drawCanvas (via ref) -> imageLoaded -> drawCanvas recreation -> image effect
+      if (drawCanvasRef.current) {
+        drawCanvasRef.current();
+      }
     };
 
     img.onerror = () => {
@@ -123,7 +134,7 @@ export function FaceSelectionUI({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [imageUrl, drawCanvas]); // Only depend on imageUrl and drawCanvas, not blinkOpacity directly
+  }, [imageUrl]); // Only depend on imageUrl, NOT drawCanvas - this breaks the circular dependency
 
   // Redraw canvas when detections, selectedIndex, or blinkOpacity changes
   // But NOT when imageUrl changes (that's handled by the image loading effect)
