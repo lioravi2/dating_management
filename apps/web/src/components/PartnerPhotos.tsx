@@ -125,7 +125,7 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
               />
               <button
                 onClick={() => handleDelete(photo.id)}
-                className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-xs opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-xs opacity-100 md:opacity-0 group-hover:md:opacity-100 transition-opacity hover:bg-red-700"
               >
                 Delete
               </button>
