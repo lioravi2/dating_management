@@ -75,6 +75,12 @@ export async function DELETE(
       );
     }
 
+    // Update partner's updated_at timestamp
+    await supabase
+      .from('partners')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', partnerId);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting photo:', error);

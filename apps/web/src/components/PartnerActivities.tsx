@@ -75,6 +75,12 @@ export default function PartnerActivities({
         text: `Error creating activity: ${error.message}`
       });
     } else {
+      // Update partner's updated_at timestamp
+      await supabase
+        .from('partners')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', partnerId);
+      
       setActivities([activity, ...activities]);
       setShowForm(false);
       setMessage({

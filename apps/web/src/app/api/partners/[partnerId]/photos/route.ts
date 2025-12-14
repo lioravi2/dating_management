@@ -91,7 +91,7 @@ export async function POST(
         return NextResponse.json(
           { 
             error: 'Storage bucket not configured', 
-            details: 'The partner-photos storage bucket does not exist. Please create it in Supabase Dashboard → Storage.' 
+            details: 'The partner-photos storage bucket does not exist. Please create it in Supabase Dashboard ? Storage.' 
           },
           { status: 500 }
         );
@@ -151,7 +151,13 @@ export async function POST(
       console.log('[API] Setting first photo as profile picture');
       await supabase
         .from('partners')
-        .update({ profile_picture_storage_path: storagePath })
+        .update({ profile_picture_storage_path: storagePath, updated_at: new Date().toISOString() })
+        .eq('id', partnerId);
+    } else {
+      // Update partner's updated_at timestamp
+      await supabase
+        .from('partners')
+        .update({ updated_at: new Date().toISOString() })
         .eq('id', partnerId);
     }
 

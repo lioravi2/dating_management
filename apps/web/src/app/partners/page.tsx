@@ -99,9 +99,12 @@ export default async function PartnersPage() {
                         {partner.description}
                       </p>
                     )}
-                    <p className="text-xs text-gray-500 mt-4">
-                      Added {new Date(partner.created_at).toLocaleDateString()}
-                    </p>
+                    <div className="text-xs text-gray-500 mt-4 space-y-1">
+                      <p>Added {new Date(partner.created_at).toLocaleDateString()}</p>
+                      {partner.updated_at && partner.updated_at !== partner.created_at && (
+                        <p>Updated {new Date(partner.updated_at).toLocaleDateString()}</p>
+                      )}
+                    </div>
                   </div>
                 </Link>
               );
