@@ -89,14 +89,36 @@ export function PhotoUploadWithFaceMatch({
           .select('id')
           .eq('user_id', user.id);
 
-        if (!partnersError && partners && partners.length > 0) {
+        // FIXED: Handle error case - fail-safe: block upload if we can't verify photo count
+        if (partnersError) {
+          console.error('Error fetching partners for photo limit check:', partnersError);
+          alert('Unable to verify photo limit. Please try again or contact support.');
+          // Reset file input
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
+        }
+
+        if (partners && partners.length > 0) {
           const partnerIds = partners.map(p => p.id);
           const { count, error: countError } = await supabase
             .from('partner_photos')
             .select('*', { count: 'exact', head: true })
             .in('partner_id', partnerIds);
 
-          if (!countError && count !== null && count >= FREE_TIER_PHOTO_LIMIT) {
+          // FIXED: Handle count error - fail-safe: block upload if we can't verify photo count
+          if (countError) {
+            console.error('Error counting photos for limit check:', countError);
+            alert('Unable to verify photo limit. Please try again or contact support.');
+            // Reset file input
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+            return;
+          }
+
+          if (count !== null && count >= FREE_TIER_PHOTO_LIMIT) {
             setShowPhotoLimitModal(true);
             // Reset file input
             if (fileInputRef.current) {
@@ -104,7 +126,7 @@ export function PhotoUploadWithFaceMatch({
             }
             return;
           }
-        } else if (!partnersError && (!partners || partners.length === 0)) {
+        } else {
           // No partners yet, so count is 0 - allow upload
         }
       }
