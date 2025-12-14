@@ -19,6 +19,19 @@ export function FaceSelectionUI({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [blinkOpacity, setBlinkOpacity] = useState(1);
+
+  // Blinking animation for unselected faces (better visibility on mobile)
+  useEffect(() => {
+    if (selectedIndex === null && detections.length > 0) {
+      const interval = setInterval(() => {
+        setBlinkOpacity(prev => prev === 1 ? 0.3 : 1);
+      }, 600); // Blink every 600ms
+      return () => clearInterval(interval);
+    } else {
+      setBlinkOpacity(1); // Full opacity when selected
+    }
+  }, [selectedIndex, detections.length]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -44,20 +57,36 @@ export function FaceSelectionUI({
 
         const { x, y, width, height } = detection.boundingBox;
         const isSelected = selectedIndex === index;
+        const opacity = isSelected ? 1 : blinkOpacity;
 
-        // Draw bounding box
-        ctx.strokeStyle = isSelected ? '#10b981' : '#ef4444';
-        ctx.lineWidth = isSelected ? 4 : 2;
+        // Draw bounding box with thicker lines for better visibility (especially on mobile)
+        ctx.strokeStyle = isSelected ? '#10b981' : `rgba(239, 68, 68, ${opacity})`;
+        ctx.lineWidth = isSelected ? 6 : 5; // Increased from 4/2 to 6/5 for better visibility
         ctx.strokeRect(x, y, width, height);
 
-        // Draw label
-        ctx.fillStyle = isSelected ? '#10b981' : '#ef4444';
-        ctx.font = '16px Arial';
-        ctx.fillText(
-          `Face ${index + 1}`,
-          x,
-          y - 5
-        );
+        // Draw a second outer stroke for even better visibility on mobile (only for unselected)
+        if (!isSelected) {
+          ctx.strokeStyle = `rgba(239, 68, 68, ${opacity * 0.6})`;
+          ctx.lineWidth = 3;
+          ctx.strokeRect(x - 3, y - 3, width + 6, height + 6);
+        }
+
+        // Draw label with background for better readability
+        const labelText = `Face ${index + 1}`;
+        ctx.font = 'bold 18px Arial'; // Increased font size
+        const textMetrics = ctx.measureText(labelText);
+        const textWidth = textMetrics.width;
+        const textHeight = 18;
+        
+        // Draw label background
+        ctx.fillStyle = isSelected 
+          ? 'rgba(16, 185, 129, 0.8)' 
+          : `rgba(239, 68, 68, ${0.8 * opacity})`;
+        ctx.fillRect(x, y - textHeight - 8, textWidth + 8, textHeight + 4);
+        
+        // Draw label text
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(labelText, x + 4, y - 6);
       });
 
       setImageLoaded(true);
@@ -68,7 +97,7 @@ export function FaceSelectionUI({
     };
 
     img.src = imageUrl;
-  }, [imageUrl, detections, selectedIndex]);
+  }, [imageUrl, detections, selectedIndex, blinkOpacity]);
 
   const handleCanvasInteraction = (
     clientX: number,
