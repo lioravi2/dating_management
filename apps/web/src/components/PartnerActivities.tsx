@@ -254,8 +254,8 @@ export default function PartnerActivities({
     }
   };
 
-  const handleDeleteActivity = async (activityId: string) => {
-    if (!confirm('Are you sure you want to delete this activity?')) return;
+  const handleDeleteActivity = async (activityId: string): Promise<boolean> => {
+    if (!confirm('Are you sure you want to delete this activity?')) return false;
 
     const activity = activities.find((a) => a.id === activityId);
     
@@ -284,6 +284,7 @@ export default function PartnerActivities({
         type: 'error',
         text: `Error deleting activity: ${error.message}`
       });
+      return false;
     } else {
       setActivities(activities.filter((a) => a.id !== activityId));
       setMessage({
@@ -291,6 +292,7 @@ export default function PartnerActivities({
         text: 'Activity deleted successfully!'
       });
       setTimeout(() => setMessage(null), 3000);
+      return true;
     }
   };
 
@@ -371,9 +373,11 @@ export default function PartnerActivities({
             setEditingActivity(null);
           }}
           onDelete={editingActivity 
-            ? () => {
-                handleDeleteActivity(editingActivity.id);
-                setEditingActivity(null);
+            ? async () => {
+                const deleted = await handleDeleteActivity(editingActivity.id);
+                if (deleted) {
+                  setEditingActivity(null);
+                }
               }
             : undefined
           }
