@@ -70,7 +70,10 @@ export function FaceSelectionUI({
     img.src = imageUrl;
   }, [imageUrl, detections, selectedIndex]);
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleCanvasInteraction = (
+    clientX: number,
+    clientY: number
+  ) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -78,10 +81,10 @@ export function FaceSelectionUI({
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
 
-    // Find which face was clicked
+    // Find which face was clicked/touched
     for (let i = 0; i < detections.length; i++) {
       const detection = detections[i];
       if (!detection.boundingBox) continue;
@@ -91,6 +94,18 @@ export function FaceSelectionUI({
         setSelectedIndex(i);
         break;
       }
+    }
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    handleCanvasInteraction(e.clientX, e.clientY);
+  };
+
+  const handleCanvasTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault(); // Prevent scrolling/zooming
+    if (e.touches.length > 0) {
+      const touch = e.touches[0];
+      handleCanvasInteraction(touch.clientX, touch.clientY);
     }
   };
 
@@ -105,15 +120,16 @@ export function FaceSelectionUI({
       <div className="bg-white rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-auto">
         <h2 className="text-xl font-bold mb-4">Select a Face</h2>
         <p className="text-gray-600 mb-4">
-          Multiple faces detected. Please click on the face you want to upload.
+          Multiple faces detected. Please tap/click on the face you want to upload.
         </p>
 
         <div className="relative mb-4">
           <canvas
             ref={canvasRef}
             onClick={handleCanvasClick}
-            className="max-w-full h-auto border border-gray-300 rounded cursor-pointer"
-            style={{ maxHeight: '70vh' }}
+            onTouchStart={handleCanvasTouch}
+            className="max-w-full h-auto border border-gray-300 rounded cursor-pointer touch-none"
+            style={{ maxHeight: '70vh', touchAction: 'none' }}
           />
         </div>
 
