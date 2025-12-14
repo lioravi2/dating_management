@@ -413,7 +413,7 @@ export function PhotoUploadWithFaceMatch({
   };
 
   const uploadPhoto = async (
-    faceDescriptor: number[],
+    faceDescriptor: number[] | null,
     file?: File,
     dimensions?: { width: number; height: number }
   ) => {
@@ -440,7 +440,9 @@ export function PhotoUploadWithFaceMatch({
     try {
       const formData = new FormData();
       formData.append('file', fileToUpload);
-      formData.append('faceDescriptor', JSON.stringify(faceDescriptor));
+      if (faceDescriptor) {
+        formData.append('faceDescriptor', JSON.stringify(faceDescriptor));
+      }
       formData.append('width', dims.width.toString());
       formData.append('height', dims.height.toString());
 
@@ -635,13 +637,12 @@ export function PhotoUploadWithFaceMatch({
               </button>
               <button
                 onClick={async () => {
-                  if (detectionResult?.descriptor) {
-                    await uploadPhoto(
-                      detectionResult.descriptor,
-                      fileRef.current || selectedFile || undefined,
-                      dimensionsRef.current || imageDimensions || undefined
-                    );
-                  }
+                  // Upload without face descriptor when no face is detected
+                  await uploadPhoto(
+                    null, // No face descriptor
+                    fileRef.current || selectedFile || undefined,
+                    dimensionsRef.current || imageDimensions || undefined
+                  );
                   setShowNoFaceModal(false);
                 }}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"

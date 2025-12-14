@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Partner } from '@/shared';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import { getPartnerProfilePictureUrl } from '@/lib/photo-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,9 +114,27 @@ export default function DeletePartnerPage() {
           <h1 className="text-2xl font-bold mb-4 text-red-600">Delete Partner</h1>
           
           <div className="mb-6">
-            <p className="text-gray-700 mb-4">
-              Are you sure you want to delete <strong>{partnerDisplayName}</strong>?
-            </p>
+            <div className="flex items-center gap-4 mb-4">
+              {partner && (() => {
+                const profilePictureUrl = getPartnerProfilePictureUrl(partner);
+                return profilePictureUrl ? (
+                  <img
+                    src={profilePictureUrl}
+                    alt={`${partnerDisplayName}'s profile`}
+                    className="w-16 h-16 rounded-full object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                    <span className="text-gray-400 text-xl">
+                      {(partner.first_name?.[0] || partner.last_name?.[0] || '?').toUpperCase()}
+                    </span>
+                  </div>
+                );
+              })()}
+              <p className="text-gray-700">
+                Are you sure you want to delete <strong>{partnerDisplayName}</strong>?
+              </p>
+            </div>
             <p className="text-gray-600 mb-2">
               This will permanently delete:
             </p>
