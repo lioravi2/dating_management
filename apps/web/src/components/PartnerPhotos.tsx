@@ -63,7 +63,8 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
       router.refresh();
     } catch (err) {
       console.error('Error deleting photo:', err);
-      alert(err instanceof Error ? err.message : 'Failed to delete photo. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to delete photo. Please try again.');
+      setTimeout(() => setError(null), 5000);
     }
   };
 
@@ -104,7 +105,7 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
 
       {/* Photo Gallery */}
       {error && (
-        <div className="mb-4 p-4 bg-red-50 text-red-600 rounded">
+        <div className="mb-4 p-3 rounded bg-red-50 text-red-800">
           {error}
         </div>
       )}

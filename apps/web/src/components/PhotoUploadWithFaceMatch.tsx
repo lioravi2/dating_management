@@ -8,6 +8,7 @@ import { PhotoUploadAnalysis, FaceMatch, FREE_TIER_PHOTO_LIMIT } from '@/shared'
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { getPhotoUrl } from '@/lib/photo-utils';
+import Link from 'next/link';
 
 interface PhotoUploadWithFaceMatchProps {
   partnerId?: string; // If provided, upload to this partner. If not, analyze across all partners.
@@ -40,7 +41,7 @@ export function PhotoUploadWithFaceMatch({
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [userAccountType, setUserAccountType] = useState<'free' | 'pro' | null>(null);
-  const [showPhotoLimitModal, setShowPhotoLimitModal] = useState(false);
+  const [photoLimitMessage, setPhotoLimitMessage] = useState<{ type: 'error'; text: string | React.ReactNode } | null>(null);
 
   // Modal states
   const [showNoFaceModal, setShowNoFaceModal] = useState(false);
@@ -92,11 +93,15 @@ export function PhotoUploadWithFaceMatch({
         // FIXED: Handle error case - fail-safe: block upload if we can't verify photo count
         if (partnersError) {
           console.error('Error fetching partners for photo limit check:', partnersError);
-          alert('Unable to verify photo limit. Please try again or contact support.');
+          setPhotoLimitMessage({
+            type: 'error',
+            text: 'Unable to verify photo limit. Please try again or contact support.'
+          });
           // Reset file input
           if (fileInputRef.current) {
             fileInputRef.current.value = '';
           }
+          setTimeout(() => setPhotoLimitMessage(null), 5000);
           return;
         }
 
@@ -110,20 +115,37 @@ export function PhotoUploadWithFaceMatch({
           // FIXED: Handle count error - fail-safe: block upload if we can't verify photo count
           if (countError) {
             console.error('Error counting photos for limit check:', countError);
-            alert('Unable to verify photo limit. Please try again or contact support.');
+            setPhotoLimitMessage({
+              type: 'error',
+              text: 'Unable to verify photo limit. Please try again or contact support.'
+            });
             // Reset file input
             if (fileInputRef.current) {
               fileInputRef.current.value = '';
             }
+            setTimeout(() => setPhotoLimitMessage(null), 5000);
             return;
           }
 
           if (count !== null && count >= FREE_TIER_PHOTO_LIMIT) {
-            setShowPhotoLimitModal(true);
+            setPhotoLimitMessage({
+              type: 'error',
+              text: (
+                <>
+                  Your free subscription is limited to {FREE_TIER_PHOTO_LIMIT} photos. Please{' '}
+                  <Link href="/upgrade" className="underline font-semibold">
+                    upgrade to Pro
+                  </Link>{' '}
+                  to upload more photos.
+                </>
+              ),
+            });
             // Reset file input
             if (fileInputRef.current) {
               fileInputRef.current.value = '';
             }
+            // Clear message after 10 seconds
+            setTimeout(() => setPhotoLimitMessage(null), 10000);
             return;
           }
         } else {
@@ -494,6 +516,7 @@ export function PhotoUploadWithFaceMatch({
     setUploadSuccess(false);
     setAnalyzing(false);
     setUploading(false);
+    setPhotoLimitMessage(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -571,6 +594,18 @@ export function PhotoUploadWithFaceMatch({
 
   return (
     <div className="space-y-4">
+      {photoLimitMessage && (
+        <div
+          className={`mb-4 p-3 rounded ${
+            photoLimitMessage.type === 'error'
+              ? 'bg-red-50 text-red-800'
+              : 'bg-green-50 text-green-800'
+          }`}
+        >
+          {photoLimitMessage.text}
+        </div>
+      )}
+
       <input
         ref={fileInputRef}
         type="file"
@@ -840,38 +875,6 @@ export function PhotoUploadWithFaceMatch({
         </div>
       )}
 
-      {/* Photo Limit Modal */}
-      {showPhotoLimitModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md">
-            <h2 className="text-xl font-bold mb-4">Photo Limit Reached</h2>
-            <p className="text-gray-600 mb-4">
-              Your free subscription is limited to {FREE_TIER_PHOTO_LIMIT} photos. Please upgrade to Pro to upload more photos.
-            </p>
-            <div className="flex gap-4 justify-end">
-              <button
-                onClick={() => {
-                  setShowPhotoLimitModal(false);
-                  resetState();
-                }}
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setShowPhotoLimitModal(false);
-                  resetState();
-                  router.push('/upgrade');
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Upgrade to Pro
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
