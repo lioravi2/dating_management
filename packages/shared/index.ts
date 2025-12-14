@@ -48,6 +48,7 @@ export interface Partner {
   x_profile: string | null;
   linkedin_profile: string | null;
   instagram_profile: string | null;
+  profile_picture_storage_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -73,6 +74,7 @@ export interface FaceMatch {
   photo_id: string;
   partner_id: string;
   partner_name: string | null;
+  partner_profile_picture: string | null; // Storage path to profile picture
   similarity: number; // 0-1, higher = more similar
   confidence: number; // Detection confidence as percentage
 }

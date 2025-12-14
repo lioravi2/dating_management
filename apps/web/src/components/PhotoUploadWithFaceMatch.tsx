@@ -7,6 +7,7 @@ import { FaceDetectionResult, MultipleFaceDetectionResult } from '@/lib/face-det
 import { PhotoUploadAnalysis, FaceMatch } from '@/shared';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import { getPhotoUrl } from '@/lib/photo-utils';
 
 interface PhotoUploadWithFaceMatchProps {
   partnerId?: string; // If provided, upload to this partner. If not, analyze across all partners.
@@ -650,6 +651,7 @@ export function PhotoUploadWithFaceMatch({
           return {
             partner_id: partnerId,
             partner_name: bestMatch.partner_name,
+            partner_profile_picture: bestMatch.partner_profile_picture || null,
             confidence: bestMatch.confidence,
             matchCount: matches.length, // Number of photos that matched
           };
@@ -664,26 +666,51 @@ export function PhotoUploadWithFaceMatch({
               </p>
               {uniquePartners.length > 0 && (
                 <div className="mb-4 space-y-2">
-                  {uniquePartners.map((partner) => (
-                    <div
-                      key={partner.partner_id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
-                    >
-                      <span className="text-gray-700">
-                        {partner.partner_name || 'Unknown Partner'} ({Math.round(partner.confidence)}% match
-                        {partner.matchCount > 1 && `, ${partner.matchCount} photos`})
-                      </span>
-                      <button
-                        onClick={() => {
-                          router.push(`/partners/${partner.partner_id}`);
-                          setShowOtherPartnersModal(false);
-                        }}
-                        className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                  {uniquePartners.map((partner) => {
+                    // Get profile picture URL
+                    const profilePictureUrl = partner.partner_profile_picture
+                      ? getPhotoUrl(partner.partner_profile_picture)
+                      : null;
+                    
+                    return (
+                      <div
+                        key={partner.partner_id}
+                        className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
                       >
-                        View
-                      </button>
-                    </div>
-                  ))}
+                        {profilePictureUrl ? (
+                          <img
+                            src={profilePictureUrl}
+                            alt={partner.partner_name || 'Partner'}
+                            className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
+                            <span className="text-gray-600 text-sm">
+                              {(partner.partner_name?.[0] || '?').toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <span className="text-gray-700 block truncate">
+                            {partner.partner_name || 'Unknown Partner'}
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {Math.round(partner.confidence)}% match
+                            {partner.matchCount > 1 && `, ${partner.matchCount} photos`}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            router.push(`/partners/${partner.partner_id}`);
+                            setShowOtherPartnersModal(false);
+                          }}
+                          className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex-shrink-0"
+                        >
+                          View
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               <div className="flex gap-4 justify-end mt-4">

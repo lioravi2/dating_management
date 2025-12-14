@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     // Get all partner IDs for this user
     const { data: userPartners, error: partnersError } = await supabase
       .from('partners')
-      .select('id, first_name, last_name')
+      .select('id, first_name, last_name, profile_picture_storage_path')
       .eq('user_id', userId);
 
     if (partnersError) {
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       allPhotos || []
     );
 
-    // Enrich matches with partner names
+    // Enrich matches with partner names and profile pictures
     const enrichedMatches: FaceMatch[] = allMatches.map((match) => {
       const photo = (allPhotos || []).find(p => p.id === match.photo_id);
       if (photo) {
@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
           partner_name: partner
             ? `${partner.first_name || ''} ${partner.last_name || ''}`.trim() || null
             : null,
+          partner_profile_picture: partner?.profile_picture_storage_path || null,
         };
       }
       return match;

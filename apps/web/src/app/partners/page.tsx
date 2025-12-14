@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Partner } from '@/shared';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import { getPartnerProfilePictureUrl } from '@/lib/photo-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,34 +59,53 @@ export default async function PartnersPage() {
         
         {partners && partners.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {partners.map((partner: Partner) => (
-              <Link
-                key={partner.id}
-                href={`/partners/${partner.id}`}
-                className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
-              >
-                <h2 className="text-xl font-semibold mb-2">
-                  {partner.first_name || partner.last_name || 'Unnamed Partner'}
-                  {partner.first_name && partner.last_name && ` ${partner.last_name}`}
-                </h2>
-                {partner.email && (
-                  <p className="text-sm text-gray-600 mb-1">{partner.email}</p>
-                )}
-                {partner.phone_number && (
-                  <p className="text-sm text-gray-600 mb-1">
-                    {partner.phone_number}
-                  </p>
-                )}
-                {partner.description && (
-                  <p className="text-sm text-gray-700 mt-3 line-clamp-2">
-                    {partner.description}
-                  </p>
-                )}
-                <p className="text-xs text-gray-500 mt-4">
-                  Added {new Date(partner.created_at).toLocaleDateString()}
-                </p>
-              </Link>
-            ))}
+            {partners.map((partner: Partner) => {
+              const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+              const profilePictureUrl = getPartnerProfilePictureUrl(partner, supabaseUrl);
+              return (
+                <Link
+                  key={partner.id}
+                  href={`/partners/${partner.id}`}
+                  className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow flex gap-4"
+                >
+                  {profilePictureUrl ? (
+                    <img
+                      src={profilePictureUrl}
+                      alt={`${partner.first_name || partner.last_name || 'Partner'}`}
+                      className="w-16 h-16 rounded-full object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                      <span className="text-gray-400 text-xl">
+                        {(partner.first_name?.[0] || partner.last_name?.[0] || '?').toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-xl font-semibold mb-2">
+                      {partner.first_name || partner.last_name || 'Unnamed Partner'}
+                      {partner.first_name && partner.last_name && ` ${partner.last_name}`}
+                    </h2>
+                    {partner.email && (
+                      <p className="text-sm text-gray-600 mb-1 truncate">{partner.email}</p>
+                    )}
+                    {partner.phone_number && (
+                      <p className="text-sm text-gray-600 mb-1">
+                        {partner.phone_number}
+                      </p>
+                    )}
+                    {partner.description && (
+                      <p className="text-sm text-gray-700 mt-3 line-clamp-2">
+                        {partner.description}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-4">
+                      Added {new Date(partner.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow p-12 text-center">

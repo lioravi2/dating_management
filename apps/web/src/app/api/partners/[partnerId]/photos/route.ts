@@ -140,6 +140,21 @@ export async function POST(
       );
     }
 
+    // Set this photo as profile picture if partner doesn't have one yet
+    const { data: currentPartner } = await supabase
+      .from('partners')
+      .select('profile_picture_storage_path')
+      .eq('id', partnerId)
+      .single();
+
+    if (currentPartner && !currentPartner.profile_picture_storage_path) {
+      console.log('[API] Setting first photo as profile picture');
+      await supabase
+        .from('partners')
+        .update({ profile_picture_storage_path: storagePath })
+        .eq('id', partnerId);
+    }
+
     console.log('[API] Photo uploaded successfully:', photo.id);
     return NextResponse.json({ photo });
   } catch (error) {
