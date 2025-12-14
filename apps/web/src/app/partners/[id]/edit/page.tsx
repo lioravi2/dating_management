@@ -19,6 +19,7 @@ export default function EditPartnerPage() {
   const [loading, setLoading] = useState(true);
   const [accountType, setAccountType] = useState<string | null>(null);
   const [partner, setPartner] = useState<Partner | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,6 +53,35 @@ export default function EditPartnerPage() {
     fetchData();
   }, [partnerId, supabase, router]);
 
+  const handleDelete = async () => {
+    if (!partner) return;
+
+    const partnerName = partner.first_name || partner.last_name || 'this partner';
+    const confirmMessage = `Are you sure you want to delete ${partnerName}? This will permanently delete all photos and activities associated with this partner. This action cannot be undone.`;
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/partners/${partnerId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete partner');
+      }
+
+      // Redirect to partners list after successful deletion
+      router.push('/partners');
+    } catch (error) {
+      console.error('Error deleting partner:', error);
+      alert(`Failed to delete partner: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -86,7 +116,16 @@ export default function EditPartnerPage() {
           </Link>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
-          <h1 className="text-2xl font-bold mb-6">Edit Partner</h1>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">Edit Partner</h1>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {deleting ? 'Deleting...' : 'Delete Partner'}
+            </button>
+          </div>
           {loading ? (
             <p>Loading...</p>
           ) : (

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useFaceDetection } from '@/lib/hooks/useFaceDetection';
 import { FaceSelectionUI } from './FaceSelectionUI';
 import { FaceDetectionResult, MultipleFaceDetectionResult } from '@/lib/face-detection/types';
-import { PhotoUploadAnalysis, FaceMatch } from '@/shared';
+import { PhotoUploadAnalysis, FaceMatch, FREE_TIER_PHOTO_LIMIT } from '@/shared';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { getPhotoUrl } from '@/lib/photo-utils';
@@ -39,6 +39,8 @@ export function PhotoUploadWithFaceMatch({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [userAccountType, setUserAccountType] = useState<'free' | 'pro' | null>(null);
+  const [showPhotoLimitModal, setShowPhotoLimitModal] = useState(false);
 
   // Modal states
   const [showNoFaceModal, setShowNoFaceModal] = useState(false);
@@ -46,6 +48,25 @@ export function PhotoUploadWithFaceMatch({
   const [showSamePersonModal, setShowSamePersonModal] = useState(false);
   const [showOtherPartnersModal, setShowOtherPartnersModal] = useState(false);
   const [showCreateNewPartnerModal, setShowCreateNewPartnerModal] = useState(false);
+
+  // Fetch user account type on mount
+  useEffect(() => {
+    const fetchAccountType = async () => {
+      const supabase = createSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('users')
+          .select('account_type')
+          .eq('id', user.id)
+          .single();
+        if (data) {
+          setUserAccountType(data.account_type as 'free' | 'pro');
+        }
+      }
+    };
+    fetchAccountType();
+  }, []);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -55,6 +76,27 @@ export function PhotoUploadWithFaceMatch({
     if (!file.type.startsWith('image/')) {
       alert('Please select an image file');
       return;
+    }
+
+    // Check photo limit for free users BEFORE face detection
+    if (userAccountType === 'free') {
+      const supabase = createSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { count, error: countError } = await supabase
+          .from('partner_photos')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+
+        if (!countError && count !== null && count >= FREE_TIER_PHOTO_LIMIT) {
+          setShowPhotoLimitModal(true);
+          // Reset file input
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
+        }
+      }
     }
 
     setSelectedFile(file);
@@ -758,6 +800,39 @@ export function PhotoUploadWithFaceMatch({
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 Create New Partner
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Limit Modal */}
+      {showPhotoLimitModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md">
+            <h2 className="text-xl font-bold mb-4">Photo Limit Reached</h2>
+            <p className="text-gray-600 mb-4">
+              Your free subscription is limited to {FREE_TIER_PHOTO_LIMIT} photos. Please upgrade to Pro to upload more photos.
+            </p>
+            <div className="flex gap-4 justify-end">
+              <button
+                onClick={() => {
+                  setShowPhotoLimitModal(false);
+                  resetState();
+                }}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowPhotoLimitModal(false);
+                  resetState();
+                  router.push('/upgrade');
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Upgrade to Pro
               </button>
             </div>
           </div>
