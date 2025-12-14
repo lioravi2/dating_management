@@ -23,30 +23,42 @@ export default function PartnerActivities({
   const [showForm, setShowForm] = useState(false);
   const [editingActivity, setEditingActivity] = useState<PartnerActivity | null>(null);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string | React.ReactNode } | null>(null);
   const [userAccountType, setUserAccountType] = useState<'free' | 'pro'>('free');
+  const [hasCalendarConnection, setHasCalendarConnection] = useState<boolean>(false);
   const [syncingActivities, setSyncingActivities] = useState<Set<string>>(new Set());
   const [syncErrors, setSyncErrors] = useState<Map<string, string>>(new Map());
   const supabase = createSupabaseClient();
 
   useEffect(() => {
-    // Get user account type
-    const fetchUserAccountType = async () => {
+    // Get user account type and calendar connection
+    const fetchUserData = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const { data } = await supabase
+        // Get account type
+        const { data: userData } = await supabase
           .from('users')
           .select('account_type')
           .eq('id', user.id)
           .single();
-        if (data) {
-          setUserAccountType(data.account_type);
+        if (userData) {
+          setUserAccountType(userData.account_type);
         }
+
+        // Check for calendar connection
+        const { data: calendarData } = await supabase
+          .from('calendar_connections')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('provider', 'google')
+          .single();
+        
+        setHasCalendarConnection(!!calendarData);
       }
     };
-    fetchUserAccountType();
+    fetchUserData();
   }, [supabase]);
 
   const canAddActivity =
@@ -165,6 +177,24 @@ export default function PartnerActivities({
   const handleSyncActivity = async (activityId: string) => {
     const activity = activities.find((a) => a.id === activityId);
     if (!activity) return;
+
+    // Check if calendar is connected
+    if (!hasCalendarConnection) {
+      setMessage({
+        type: 'error',
+        text: (
+          <>
+            Calendar not available -{' '}
+            <Link href="/profile" className="underline font-semibold">
+              click here
+            </Link>{' '}
+            to synchronize your calendar from your profile page
+          </>
+        ),
+      });
+      setTimeout(() => setMessage(null), 5000);
+      return;
+    }
 
     const isSynced = !!activity.google_calendar_event_id;
     
@@ -421,14 +451,18 @@ export default function PartnerActivities({
                                 onClick={() => handleSyncActivity(activity.id)}
                                 disabled={syncingActivities.has(activity.id)}
                                 className={`p-2 rounded transition-colors ${
-                                  activity.google_calendar_event_id
+                                  !hasCalendarConnection
+                                    ? 'text-red-600 hover:text-red-800 hover:bg-red-50'
+                                    : activity.google_calendar_event_id
                                     ? 'text-green-600 hover:text-green-800 hover:bg-green-50'
                                     : syncErrors.has(activity.id)
                                     ? 'text-red-600 hover:text-red-800 hover:bg-red-50'
                                     : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                                 } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 title={
-                                  syncingActivities.has(activity.id)
+                                  !hasCalendarConnection
+                                    ? 'Calendar not connected - click to connect'
+                                    : syncingActivities.has(activity.id)
                                     ? 'Syncing...'
                                     : activity.google_calendar_event_id
                                     ? 'Unsync from calendar'
