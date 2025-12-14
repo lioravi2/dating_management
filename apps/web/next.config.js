@@ -2,7 +2,21 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['localhost'],
+    domains: [
+      'localhost',
+      'tpidbrwziqoujspvradj.supabase.co', // Your Supabase project domain
+    ],
+  },
+  webpack: (config, { isServer }) => {
+    // Fix for face-api.js Node.js module warnings
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        encoding: false,
+      };
+    }
+    return config;
   },
   env: {
     // Build number - set by CI/CD or generated for local dev

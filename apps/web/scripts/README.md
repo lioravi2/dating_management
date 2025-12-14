@@ -113,3 +113,5 @@ npx tsx scripts/change-subscription-to-daily.ts user@example.com
 - Verify all required variables are set
 
 
+
+

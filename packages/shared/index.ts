@@ -61,9 +61,32 @@ export interface PartnerPhoto {
   mime_type: string | null;
   width: number | null;
   height: number | null;
+  face_descriptor: number[] | null;
+  face_detection_attempted: boolean | null;
   uploaded_at: string;
   created_at: string;
   updated_at: string;
+}
+
+// Face Recognition Types
+export interface FaceMatch {
+  photo_id: string;
+  partner_id: string;
+  partner_name: string | null;
+  similarity: number; // 0-1, higher = more similar
+  confidence: number; // Detection confidence as percentage
+}
+
+export type PhotoUploadDecision = 
+  | { type: 'proceed'; reason: 'matches_partner_or_no_photos' | 'no_matches' }
+  | { type: 'warn_same_person'; reason: 'doesnt_match_partner_has_photos' }
+  | { type: 'warn_other_partners'; matches: FaceMatch[]; reason: 'matches_other_partners' };
+
+export interface PhotoUploadAnalysis {
+  decision: PhotoUploadDecision;
+  partnerMatches: FaceMatch[]; // Matches within the same partner
+  otherPartnerMatches: FaceMatch[]; // Matches with other partners
+  partnerHasOtherPhotos: boolean;
 }
 
 export interface PartnerActivity {

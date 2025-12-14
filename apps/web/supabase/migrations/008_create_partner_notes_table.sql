@@ -71,3 +71,5 @@ CREATE TRIGGER update_partner_notes_updated_at BEFORE UPDATE ON public.partner_n
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 
+
+

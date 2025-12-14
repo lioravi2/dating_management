@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Partner, PartnerActivity } from '@/shared';
 import PartnerActivities from '@/components/PartnerActivities';
+import PartnerPhotos from '@/components/PartnerPhotos';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
 
@@ -176,6 +177,8 @@ export default async function PartnerDetailPage({
             </div>
           )}
         </div>
+
+        <PartnerPhotos partnerId={params.id} />
 
         <PartnerActivities partnerId={params.id} initialActivities={activities || []} />
       </main>

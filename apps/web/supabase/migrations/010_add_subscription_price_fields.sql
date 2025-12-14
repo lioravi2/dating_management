@@ -7,3 +7,5 @@ ADD COLUMN IF NOT EXISTS billing_interval TEXT CHECK (billing_interval IN ('day'
 COMMENT ON COLUMN public.subscriptions.price_amount IS 'Price in cents';
 COMMENT ON COLUMN public.subscriptions.billing_interval IS 'Billing interval: day, month, or year';
 
+
+
