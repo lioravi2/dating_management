@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
@@ -27,7 +27,10 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   const [message, setMessage] = useState('');
   const [isLimitReached, setIsLimitReached] = useState(false);
   const [lastActivityDescription, setLastActivityDescription] = useState<string | null>(null);
-  const [hasUserTyped, setHasUserTyped] = useState(false);
+  const [suggestionText, setSuggestionText] = useState<string>('');
+  const [showSuggestion, setShowSuggestion] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const suggestionRef = useRef<HTMLSpanElement>(null);
 
   // Fetch last activity description if partner has no description
   useEffect(() => {
@@ -50,13 +53,45 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     fetchLastActivity();
   }, [partner]);
 
-  // Handle tab key to prefill description
-  const handleDescriptionKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Tab' && !hasUserTyped && !formData.description && lastActivityDescription) {
-      e.preventDefault();
-      setFormData({ ...formData, description: lastActivityDescription });
-      setHasUserTyped(true);
+  // Update suggestion text based on current input
+  useEffect(() => {
+    if (lastActivityDescription && formData.description && !partner?.description) {
+      const input = formData.description.toLowerCase();
+      const suggestion = lastActivityDescription.toLowerCase();
+      
+      // Check if suggestion starts with input
+      if (suggestion.startsWith(input) && input.length < suggestion.length) {
+        setSuggestionText(lastActivityDescription.substring(input.length));
+        setShowSuggestion(true);
+      } else {
+        setSuggestionText('');
+        setShowSuggestion(false);
+      }
+    } else {
+      setSuggestionText('');
+      setShowSuggestion(false);
     }
+  }, [formData.description, lastActivityDescription, partner?.description]);
+
+  // Handle keyboard events for inline autocomplete
+  const handleDescriptionKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Accept suggestion with Tab or Right Arrow
+    if ((e.key === 'Tab' || e.key === 'ArrowRight') && showSuggestion && suggestionText) {
+      e.preventDefault();
+      setFormData({ ...formData, description: formData.description + suggestionText });
+      setShowSuggestion(false);
+      setSuggestionText('');
+    }
+    // Dismiss suggestion with Escape
+    else if (e.key === 'Escape' && showSuggestion) {
+      setShowSuggestion(false);
+      setSuggestionText('');
+    }
+  };
+
+  // Handle input changes
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setFormData({ ...formData, description: e.target.value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -219,32 +254,57 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         >
           Description
         </label>
-        <textarea
-          id="description"
-          value={formData.description}
-          onChange={(e) => {
-            setFormData({ ...formData, description: e.target.value });
-            if (e.target.value.length > 0) {
-              setHasUserTyped(true);
-            }
-          }}
-          onFocus={() => {
-            if (!hasUserTyped && !formData.description && lastActivityDescription) {
-              setHasUserTyped(true);
-            }
-          }}
-          onKeyDown={handleDescriptionKeyDown}
-          placeholder={!hasUserTyped && !formData.description && lastActivityDescription 
-            ? lastActivityDescription 
-            : undefined
-          }
-          rows={4}
-          className={`w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-            !hasUserTyped && !formData.description && lastActivityDescription 
-              ? 'placeholder:text-gray-400' 
-              : ''
-          }`}
-        />
+        <div className="relative">
+          {/* Suggestion overlay - positioned behind textarea to show inline autocomplete */}
+          {showSuggestion && suggestionText && (
+            <div
+              className="absolute inset-0 pointer-events-none z-0 border border-transparent rounded-lg px-4 py-2 overflow-hidden"
+              style={{
+                fontFamily: 'inherit',
+                fontSize: '0.875rem',
+                lineHeight: '1.5rem',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              <span className="invisible">{formData.description}</span>
+              <span className="text-gray-400">{suggestionText}</span>
+            </div>
+          )}
+          <textarea
+            ref={textareaRef}
+            id="description"
+            value={formData.description}
+            onChange={handleDescriptionChange}
+            onKeyDown={handleDescriptionKeyDown}
+            rows={4}
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent relative z-10 bg-transparent"
+            style={{ 
+              caretColor: 'inherit',
+            }}
+          />
+          {/* Mobile tap button to accept suggestion */}
+          {showSuggestion && suggestionText && (
+            <button
+              type="button"
+              onClick={() => {
+                setFormData({ ...formData, description: formData.description + suggestionText });
+                setShowSuggestion(false);
+                setSuggestionText('');
+                textareaRef.current?.focus();
+              }}
+              className="absolute right-2 top-2 z-20 px-2 py-1 text-xs bg-primary-100 text-primary-700 rounded hover:bg-primary-200 transition-colors md:hidden"
+              aria-label="Accept suggestion"
+            >
+              Accept
+            </button>
+          )}
+        </div>
+        {showSuggestion && suggestionText && (
+          <p className="text-xs text-gray-500 mt-1">
+            Press <kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">Tab</kbd> or <kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">→</kbd> to accept suggestion
+          </p>
+        )}
         {partner?.description_time && (
           <p className="text-xs text-gray-500 mt-1">
             Last updated: {new Date(partner.description_time).toLocaleString()}
