@@ -495,11 +495,13 @@ export function PhotoUploadWithFaceMatch({
           // Navigate to generic similar photos page (no partnerId required)
           const analysisParam = encodeURIComponent(JSON.stringify(analysis));
           // Convert blob URL to base64 data URL for persistence across navigation
+          // Use fileRef.current directly - it's more reliable than imageUrl state
           let imageUrlParam = '';
-          if (imageUrl && fileRef.current) {
+          const fileToConvert = fileRef.current || selectedFile;
+          if (fileToConvert) {
             try {
-              console.log('[PhotoUpload] Converting image to base64, file size:', fileRef.current.size);
-              const base64Url = await convertBlobToBase64(fileRef.current);
+              console.log('[PhotoUpload] Converting image to base64, file size:', fileToConvert.size);
+              const base64Url = await convertBlobToBase64(fileToConvert);
               console.log('[PhotoUpload] Base64 conversion successful, length:', base64Url.length);
               imageUrlParam = `&imageUrl=${encodeURIComponent(base64Url)}`;
               console.log('[PhotoUpload] Image URL param length:', imageUrlParam.length);
@@ -509,18 +511,8 @@ export function PhotoUploadWithFaceMatch({
               // Instead, navigate without imageUrl - the page will work fine without it
               console.warn('[PhotoUpload] Navigating without image preview due to conversion failure');
             }
-          } else if (imageUrl) {
-            // If we have imageUrl but no fileRef, try to use it (might be base64 already)
-            // But log a warning since blob URLs won't work
-            if (imageUrl.startsWith('data:')) {
-              console.log('[PhotoUpload] Image URL is already base64');
-              imageUrlParam = `&imageUrl=${encodeURIComponent(imageUrl)}`;
-            } else {
-              console.warn('[PhotoUpload] Image URL is blob URL without fileRef - may not persist');
-              // Don't include blob URL - it won't work after navigation
-            }
           } else {
-            console.log('[PhotoUpload] No imageUrl available');
+            console.log('[PhotoUpload] No file available for conversion (fileRef.current:', !!fileRef.current, ', selectedFile:', !!selectedFile, ')');
           }
           router.push(`/similar-photos?analysis=${analysisParam}${imageUrlParam}`);
         }
