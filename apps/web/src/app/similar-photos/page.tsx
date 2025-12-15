@@ -164,10 +164,31 @@ export default function SimilarPhotosPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow p-6">
-          <h1 className="text-2xl font-bold mb-4">This photo resembles other partners</h1>
-          <p className="text-gray-600 mb-6">
-            This photo matches photos from other partners:
-          </p>
+          <div className="flex items-center gap-4 mb-4">
+            {imageUrl && (
+              <img
+                src={imageUrl}
+                alt="Uploaded photo"
+                className="w-16 h-16 rounded-full object-cover flex-shrink-0 border-2 border-gray-300"
+                onError={(e) => {
+                  console.error('[SimilarPhotos] Failed to load image:', imageUrl);
+                  console.error('[SimilarPhotos] Image error details:', e);
+                  // Hide the image on error
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
+                onLoad={() => {
+                  console.log('[SimilarPhotos] Image loaded successfully');
+                }}
+              />
+            )}
+            <div>
+              <h1 className="text-2xl font-bold">This photo resembles other partners</h1>
+              <p className="text-gray-600 mt-1">
+                This photo matches photos from other partners:
+              </p>
+            </div>
+          </div>
 
           {similarPartners.length > 0 ? (
             <div className="mb-6 space-y-3">
