@@ -561,7 +561,7 @@ export function PhotoUploadWithFaceMatch({
     setMounted(true);
   }, []);
 
-  // Restore modal state from sessionStorage on mount
+  // Restore modal state from sessionStorage on mount or when partnerId changes
   useEffect(() => {
     if (!mounted || !partnerId) return;
     
@@ -580,7 +580,10 @@ export function PhotoUploadWithFaceMatch({
           if (modalData.detectionResult) {
             setDetectionResult(modalData.detectionResult);
           }
-          setShowOtherPartnersModal(true);
+          // Set modal to show after a small delay to ensure state is set
+          setTimeout(() => {
+            setShowOtherPartnersModal(true);
+          }, 0);
         }
       } catch (e) {
         console.error('Error restoring modal state:', e);
@@ -590,6 +593,7 @@ export function PhotoUploadWithFaceMatch({
   }, [mounted, partnerId]);
 
   // Save modal state to sessionStorage when modal opens
+  // Don't clear on unmount - only clear when explicitly closed via buttons
   useEffect(() => {
     if (showOtherPartnersModal && analysis?.otherPartnerMatches && partnerId) {
       const modalData = {
@@ -600,10 +604,8 @@ export function PhotoUploadWithFaceMatch({
         detectionResult: detectionResult,
       };
       sessionStorage.setItem('photoUploadModal', JSON.stringify(modalData));
-    } else if (!showOtherPartnersModal) {
-      // Clear sessionStorage when modal is closed
-      sessionStorage.removeItem('photoUploadModal');
     }
+    // Don't clear sessionStorage here - only clear when user explicitly closes modal
   }, [showOtherPartnersModal, analysis, partnerId, imageUrl, detectionResult]);
 
   // Check authentication on mount
@@ -897,8 +899,20 @@ export function PhotoUploadWithFaceMatch({
                         </div>
                         <button
                           onClick={() => {
+                            // Save modal state to sessionStorage before navigating
+                            if (analysis?.otherPartnerMatches && partnerId) {
+                              const modalData = {
+                                type: 'otherPartners',
+                                partnerId: partnerId,
+                                analysis: analysis,
+                                imageUrl: imageUrl,
+                                detectionResult: detectionResult,
+                              };
+                              sessionStorage.setItem('photoUploadModal', JSON.stringify(modalData));
+                            }
+                            // Close modal visually but keep data in sessionStorage for restoration
+                            setShowOtherPartnersModal(false);
                             router.push(`/partners/${partner.partner_id}`);
-                            // Don't close modal - let it persist via sessionStorage
                           }}
                           className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex-shrink-0"
                         >
