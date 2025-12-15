@@ -445,15 +445,29 @@ export function PhotoUploadWithFaceMatch({
           let imageUrlParam = '';
           if (imageUrl && fileRef.current) {
             try {
+              console.log('[PhotoUpload] Converting image to base64, file size:', fileRef.current.size);
               const base64Url = await convertBlobToBase64(fileRef.current);
+              console.log('[PhotoUpload] Base64 conversion successful, length:', base64Url.length);
               imageUrlParam = `&imageUrl=${encodeURIComponent(base64Url)}`;
+              console.log('[PhotoUpload] Image URL param length:', imageUrlParam.length);
             } catch (error) {
               console.error('[PhotoUpload] Failed to convert image to base64:', error);
-              // Fallback to original blob URL if conversion fails
-              imageUrlParam = imageUrl ? `&imageUrl=${encodeURIComponent(imageUrl)}` : '';
+              // Don't use blob URL as fallback - it won't persist across navigation
+              // Instead, navigate without imageUrl - the page will work fine without it
+              console.warn('[PhotoUpload] Navigating without image preview due to conversion failure');
             }
           } else if (imageUrl) {
-            imageUrlParam = `&imageUrl=${encodeURIComponent(imageUrl)}`;
+            // If we have imageUrl but no fileRef, try to use it (might be base64 already)
+            // But log a warning since blob URLs won't work
+            if (imageUrl.startsWith('data:')) {
+              console.log('[PhotoUpload] Image URL is already base64');
+              imageUrlParam = `&imageUrl=${encodeURIComponent(imageUrl)}`;
+            } else {
+              console.warn('[PhotoUpload] Image URL is blob URL without fileRef - may not persist');
+              // Don't include blob URL - it won't work after navigation
+            }
+          } else {
+            console.log('[PhotoUpload] No imageUrl available');
           }
           router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}${imageUrlParam}`);
         }
@@ -492,15 +506,29 @@ export function PhotoUploadWithFaceMatch({
           let imageUrlParam = '';
           if (imageUrl && fileRef.current) {
             try {
+              console.log('[PhotoUpload] Converting image to base64, file size:', fileRef.current.size);
               const base64Url = await convertBlobToBase64(fileRef.current);
+              console.log('[PhotoUpload] Base64 conversion successful, length:', base64Url.length);
               imageUrlParam = `&imageUrl=${encodeURIComponent(base64Url)}`;
+              console.log('[PhotoUpload] Image URL param length:', imageUrlParam.length);
             } catch (error) {
               console.error('[PhotoUpload] Failed to convert image to base64:', error);
-              // Fallback to original blob URL if conversion fails
-              imageUrlParam = imageUrl ? `&imageUrl=${encodeURIComponent(imageUrl)}` : '';
+              // Don't use blob URL as fallback - it won't persist across navigation
+              // Instead, navigate without imageUrl - the page will work fine without it
+              console.warn('[PhotoUpload] Navigating without image preview due to conversion failure');
             }
           } else if (imageUrl) {
-            imageUrlParam = `&imageUrl=${encodeURIComponent(imageUrl)}`;
+            // If we have imageUrl but no fileRef, try to use it (might be base64 already)
+            // But log a warning since blob URLs won't work
+            if (imageUrl.startsWith('data:')) {
+              console.log('[PhotoUpload] Image URL is already base64');
+              imageUrlParam = `&imageUrl=${encodeURIComponent(imageUrl)}`;
+            } else {
+              console.warn('[PhotoUpload] Image URL is blob URL without fileRef - may not persist');
+              // Don't include blob URL - it won't work after navigation
+            }
+          } else {
+            console.log('[PhotoUpload] No imageUrl available');
           }
           router.push(`/similar-photos?analysis=${analysisParam}${imageUrlParam}`);
         }
