@@ -583,37 +583,36 @@ export function PhotoUploadWithFaceMatch({
         // Only restore if partnerId matches
         if (modalData.type === 'otherPartners' && modalData.partnerId === partnerId) {
           // Only restore if there's no current imageUrl (meaning we're returning from navigation, not uploading new photo)
-          // If imageUrl exists and doesn't match stored one, it means user has selected a new photo
-          if (imageUrl && modalData.imageUrl && imageUrl !== modalData.imageUrl) {
+          // If imageUrl exists, it means user has selected a new photo, so don't restore old modal state
+          if (imageUrl) {
+            // Check if this is the same photo by comparing analysis data (more reliable than blob URLs)
+            // If analysis exists and matches, we're already restored - skip
+            if (analysis && modalData.analysis && 
+                JSON.stringify(analysis.otherPartnerMatches) === JSON.stringify(modalData.analysis.otherPartnerMatches)) {
+              return;
+            }
             // Different photo - clear stale sessionStorage
             sessionStorage.removeItem('photoUploadModal');
             return;
           }
           
-          // If imageUrl exists and matches stored one, we're already restored - skip
-          if (imageUrl && modalData.imageUrl && imageUrl === modalData.imageUrl) {
-            return;
-          }
-          
           // Only restore if no current imageUrl (returning from navigation)
-          if (!imageUrl) {
-            isRestoringModalRef.current = true;
-            
-            // Restore analysis and image state
-            if (modalData.analysis) {
-              setAnalysis(modalData.analysis);
-            }
-            if (modalData.imageUrl) {
-              setImageUrl(modalData.imageUrl);
-            }
-            if (modalData.detectionResult) {
-              setDetectionResult(modalData.detectionResult);
-            }
-            // Set modal to show after a small delay to ensure state is set
-            setTimeout(() => {
-              setShowOtherPartnersModal(true);
-            }, 0);
+          isRestoringModalRef.current = true;
+          
+          // Restore analysis and image state
+          if (modalData.analysis) {
+            setAnalysis(modalData.analysis);
           }
+          if (modalData.imageUrl) {
+            setImageUrl(modalData.imageUrl);
+          }
+          if (modalData.detectionResult) {
+            setDetectionResult(modalData.detectionResult);
+          }
+          // Set modal to show after a small delay to ensure state is set
+          setTimeout(() => {
+            setShowOtherPartnersModal(true);
+          }, 0);
         } else {
           // Different partner - clear stale sessionStorage
           sessionStorage.removeItem('photoUploadModal');
@@ -623,7 +622,7 @@ export function PhotoUploadWithFaceMatch({
         sessionStorage.removeItem('photoUploadModal');
       }
     }
-  }, [mounted, partnerId, imageUrl]);
+  }, [mounted, partnerId, imageUrl, analysis]);
 
   // Save modal state to sessionStorage when modal opens
   // Don't clear on unmount - only clear when explicitly closed via buttons
