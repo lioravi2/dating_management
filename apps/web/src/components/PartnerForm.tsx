@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
@@ -26,6 +26,38 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [isLimitReached, setIsLimitReached] = useState(false);
+  const [lastActivityDescription, setLastActivityDescription] = useState<string | null>(null);
+  const [hasUserTyped, setHasUserTyped] = useState(false);
+
+  // Fetch last activity description if partner has no description
+  useEffect(() => {
+    const fetchLastActivity = async () => {
+      if (partner && !partner.description) {
+        const supabase = createSupabaseClient();
+        const { data: activities } = await supabase
+          .from('partner_notes')
+          .select('description')
+          .eq('partner_id', partner.id)
+          .order('start_time', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (activities?.description) {
+          setLastActivityDescription(activities.description);
+        }
+      }
+    };
+    fetchLastActivity();
+  }, [partner]);
+
+  // Handle tab key to prefill description
+  const handleDescriptionKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab' && !hasUserTyped && !formData.description && lastActivityDescription) {
+      e.preventDefault();
+      setFormData({ ...formData, description: lastActivityDescription });
+      setHasUserTyped(true);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,11 +222,28 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         <textarea
           id="description"
           value={formData.description}
-          onChange={(e) =>
-            setFormData({ ...formData, description: e.target.value })
+          onChange={(e) => {
+            setFormData({ ...formData, description: e.target.value });
+            if (e.target.value.length > 0) {
+              setHasUserTyped(true);
+            }
+          }}
+          onFocus={() => {
+            if (!hasUserTyped && !formData.description && lastActivityDescription) {
+              setHasUserTyped(true);
+            }
+          }}
+          onKeyDown={handleDescriptionKeyDown}
+          placeholder={!hasUserTyped && !formData.description && lastActivityDescription 
+            ? lastActivityDescription 
+            : undefined
           }
           rows={4}
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          className={`w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+            !hasUserTyped && !formData.description && lastActivityDescription 
+              ? 'placeholder:text-gray-400' 
+              : ''
+          }`}
         />
         {partner?.description_time && (
           <p className="text-xs text-gray-500 mt-1">

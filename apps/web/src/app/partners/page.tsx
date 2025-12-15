@@ -34,6 +34,28 @@ export default async function PartnersPage() {
     console.error('Error fetching partners:', partnersError);
   }
 
+  // Fetch last activity description for each partner (if partner has no description)
+  const partnerIds = partners?.map(p => p.id) || [];
+  const lastActivities: { [key: string]: string | null } = {};
+  
+  if (partnerIds.length > 0) {
+    // Get the most recent activity for each partner
+    const { data: activities } = await supabase
+      .from('partner_notes')
+      .select('partner_id, description')
+      .in('partner_id', partnerIds)
+      .order('start_time', { ascending: false });
+    
+    // Group by partner_id and get the first (most recent) activity description
+    if (activities) {
+      activities.forEach((activity) => {
+        if (activity.description && !lastActivities[activity.partner_id]) {
+          lastActivities[activity.partner_id] = activity.description;
+        }
+      });
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header accountType={user?.account_type} />
@@ -94,9 +116,9 @@ export default async function PartnersPage() {
                         {partner.phone_number}
                       </p>
                     )}
-                    {partner.description && (
+                    {(partner.description || lastActivities[partner.id]) && (
                       <p className="text-sm text-gray-700 mt-3 line-clamp-2">
-                        {partner.description}
+                        {partner.description || lastActivities[partner.id]}
                       </p>
                     )}
                     <div className="text-xs text-gray-500 mt-4 space-y-1">

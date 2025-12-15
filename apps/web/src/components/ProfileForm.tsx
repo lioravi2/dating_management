@@ -177,6 +177,21 @@ export default function ProfileForm({ user }: ProfileFormProps) {
           </p>
         </div>
 
+        {user.created_at && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Member Since
+            </label>
+            <p className="text-gray-900">
+              {new Date(user.created_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </p>
+          </div>
+        )}
+
         <div>
           <label
             htmlFor="full_name"

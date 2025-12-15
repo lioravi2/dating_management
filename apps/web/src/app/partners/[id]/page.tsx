@@ -46,6 +46,11 @@ export default async function PartnerDetailPage({
     .eq('partner_id', params.id)
     .order('start_time', { ascending: false });
 
+  // Get last activity description if partner has no description
+  const lastActivityDescription = !partner.description && activities && activities.length > 0
+    ? activities.find(a => a.description)?.description || null
+    : null;
+
   const partnerDisplayName = partner.first_name && partner.last_name
     ? `${partner.first_name} ${partner.last_name}`
     : partner.first_name || partner.last_name || 'Unnamed Partner';
@@ -105,13 +110,15 @@ export default async function PartnerDetailPage({
             )}
           </div>
 
-          {partner.description && (
+          {(partner.description || lastActivityDescription) && (
             <div className="mt-4">
               <label className="text-sm font-medium text-gray-700">
                 Description
               </label>
-              <p className="text-gray-900 mt-1">{partner.description}</p>
-              {partner.description_time && (
+              <p className="text-gray-900 mt-1">
+                {partner.description || lastActivityDescription}
+              </p>
+              {partner.description && partner.description_time && (
                 <p className="text-xs text-gray-500 mt-1">
                   Updated {new Date(partner.description_time).toLocaleString()}
                 </p>

@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import Header from '@/components/Header';
+import { getPartnerProfilePictureUrl } from '@/lib/photo-utils';
+import { Partner } from '@/shared';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -67,6 +69,34 @@ export default async function DashboardPage() {
     }
   }
 
+  // Fetch recent partners (3 most recently updated)
+  const { data: recentPartners } = await supabase
+    .from('partners')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .order('updated_at', { ascending: false })
+    .limit(3);
+
+  // Fetch last activity descriptions for partners without descriptions
+  const partnerIds = recentPartners?.map(p => p.id) || [];
+  const lastActivities: { [key: string]: string | null } = {};
+  
+  if (partnerIds.length > 0) {
+    const { data: activities } = await supabase
+      .from('partner_notes')
+      .select('partner_id, description')
+      .in('partner_id', partnerIds)
+      .order('start_time', { ascending: false });
+    
+    if (activities) {
+      activities.forEach((activity) => {
+        if (activity.description && !lastActivities[activity.partner_id]) {
+          lastActivities[activity.partner_id] = activity.description;
+        }
+      });
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header accountType={user?.account_type} />
@@ -78,49 +108,66 @@ export default async function DashboardPage() {
           <h1 className="text-3xl font-bold mb-2">
             Welcome{user?.full_name ? `, ${user.full_name}` : ' back'}! 👋
           </h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600">
             Here's your dashboard overview
           </p>
-          
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <h2 className="text-lg font-semibold mb-3">Your Account Details</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Email</p>
-                <p className="font-medium">{user?.email || session.user.email}</p>
-              </div>
-              {user?.full_name && (
-                <div>
-                  <p className="text-sm text-gray-500">Full Name</p>
-                  <p className="font-medium">{user.full_name}</p>
-                </div>
-              )}
-              {user?.created_at && (
-                <div>
-                  <p className="text-sm text-gray-500">Member Since</p>
-                  <p className="font-medium">
-                    {new Date(user.created_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </p>
-                </div>
-              )}
+        </div>
+
+        {recentPartners && recentPartners.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Recent Partners</h2>
+              <Link
+                href="/partners"
+                className="text-primary-600 hover:text-primary-800 font-medium"
+              >
+                View all partners →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {recentPartners.map((partner: Partner) => {
+                const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+                const profilePictureUrl = getPartnerProfilePictureUrl(partner, supabaseUrl);
+                return (
+                  <Link
+                    key={partner.id}
+                    href={`/partners/${partner.id}`}
+                    className="bg-gray-50 rounded-lg shadow p-4 hover:shadow-lg transition-shadow flex gap-3"
+                  >
+                    {profilePictureUrl ? (
+                      <img
+                        src={profilePictureUrl}
+                        alt={`${partner.first_name || partner.last_name || 'Partner'}`}
+                        className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                        <span className="text-gray-400 text-sm">
+                          {(partner.first_name?.[0] || partner.last_name?.[0] || '?').toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold mb-1 truncate">
+                        {partner.first_name || partner.last_name || 'Unnamed Partner'}
+                        {partner.first_name && partner.last_name && ` ${partner.last_name}`}
+                      </h3>
+                      {(partner.description || lastActivities[partner.id]) && (
+                        <p className="text-sm text-gray-600 line-clamp-2">
+                          {partner.description || lastActivities[partner.id]}
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </div>
-        </div>
+        )}
 
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link
-              href="/partners"
-              className="bg-primary-50 border-2 border-primary-200 rounded-lg p-4 hover:bg-primary-100 transition-colors"
-            >
-              <h2 className="font-semibold text-lg mb-2">View Partners</h2>
-              <p className="text-sm text-gray-600">See all your partners</p>
-            </Link>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Link
               href="/partners/new"
               className="bg-green-50 border-2 border-green-200 rounded-lg p-4 hover:bg-green-100 transition-colors"
