@@ -18,7 +18,7 @@ export default function PartnerCard({ partner, lastActivityDescription, showDele
     <div className="relative group">
       <Link
         href={`/partners/${partner.id}`}
-        className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow flex gap-4 block"
+        className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow flex gap-4"
       >
         {profilePictureUrl ? (
           <img
