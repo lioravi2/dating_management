@@ -456,11 +456,9 @@ export function PhotoUploadWithFaceMatch({
             partnerHasOtherPhotos: false,
           };
           setAnalysis(analysis);
-          // Navigate to dedicated page instead of showing modal
-          // Note: This is for the "no partner ID" case, so we can't use partnerId in the route
-          // For now, we'll show a modal or handle differently - but this case shouldn't happen in normal flow
-          // since we always have a partnerId when uploading from partner page
-          console.warn('No partnerId available for similar photos navigation');
+          // Navigate to generic similar photos page (no partnerId required)
+          const analysisParam = encodeURIComponent(JSON.stringify(analysis));
+          router.push(`/similar-photos?analysis=${analysisParam}`);
         }
       }
     } catch (error) {
