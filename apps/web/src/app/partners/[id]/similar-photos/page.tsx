@@ -35,17 +35,24 @@ export default function SimilarPhotosPage() {
       if (storedImage) {
         console.log('[SimilarPhotos] Image loaded from sessionStorage, length:', storedImage.length);
         setImageUrl(storedImage);
-        // Clean up old sessionStorage entries (keep only the current one)
-        Object.keys(sessionStorage).forEach(key => {
-          if (key.startsWith('similar-photos-image-') && key !== imageKey) {
-            sessionStorage.removeItem(key);
-          }
-        });
       } else {
         console.log('[SimilarPhotos] Image key found but no image in sessionStorage');
       }
+      // Clean up old sessionStorage entries (keep only the current one)
+      // Run cleanup regardless of whether current image was found
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.startsWith('similar-photos-image-') && key !== imageKey) {
+          sessionStorage.removeItem(key);
+        }
+      });
     } else {
       console.log('[SimilarPhotos] No image key in query params');
+      // If no imageKey, clean up all similar-photos-image entries
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.startsWith('similar-photos-image-')) {
+          sessionStorage.removeItem(key);
+        }
+      });
     }
   }, [imageKey]);
   
