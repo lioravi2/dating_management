@@ -33,6 +33,7 @@ export function PhotoUploadWithFaceMatch({
   // Use refs to preserve file and dimensions across async operations
   const fileRef = useRef<File | null>(null);
   const dimensionsRef = useRef<{ width: number; height: number } | null>(null);
+  const isRestoringModalRef = useRef<boolean>(false);
   const [detectionResult, setDetectionResult] = useState<FaceDetectionResult | null>(null);
   const [multipleDetections, setMultipleDetections] = useState<FaceDetectionResult[] | null>(null);
   const [analysis, setAnalysis] = useState<PhotoUploadAnalysis | null>(null);
@@ -569,6 +570,12 @@ export function PhotoUploadWithFaceMatch({
   useEffect(() => {
     if (!mounted || !partnerId) return;
     
+    // Skip if we're currently restoring to avoid clearing sessionStorage after restoration
+    if (isRestoringModalRef.current) {
+      isRestoringModalRef.current = false;
+      return;
+    }
+    
     const savedModal = sessionStorage.getItem('photoUploadModal');
     if (savedModal) {
       try {
@@ -576,27 +583,37 @@ export function PhotoUploadWithFaceMatch({
         // Only restore if partnerId matches
         if (modalData.type === 'otherPartners' && modalData.partnerId === partnerId) {
           // Only restore if there's no current imageUrl (meaning we're returning from navigation, not uploading new photo)
-          // If imageUrl exists, it means user has selected a new photo, so don't restore old modal state
-          if (imageUrl) {
-            // User has selected a new photo - clear stale sessionStorage
+          // If imageUrl exists and doesn't match stored one, it means user has selected a new photo
+          if (imageUrl && modalData.imageUrl && imageUrl !== modalData.imageUrl) {
+            // Different photo - clear stale sessionStorage
             sessionStorage.removeItem('photoUploadModal');
             return;
           }
           
-          // Restore analysis and image state
-          if (modalData.analysis) {
-            setAnalysis(modalData.analysis);
+          // If imageUrl exists and matches stored one, we're already restored - skip
+          if (imageUrl && modalData.imageUrl && imageUrl === modalData.imageUrl) {
+            return;
           }
-          if (modalData.imageUrl) {
-            setImageUrl(modalData.imageUrl);
+          
+          // Only restore if no current imageUrl (returning from navigation)
+          if (!imageUrl) {
+            isRestoringModalRef.current = true;
+            
+            // Restore analysis and image state
+            if (modalData.analysis) {
+              setAnalysis(modalData.analysis);
+            }
+            if (modalData.imageUrl) {
+              setImageUrl(modalData.imageUrl);
+            }
+            if (modalData.detectionResult) {
+              setDetectionResult(modalData.detectionResult);
+            }
+            // Set modal to show after a small delay to ensure state is set
+            setTimeout(() => {
+              setShowOtherPartnersModal(true);
+            }, 0);
           }
-          if (modalData.detectionResult) {
-            setDetectionResult(modalData.detectionResult);
-          }
-          // Set modal to show after a small delay to ensure state is set
-          setTimeout(() => {
-            setShowOtherPartnersModal(true);
-          }, 0);
         } else {
           // Different partner - clear stale sessionStorage
           sessionStorage.removeItem('photoUploadModal');
