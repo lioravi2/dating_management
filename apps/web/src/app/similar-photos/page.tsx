@@ -26,20 +26,29 @@ export default function SimilarPhotosPage() {
   
   // Optional partnerId from query params (for when uploading to a specific partner)
   const partnerId = searchParams.get('partnerId') || null;
-  const imageUrlRaw = searchParams.get('imageUrl');
-  // Decode the imageUrl if it exists (it's encoded when passed through URL)
-  const imageUrl = imageUrlRaw ? decodeURIComponent(imageUrlRaw) : null;
+  const imageKey = searchParams.get('imageKey');
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   
   useEffect(() => {
-    if (imageUrl) {
-      console.log('[SimilarPhotos] Image URL received, length:', imageUrl.length);
-      console.log('[SimilarPhotos] Image URL type:', imageUrl.startsWith('data:') ? 'base64' : 'blob/other');
-      console.log('[SimilarPhotos] Image URL preview (first 100 chars):', imageUrl.substring(0, 100));
+    // Load image from sessionStorage using the key from URL
+    if (imageKey) {
+      const storedImage = sessionStorage.getItem(imageKey);
+      if (storedImage) {
+        console.log('[SimilarPhotos] Image loaded from sessionStorage, length:', storedImage.length);
+        setImageUrl(storedImage);
+        // Clean up old sessionStorage entries (keep only the current one)
+        Object.keys(sessionStorage).forEach(key => {
+          if (key.startsWith('similar-photos-image-') && key !== imageKey) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      } else {
+        console.log('[SimilarPhotos] Image key found but no image in sessionStorage');
+      }
     } else {
-      console.log('[SimilarPhotos] No image URL in query params');
-      console.log('[SimilarPhotos] Raw imageUrl param:', imageUrlRaw);
+      console.log('[SimilarPhotos] No image key in query params');
     }
-  }, [imageUrl, imageUrlRaw]);
+  }, [imageKey]);
   
   const [loading, setLoading] = useState(true);
   const [accountType, setAccountType] = useState<string | null>(null);
@@ -202,8 +211,8 @@ export default function SimilarPhotosPage() {
               </div>
             )}
             <div>
-              <h1 className="text-2xl font-bold">This photo resembles other partners</h1>
-              <p className="text-gray-600 mt-1">
+              <h1 className="text-2xl font-bold mb-1">This photo resembles other partners</h1>
+              <p className="text-gray-600">
                 This photo matches photos from other partners:
               </p>
             </div>

@@ -441,27 +441,27 @@ export function PhotoUploadWithFaceMatch({
           console.log('[PhotoUpload] Navigating to similar photos page');
           // Navigate to dedicated page instead of showing modal
           const analysisParam = encodeURIComponent(JSON.stringify(analysis));
-          // Convert blob URL to base64 data URL for persistence across navigation
-          // Use fileRef.current directly - it's more reliable than imageUrl state
-          let imageUrlParam = '';
+          // Store image in sessionStorage instead of URL params (base64 URLs are too long)
           const fileToConvert = fileRef.current || selectedFile;
           if (fileToConvert) {
             try {
               console.log('[PhotoUpload] Converting image to base64, file size:', fileToConvert.size);
               const base64Url = await convertBlobToBase64(fileToConvert);
               console.log('[PhotoUpload] Base64 conversion successful, length:', base64Url.length);
-              imageUrlParam = `&imageUrl=${encodeURIComponent(base64Url)}`;
-              console.log('[PhotoUpload] Image URL param length:', imageUrlParam.length);
+              // Store in sessionStorage with a unique key
+              const imageKey = `similar-photos-image-${Date.now()}`;
+              sessionStorage.setItem(imageKey, base64Url);
+              // Pass the key in URL instead of the full image
+              router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}&imageKey=${imageKey}`);
             } catch (error) {
               console.error('[PhotoUpload] Failed to convert image to base64:', error);
-              // Don't use blob URL as fallback - it won't persist across navigation
-              // Instead, navigate without imageUrl - the page will work fine without it
               console.warn('[PhotoUpload] Navigating without image preview due to conversion failure');
+              router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}`);
             }
           } else {
-            console.log('[PhotoUpload] No file available for conversion (fileRef.current:', !!fileRef.current, ', selectedFile:', !!selectedFile, ')');
+            console.log('[PhotoUpload] No file available for conversion');
+            router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}`);
           }
-          router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}${imageUrlParam}`);
         }
       } else {
         // Use Case 2: Upload without partner selection
@@ -494,27 +494,27 @@ export function PhotoUploadWithFaceMatch({
           setAnalysis(analysis);
           // Navigate to generic similar photos page (no partnerId required)
           const analysisParam = encodeURIComponent(JSON.stringify(analysis));
-          // Convert blob URL to base64 data URL for persistence across navigation
-          // Use fileRef.current directly - it's more reliable than imageUrl state
-          let imageUrlParam = '';
+          // Store image in sessionStorage instead of URL params (base64 URLs are too long)
           const fileToConvert = fileRef.current || selectedFile;
           if (fileToConvert) {
             try {
               console.log('[PhotoUpload] Converting image to base64, file size:', fileToConvert.size);
               const base64Url = await convertBlobToBase64(fileToConvert);
               console.log('[PhotoUpload] Base64 conversion successful, length:', base64Url.length);
-              imageUrlParam = `&imageUrl=${encodeURIComponent(base64Url)}`;
-              console.log('[PhotoUpload] Image URL param length:', imageUrlParam.length);
+              // Store in sessionStorage with a unique key
+              const imageKey = `similar-photos-image-${Date.now()}`;
+              sessionStorage.setItem(imageKey, base64Url);
+              // Pass the key in URL instead of the full image
+              router.push(`/similar-photos?analysis=${analysisParam}&imageKey=${imageKey}`);
             } catch (error) {
               console.error('[PhotoUpload] Failed to convert image to base64:', error);
-              // Don't use blob URL as fallback - it won't persist across navigation
-              // Instead, navigate without imageUrl - the page will work fine without it
               console.warn('[PhotoUpload] Navigating without image preview due to conversion failure');
+              router.push(`/similar-photos?analysis=${analysisParam}`);
             }
           } else {
-            console.log('[PhotoUpload] No file available for conversion (fileRef.current:', !!fileRef.current, ', selectedFile:', !!selectedFile, ')');
+            console.log('[PhotoUpload] No file available for conversion');
+            router.push(`/similar-photos?analysis=${analysisParam}`);
           }
-          router.push(`/similar-photos?analysis=${analysisParam}${imageUrlParam}`);
         }
       }
     } catch (error) {
