@@ -24,6 +24,7 @@ export default function SimilarPhotosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const partnerId = params.id as string;
+  const imageUrl = searchParams.get('imageUrl');
   const supabase = createSupabaseClient();
   
   const [loading, setLoading] = useState(true);

@@ -425,7 +425,8 @@ export function PhotoUploadWithFaceMatch({
           console.log('[PhotoUpload] Navigating to similar photos page');
           // Navigate to dedicated page instead of showing modal
           const analysisParam = encodeURIComponent(JSON.stringify(analysis));
-          router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}`);
+          const imageUrlParam = imageUrl ? `&imageUrl=${encodeURIComponent(imageUrl)}` : '';
+          router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}${imageUrlParam}`);
         }
       } else {
         // Use Case 2: Upload without partner selection
@@ -458,7 +459,8 @@ export function PhotoUploadWithFaceMatch({
           setAnalysis(analysis);
           // Navigate to generic similar photos page (no partnerId required)
           const analysisParam = encodeURIComponent(JSON.stringify(analysis));
-          router.push(`/similar-photos?analysis=${analysisParam}`);
+          const imageUrlParam = imageUrl ? `&imageUrl=${encodeURIComponent(imageUrl)}` : '';
+          router.push(`/similar-photos?analysis=${analysisParam}${imageUrlParam}`);
         }
       }
     } catch (error) {

@@ -26,6 +26,7 @@ export default function SimilarPhotosPage() {
   
   // Optional partnerId from query params (for when uploading to a specific partner)
   const partnerId = searchParams.get('partnerId') || null;
+  const imageUrl = searchParams.get('imageUrl');
   
   const [loading, setLoading] = useState(true);
   const [accountType, setAccountType] = useState<string | null>(null);
