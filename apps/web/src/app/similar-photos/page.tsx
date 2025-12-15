@@ -26,7 +26,20 @@ export default function SimilarPhotosPage() {
   
   // Optional partnerId from query params (for when uploading to a specific partner)
   const partnerId = searchParams.get('partnerId') || null;
-  const imageUrl = searchParams.get('imageUrl');
+  const imageUrlRaw = searchParams.get('imageUrl');
+  // Decode the imageUrl if it exists (it's encoded when passed through URL)
+  const imageUrl = imageUrlRaw ? decodeURIComponent(imageUrlRaw) : null;
+  
+  useEffect(() => {
+    if (imageUrl) {
+      console.log('[SimilarPhotos] Image URL received, length:', imageUrl.length);
+      console.log('[SimilarPhotos] Image URL type:', imageUrl.startsWith('data:') ? 'base64' : 'blob/other');
+      console.log('[SimilarPhotos] Image URL preview (first 100 chars):', imageUrl.substring(0, 100));
+    } else {
+      console.log('[SimilarPhotos] No image URL in query params');
+      console.log('[SimilarPhotos] Raw imageUrl param:', imageUrlRaw);
+    }
+  }, [imageUrl, imageUrlRaw]);
   
   const [loading, setLoading] = useState(true);
   const [accountType, setAccountType] = useState<string | null>(null);
