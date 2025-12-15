@@ -565,7 +565,7 @@ export function PhotoUploadWithFaceMatch({
   }, []);
 
   // Restore modal state from sessionStorage on mount or when partnerId changes
-  // Clear sessionStorage if partnerId or photo context doesn't match
+  // Clear sessionStorage if partnerId doesn't match or if user has selected a new photo
   useEffect(() => {
     if (!mounted || !partnerId) return;
     
@@ -573,12 +573,12 @@ export function PhotoUploadWithFaceMatch({
     if (savedModal) {
       try {
         const modalData = JSON.parse(savedModal);
-        // Only restore if partnerId matches AND we're on the same photo context
+        // Only restore if partnerId matches
         if (modalData.type === 'otherPartners' && modalData.partnerId === partnerId) {
-          // Check if we have a current imageUrl - if it doesn't match stored one, clear storage
-          // This handles the case where user uploads a new photo
-          if (imageUrl && modalData.imageUrl && imageUrl !== modalData.imageUrl) {
-            // Different photo - clear stale sessionStorage
+          // Only restore if there's no current imageUrl (meaning we're returning from navigation, not uploading new photo)
+          // If imageUrl exists, it means user has selected a new photo, so don't restore old modal state
+          if (imageUrl) {
+            // User has selected a new photo - clear stale sessionStorage
             sessionStorage.removeItem('photoUploadModal');
             return;
           }
@@ -587,7 +587,7 @@ export function PhotoUploadWithFaceMatch({
           if (modalData.analysis) {
             setAnalysis(modalData.analysis);
           }
-          if (modalData.imageUrl && !imageUrl) {
+          if (modalData.imageUrl) {
             setImageUrl(modalData.imageUrl);
           }
           if (modalData.detectionResult) {

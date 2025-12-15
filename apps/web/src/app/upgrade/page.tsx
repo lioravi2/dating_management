@@ -67,19 +67,19 @@ export default async function UpgradePage() {
             <ul className="space-y-2 text-gray-700">
               <li className="flex items-center">
                 <span className="text-green-600 mr-2">✓</span>
-                Premium features
+                Unlimited partners
               </li>
               <li className="flex items-center">
                 <span className="text-green-600 mr-2">✓</span>
-                Google Calendar bi-directional sync
+                Unlimited activities
               </li>
               <li className="flex items-center">
                 <span className="text-green-600 mr-2">✓</span>
-                Priority support
+                Unlimited photos
               </li>
               <li className="flex items-center">
                 <span className="text-green-600 mr-2">✓</span>
-                Advanced analytics
+                Calendar synchronization
               </li>
             </ul>
           </div>
