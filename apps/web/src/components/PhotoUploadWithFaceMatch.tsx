@@ -425,7 +425,20 @@ export function PhotoUploadWithFaceMatch({
           console.log('[PhotoUpload] Navigating to similar photos page');
           // Navigate to dedicated page instead of showing modal
           const analysisParam = encodeURIComponent(JSON.stringify(analysis));
-          const imageUrlParam = imageUrl ? `&imageUrl=${encodeURIComponent(imageUrl)}` : '';
+          // Convert blob URL to base64 data URL for persistence across navigation
+          let imageUrlParam = '';
+          if (imageUrl && fileRef.current) {
+            try {
+              const base64Url = await convertBlobToBase64(fileRef.current);
+              imageUrlParam = `&imageUrl=${encodeURIComponent(base64Url)}`;
+            } catch (error) {
+              console.error('[PhotoUpload] Failed to convert image to base64:', error);
+              // Fallback to original blob URL if conversion fails
+              imageUrlParam = imageUrl ? `&imageUrl=${encodeURIComponent(imageUrl)}` : '';
+            }
+          } else if (imageUrl) {
+            imageUrlParam = `&imageUrl=${encodeURIComponent(imageUrl)}`;
+          }
           router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}${imageUrlParam}`);
         }
       } else {
@@ -459,7 +472,20 @@ export function PhotoUploadWithFaceMatch({
           setAnalysis(analysis);
           // Navigate to generic similar photos page (no partnerId required)
           const analysisParam = encodeURIComponent(JSON.stringify(analysis));
-          const imageUrlParam = imageUrl ? `&imageUrl=${encodeURIComponent(imageUrl)}` : '';
+          // Convert blob URL to base64 data URL for persistence across navigation
+          let imageUrlParam = '';
+          if (imageUrl && fileRef.current) {
+            try {
+              const base64Url = await convertBlobToBase64(fileRef.current);
+              imageUrlParam = `&imageUrl=${encodeURIComponent(base64Url)}`;
+            } catch (error) {
+              console.error('[PhotoUpload] Failed to convert image to base64:', error);
+              // Fallback to original blob URL if conversion fails
+              imageUrlParam = imageUrl ? `&imageUrl=${encodeURIComponent(imageUrl)}` : '';
+            }
+          } else if (imageUrl) {
+            imageUrlParam = `&imageUrl=${encodeURIComponent(imageUrl)}`;
+          }
           router.push(`/similar-photos?analysis=${analysisParam}${imageUrlParam}`);
         }
       }

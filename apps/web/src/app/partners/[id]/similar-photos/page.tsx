@@ -155,6 +155,16 @@ export default function SimilarPhotosPage() {
                 src={imageUrl}
                 alt="Uploaded photo"
                 className="w-16 h-16 rounded-full object-cover flex-shrink-0 border-2 border-gray-300"
+                onError={(e) => {
+                  console.error('[SimilarPhotos] Failed to load image:', imageUrl);
+                  console.error('[SimilarPhotos] Image error details:', e);
+                  // Hide the image on error
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
+                onLoad={() => {
+                  console.log('[SimilarPhotos] Image loaded successfully');
+                }}
               />
             )}
             <div>
