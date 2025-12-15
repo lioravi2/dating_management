@@ -82,6 +82,9 @@ export function PhotoUploadWithFaceMatch({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Clear any existing modal state from sessionStorage when selecting a new photo
+    sessionStorage.removeItem('photoUploadModal');
+
     // Validate file type
     if (!file.type.startsWith('image/')) {
       setAlertDialog({
@@ -562,6 +565,7 @@ export function PhotoUploadWithFaceMatch({
   }, []);
 
   // Restore modal state from sessionStorage on mount or when partnerId changes
+  // Clear sessionStorage if partnerId or photo context doesn't match
   useEffect(() => {
     if (!mounted || !partnerId) return;
     
@@ -569,12 +573,21 @@ export function PhotoUploadWithFaceMatch({
     if (savedModal) {
       try {
         const modalData = JSON.parse(savedModal);
+        // Only restore if partnerId matches AND we're on the same photo context
         if (modalData.type === 'otherPartners' && modalData.partnerId === partnerId) {
+          // Check if we have a current imageUrl - if it doesn't match stored one, clear storage
+          // This handles the case where user uploads a new photo
+          if (imageUrl && modalData.imageUrl && imageUrl !== modalData.imageUrl) {
+            // Different photo - clear stale sessionStorage
+            sessionStorage.removeItem('photoUploadModal');
+            return;
+          }
+          
           // Restore analysis and image state
           if (modalData.analysis) {
             setAnalysis(modalData.analysis);
           }
-          if (modalData.imageUrl) {
+          if (modalData.imageUrl && !imageUrl) {
             setImageUrl(modalData.imageUrl);
           }
           if (modalData.detectionResult) {
@@ -584,13 +597,16 @@ export function PhotoUploadWithFaceMatch({
           setTimeout(() => {
             setShowOtherPartnersModal(true);
           }, 0);
+        } else {
+          // Different partner - clear stale sessionStorage
+          sessionStorage.removeItem('photoUploadModal');
         }
       } catch (e) {
         console.error('Error restoring modal state:', e);
         sessionStorage.removeItem('photoUploadModal');
       }
     }
-  }, [mounted, partnerId]);
+  }, [mounted, partnerId, imageUrl]);
 
   // Save modal state to sessionStorage when modal opens
   // Don't clear on unmount - only clear when explicitly closed via buttons
