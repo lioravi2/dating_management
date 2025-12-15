@@ -58,15 +58,6 @@ export default async function PartnerDetailPage({
       ]} />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-4">
-          <Link
-            href="/partners"
-            className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <span className="mr-2">←</span>
-            Back to Partners
-          </Link>
-        </div>
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <div className="flex justify-between items-start mb-4">
             <div>
