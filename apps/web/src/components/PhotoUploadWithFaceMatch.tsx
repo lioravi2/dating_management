@@ -33,7 +33,6 @@ export function PhotoUploadWithFaceMatch({
   // Use refs to preserve file and dimensions across async operations
   const fileRef = useRef<File | null>(null);
   const dimensionsRef = useRef<{ width: number; height: number } | null>(null);
-  const isRestoringModalRef = useRef<boolean>(false);
   const [detectionResult, setDetectionResult] = useState<FaceDetectionResult | null>(null);
   const [multipleDetections, setMultipleDetections] = useState<FaceDetectionResult[] | null>(null);
   const [analysis, setAnalysis] = useState<PhotoUploadAnalysis | null>(null);
@@ -50,7 +49,6 @@ export function PhotoUploadWithFaceMatch({
   const [showNoFaceModal, setShowNoFaceModal] = useState(false);
   const [showMultipleFacesModal, setShowMultipleFacesModal] = useState(false);
   const [showSamePersonModal, setShowSamePersonModal] = useState(false);
-  const [showOtherPartnersModal, setShowOtherPartnersModal] = useState(false);
   const [showCreateNewPartnerModal, setShowCreateNewPartnerModal] = useState(false);
   
   // Alert dialog state
@@ -424,8 +422,10 @@ export function PhotoUploadWithFaceMatch({
           console.log('[PhotoUpload] Showing same person warning modal');
           setShowSamePersonModal(true);
         } else if (analysis.decision.type === 'warn_other_partners') {
-          console.log('[PhotoUpload] Showing other partners warning modal');
-          setShowOtherPartnersModal(true);
+          console.log('[PhotoUpload] Navigating to similar photos page');
+          // Navigate to dedicated page instead of showing modal
+          const analysisParam = encodeURIComponent(JSON.stringify(analysis));
+          router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}`);
         }
       } else {
         // Use Case 2: Upload without partner selection
@@ -445,7 +445,7 @@ export function PhotoUploadWithFaceMatch({
           setShowCreateNewPartnerModal(true);
         } else if (result.decision === 'warn_matches') {
           // Set analysis for displaying matches
-          setAnalysis({
+          const analysis: PhotoUploadAnalysis = {
             decision: {
               type: 'warn_other_partners',
               matches: result.matches || [],
@@ -454,8 +454,13 @@ export function PhotoUploadWithFaceMatch({
             partnerMatches: [],
             otherPartnerMatches: result.matches || [],
             partnerHasOtherPhotos: false,
-          });
-          setShowOtherPartnersModal(true);
+          };
+          setAnalysis(analysis);
+          // Navigate to dedicated page instead of showing modal
+          // Note: This is for the "no partner ID" case, so we can't use partnerId in the route
+          // For now, we'll show a modal or handle differently - but this case shouldn't happen in normal flow
+          // since we always have a partnerId when uploading from partner page
+          console.warn('No partnerId available for similar photos navigation');
         }
       }
     } catch (error) {
@@ -565,81 +570,6 @@ export function PhotoUploadWithFaceMatch({
     setMounted(true);
   }, []);
 
-  // Restore modal state from sessionStorage on mount or when partnerId changes
-  // Clear sessionStorage if partnerId doesn't match or if user has selected a new photo
-  useEffect(() => {
-    if (!mounted || !partnerId) return;
-    
-    // Skip if we're currently restoring to avoid clearing sessionStorage after restoration
-    if (isRestoringModalRef.current) {
-      isRestoringModalRef.current = false;
-      return;
-    }
-    
-    const savedModal = sessionStorage.getItem('photoUploadModal');
-    if (savedModal) {
-      try {
-        const modalData = JSON.parse(savedModal);
-        // Only restore if partnerId matches
-        if (modalData.type === 'otherPartners' && modalData.partnerId === partnerId) {
-          // Only restore if there's no current imageUrl (meaning we're returning from navigation, not uploading new photo)
-          // If imageUrl exists, it means user has selected a new photo, so don't restore old modal state
-          if (imageUrl) {
-            // Check if this is the same photo by comparing analysis data (more reliable than blob URLs)
-            // If analysis exists and matches, we're already restored - skip
-            if (analysis && modalData.analysis && 
-                JSON.stringify(analysis.otherPartnerMatches) === JSON.stringify(modalData.analysis.otherPartnerMatches)) {
-              return;
-            }
-            // Different photo - clear stale sessionStorage
-            sessionStorage.removeItem('photoUploadModal');
-            return;
-          }
-          
-          // Only restore if no current imageUrl (returning from navigation)
-          isRestoringModalRef.current = true;
-          
-          // Restore analysis and image state
-          if (modalData.analysis) {
-            setAnalysis(modalData.analysis);
-          }
-          if (modalData.imageUrl) {
-            setImageUrl(modalData.imageUrl);
-          }
-          if (modalData.detectionResult) {
-            setDetectionResult(modalData.detectionResult);
-          }
-          // Set modal to show after a small delay to ensure state is set
-          setTimeout(() => {
-            setShowOtherPartnersModal(true);
-          }, 0);
-        } else {
-          // Different partner - clear stale sessionStorage
-          sessionStorage.removeItem('photoUploadModal');
-        }
-      } catch (e) {
-        console.error('Error restoring modal state:', e);
-        sessionStorage.removeItem('photoUploadModal');
-      }
-    }
-  }, [mounted, partnerId, imageUrl, analysis]);
-
-  // Save modal state to sessionStorage when modal opens
-  // Don't clear on unmount - only clear when explicitly closed via buttons
-  useEffect(() => {
-    if (showOtherPartnersModal && analysis?.otherPartnerMatches && partnerId) {
-      const modalData = {
-        type: 'otherPartners',
-        partnerId: partnerId,
-        analysis: analysis,
-        imageUrl: imageUrl,
-        detectionResult: detectionResult,
-      };
-      sessionStorage.setItem('photoUploadModal', JSON.stringify(modalData));
-    }
-    // Don't clear sessionStorage here - only clear when user explicitly closes modal
-  }, [showOtherPartnersModal, analysis, partnerId, imageUrl, detectionResult]);
-
   // Check authentication on mount
   useEffect(() => {
     const checkAuth = async () => {
@@ -659,7 +589,6 @@ export function PhotoUploadWithFaceMatch({
       );
     }
     setShowSamePersonModal(false);
-    setShowOtherPartnersModal(false);
   };
 
   // Removed handleViewPartners - now each match has its own button in the modal
@@ -861,125 +790,6 @@ export function PhotoUploadWithFaceMatch({
         </div>
       )}
 
-      {/* Other Partners Warning Modal */}
-      {showOtherPartnersModal && (() => {
-        // Group matches by partner_id to avoid duplicates
-        const groupedMatches = new Map<string, FaceMatch[]>();
-        analysis?.otherPartnerMatches?.forEach((match) => {
-          const partnerId = match.partner_id;
-          if (!groupedMatches.has(partnerId)) {
-            groupedMatches.set(partnerId, []);
-          }
-          groupedMatches.get(partnerId)!.push(match);
-        });
-
-        // Get the best match (highest confidence) for each partner
-        const uniquePartners = Array.from(groupedMatches.entries()).map(([partnerId, matches]) => {
-          const bestMatch = matches.reduce((best, current) => 
-            current.confidence > best.confidence ? current : best
-          );
-          return {
-            partner_id: partnerId,
-            partner_name: bestMatch.partner_name,
-            partner_profile_picture: bestMatch.partner_profile_picture || null,
-            confidence: bestMatch.confidence,
-            matchCount: matches.length, // Number of photos that matched
-          };
-        });
-
-        return (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md max-h-[90vh] overflow-y-auto">
-              <h2 className="text-xl font-bold mb-4">This photo resembles other partners</h2>
-              <p className="text-gray-600 mb-4">
-                This photo matches photos from other partners:
-              </p>
-              {uniquePartners.length > 0 && (
-                <div className="mb-4 space-y-2">
-                  {uniquePartners.map((partner) => {
-                    // Get profile picture URL
-                    const profilePictureUrl = partner.partner_profile_picture
-                      ? getPhotoUrl(partner.partner_profile_picture)
-                      : null;
-                    
-                    return (
-                      <div
-                        key={partner.partner_id}
-                        className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
-                      >
-                        {profilePictureUrl ? (
-                          <img
-                            src={profilePictureUrl}
-                            alt={partner.partner_name || 'Partner'}
-                            className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
-                            <span className="text-gray-600 text-sm">
-                              {(partner.partner_name?.[0] || '?').toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <span className="text-gray-700 block truncate">
-                            {partner.partner_name || 'Unknown Partner'}
-                          </span>
-                          <span className="text-sm text-gray-500">
-                            {Math.round(partner.confidence)}% match
-                            {partner.matchCount > 1 && `, ${partner.matchCount} photos`}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => {
-                            // Save modal state to sessionStorage before navigating
-                            if (analysis?.otherPartnerMatches && partnerId) {
-                              const modalData = {
-                                type: 'otherPartners',
-                                partnerId: partnerId,
-                                analysis: analysis,
-                                imageUrl: imageUrl,
-                                detectionResult: detectionResult,
-                              };
-                              sessionStorage.setItem('photoUploadModal', JSON.stringify(modalData));
-                            }
-                            // Close modal visually but keep data in sessionStorage for restoration
-                            setShowOtherPartnersModal(false);
-                            router.push(`/partners/${partner.partner_id}`);
-                          }}
-                          className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex-shrink-0"
-                        >
-                          View
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              <div className="flex gap-4 justify-end mt-4">
-                <button
-                  onClick={() => {
-                    setShowOtherPartnersModal(false);
-                    sessionStorage.removeItem('photoUploadModal');
-                    resetState();
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    sessionStorage.removeItem('photoUploadModal');
-                    handleProceedAnyway();
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Upload Anyway
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* Create New Partner Modal */}
       {showCreateNewPartnerModal && (
