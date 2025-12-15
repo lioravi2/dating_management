@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { User } from '@/shared';
 import { useRouter } from 'next/navigation';
+import ConfirmDialog from './ConfirmDialog';
 
 interface ProfileFormProps {
   user: User;
@@ -40,6 +41,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
   const [message, setMessage] = useState('');
   const [calendarConnections, setCalendarConnections] = useState<Array<{ provider: string; connected: boolean }>>([]);
   const [connectingCalendar, setConnectingCalendar] = useState(false);
+  const [disconnectConfirm, setDisconnectConfirm] = useState<{ open: boolean; provider: string | null }>({ open: false, provider: null });
   const originalName = user.full_name || '';
   const originalTimezone = user.timezone || 'Asia/Jerusalem';
   
@@ -123,8 +125,14 @@ export default function ProfileForm({ user }: ProfileFormProps) {
     }
   };
 
-  const handleDisconnectCalendar = async (provider: string) => {
-    if (!confirm(`Are you sure you want to disconnect your ${provider} calendar?`)) return;
+  const handleDisconnectClick = (provider: string) => {
+    setDisconnectConfirm({ open: true, provider });
+  };
+
+  const handleDisconnectConfirm = async () => {
+    if (!disconnectConfirm.provider) return;
+    const provider = disconnectConfirm.provider;
+    setDisconnectConfirm({ open: false, provider: null });
     
     const { error } = await supabase
       .from('calendar_connections')
@@ -286,7 +294,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
               </div>
               {connection.connected ? (
                 <button
-                  onClick={() => handleDisconnectCalendar(connection.provider)}
+                  onClick={() => handleDisconnectClick(connection.provider)}
                   className="text-sm text-red-600 hover:text-red-800"
                 >
                   Disconnect
@@ -307,6 +315,17 @@ export default function ProfileForm({ user }: ProfileFormProps) {
           Connect your calendar to sync activities automatically. You can sync activities individually from the activity timeline.
         </p>
       </div>
+
+      <ConfirmDialog
+        open={disconnectConfirm.open}
+        title="Disconnect Calendar"
+        message={disconnectConfirm.provider ? `Are you sure you want to disconnect your ${disconnectConfirm.provider} calendar?` : ''}
+        confirmLabel="Disconnect"
+        cancelLabel="Cancel"
+        onConfirm={handleDisconnectConfirm}
+        onCancel={() => setDisconnectConfirm({ open: false, provider: null })}
+        confirmButtonClass="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { PartnerActivity, PartnerActivityType, FREE_TIER_ACTIVITY_LIMIT } from '
 import Link from 'next/link';
 import { format, isSameDay, parseISO, startOfDay } from 'date-fns';
 import { useLoadScript, Autocomplete } from '@react-google-maps/api';
+import ConfirmDialog from './ConfirmDialog';
 
 // Move libraries array outside component to prevent LoadScript reload warning
 const GOOGLE_MAPS_LIBRARIES: ('places')[] = ['places'];
@@ -28,6 +29,7 @@ export default function PartnerActivities({
   const [hasCalendarConnection, setHasCalendarConnection] = useState<boolean>(false);
   const [syncingActivities, setSyncingActivities] = useState<Set<string>>(new Set());
   const [syncErrors, setSyncErrors] = useState<Map<string, string>>(new Map());
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; activityId: string | null }>({ open: false, activityId: null });
   const supabase = createSupabaseClient();
 
   useEffect(() => {
@@ -254,9 +256,11 @@ export default function PartnerActivities({
     }
   };
 
-  const handleDeleteActivity = async (activityId: string): Promise<boolean> => {
-    if (!confirm('Are you sure you want to delete this activity?')) return false;
+  const handleDeleteClick = (activityId: string) => {
+    setDeleteConfirm({ open: true, activityId });
+  };
 
+  const handleDeleteActivity = async (activityId: string): Promise<boolean> => {
     const activity = activities.find((a) => a.id === activityId);
     
     // If activity is synced, unsync it first
@@ -294,6 +298,13 @@ export default function PartnerActivities({
       setTimeout(() => setMessage(null), 3000);
       return true;
     }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.activityId) return;
+    const result = await handleDeleteActivity(deleteConfirm.activityId);
+    setDeleteConfirm({ open: false, activityId: null });
+    return result;
   };
 
   // Group activities by date
@@ -535,8 +546,9 @@ export default function PartnerActivities({
                               </button>
                               {/* Delete button */}
                               <button
-                                onClick={async () => {
-                                  await handleDeleteActivity(activity.id);
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteClick(activity.id);
                                 }}
                                 className="text-red-600 hover:text-red-800 text-sm"
                               >
@@ -556,6 +568,17 @@ export default function PartnerActivities({
           <p className="text-gray-600 text-center py-8">No activities yet.</p>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        title="Delete Activity"
+        message="Are you sure you want to delete this activity?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteConfirm({ open: false, activityId: null })}
+        confirmButtonClass="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+      />
     </div>
   );
 }

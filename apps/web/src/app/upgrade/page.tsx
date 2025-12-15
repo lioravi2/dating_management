@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import UpgradeForm from '@/components/UpgradeForm';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import Header from '@/components/Header';
+import { formatPrice } from '@/lib/pricing';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -37,6 +38,14 @@ export default async function UpgradePage() {
   if (accountType === 'pro') {
     redirect('/profile');
   }
+
+  // Get payment history
+  const { data: payments } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .order('paid_at', { ascending: false })
+    .limit(50);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -77,6 +86,63 @@ export default async function UpgradePage() {
 
           <UpgradeForm user={{ ...user, account_type: accountType as 'free' | 'pro' }} />
         </div>
+
+        {/* Payment History Section - Only show if user has previous payments */}
+        {payments && payments.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6 mt-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Payment History</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {payments.map((payment) => (
+                    <tr key={payment.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {payment.paid_at
+                          ? new Date(payment.paid_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })
+                          : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatPrice(payment.amount)} {payment.currency.toUpperCase()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            payment.status === 'succeeded'
+                              ? 'bg-green-100 text-green-800'
+                              : payment.status === 'pending'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {payment.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

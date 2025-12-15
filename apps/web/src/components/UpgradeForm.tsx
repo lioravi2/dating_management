@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { getStripe } from '@/lib/stripe';
 import { getDailyPriceDisplay } from '@/lib/pricing';
 import { User } from '@/shared';
+import AlertDialog from './AlertDialog';
 
 interface UpgradeFormProps {
   user: User | { id: string; account_type?: string | null };
@@ -11,6 +12,7 @@ interface UpgradeFormProps {
 
 export default function UpgradeForm({ user }: UpgradeFormProps) {
   const [loading, setLoading] = useState(false);
+  const [alertDialog, setAlertDialog] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: '', message: '' });
 
   const handleCheckout = async () => {
     setLoading(true);
@@ -58,13 +60,21 @@ export default function UpgradeForm({ user }: UpgradeFormProps) {
 
       if (error) {
         console.error('Stripe checkout error:', error);
-        alert('Error redirecting to checkout: ' + error.message);
+        setAlertDialog({
+          open: true,
+          title: 'Checkout Error',
+          message: 'Error redirecting to checkout: ' + error.message,
+        });
         setLoading(false);
       }
       // If successful, user will be redirected, so don't set loading to false
     } catch (error: any) {
       console.error('Checkout error:', error);
-      alert('Error starting checkout: ' + (error.message || 'Unknown error occurred'));
+      setAlertDialog({
+        open: true,
+        title: 'Checkout Error',
+        message: 'Error starting checkout: ' + (error.message || 'Unknown error occurred'),
+      });
       setLoading(false);
     }
   };
@@ -87,6 +97,13 @@ export default function UpgradeForm({ user }: UpgradeFormProps) {
       <p className="text-xs text-gray-500 text-center mt-4">
         Cancel anytime. Your subscription will renew automatically.
       </p>
+
+      <AlertDialog
+        open={alertDialog.open}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        onClose={() => setAlertDialog({ open: false, title: '', message: '' })}
+      />
     </div>
   );
 }

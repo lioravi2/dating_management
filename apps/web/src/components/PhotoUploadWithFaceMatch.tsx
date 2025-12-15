@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { getPhotoUrl } from '@/lib/photo-utils';
 import Link from 'next/link';
+import AlertDialog from './AlertDialog';
 
 interface PhotoUploadWithFaceMatchProps {
   partnerId?: string; // If provided, upload to this partner. If not, analyze across all partners.
@@ -50,6 +51,13 @@ export function PhotoUploadWithFaceMatch({
   const [showSamePersonModal, setShowSamePersonModal] = useState(false);
   const [showOtherPartnersModal, setShowOtherPartnersModal] = useState(false);
   const [showCreateNewPartnerModal, setShowCreateNewPartnerModal] = useState(false);
+  
+  // Alert dialog state
+  const [alertDialog, setAlertDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+  }>({ open: false, title: '', message: '' });
 
   // Fetch user account type on mount
   useEffect(() => {
@@ -76,7 +84,11 @@ export function PhotoUploadWithFaceMatch({
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      setAlertDialog({
+        open: true,
+        title: 'Invalid File Type',
+        message: 'Please select an image file',
+      });
       return;
     }
 
@@ -195,7 +207,11 @@ export function PhotoUploadWithFaceMatch({
       
       if (allFacesResult.error) {
         setAnalyzing(false);
-        alert(`Face detection error: ${allFacesResult.error}`);
+        setAlertDialog({
+          open: true,
+          title: 'Face Detection Error',
+          message: allFacesResult.error || 'Unknown face detection error',
+        });
         return;
       }
       
@@ -226,7 +242,11 @@ export function PhotoUploadWithFaceMatch({
     };
 
     img.onerror = () => {
-      alert('Failed to load image');
+      setAlertDialog({
+        open: true,
+        title: 'Image Load Error',
+        message: 'Failed to load image',
+      });
       setSelectedFile(null);
       setImageUrl(null);
     };
@@ -332,7 +352,11 @@ export function PhotoUploadWithFaceMatch({
         });
       } catch (error) {
         console.error('[PhotoUpload] Error cropping image:', error);
-        alert('Failed to crop image. Using original photo instead.');
+        setAlertDialog({
+          open: true,
+          title: 'Crop Failed',
+          message: 'Failed to crop image. Using original photo instead.',
+        });
         // Continue with original file if cropping fails
       }
     }
@@ -342,7 +366,11 @@ export function PhotoUploadWithFaceMatch({
 
   const analyzeFace = async (detection: FaceDetectionResult) => {
     if (!detection.descriptor) {
-      alert('No face descriptor available');
+      setAlertDialog({
+        open: true,
+        title: 'Face Detection Error',
+        message: 'No face descriptor available',
+      });
       return;
     }
 
@@ -430,7 +458,11 @@ export function PhotoUploadWithFaceMatch({
       console.error('Error analyzing face:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Full error details:', error);
-      alert(`Failed to analyze photo: ${errorMessage}. Please check the console for details.`);
+      setAlertDialog({
+        open: true,
+        title: 'Analysis Error',
+        message: `Failed to analyze photo: ${errorMessage}. Please check the console for details.`,
+      });
     } finally {
       setAnalyzing(false);
     }
@@ -528,6 +560,51 @@ export function PhotoUploadWithFaceMatch({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Restore modal state from sessionStorage on mount
+  useEffect(() => {
+    if (!mounted || !partnerId) return;
+    
+    const savedModal = sessionStorage.getItem('photoUploadModal');
+    if (savedModal) {
+      try {
+        const modalData = JSON.parse(savedModal);
+        if (modalData.type === 'otherPartners' && modalData.partnerId === partnerId) {
+          // Restore analysis and image state
+          if (modalData.analysis) {
+            setAnalysis(modalData.analysis);
+          }
+          if (modalData.imageUrl) {
+            setImageUrl(modalData.imageUrl);
+          }
+          if (modalData.detectionResult) {
+            setDetectionResult(modalData.detectionResult);
+          }
+          setShowOtherPartnersModal(true);
+        }
+      } catch (e) {
+        console.error('Error restoring modal state:', e);
+        sessionStorage.removeItem('photoUploadModal');
+      }
+    }
+  }, [mounted, partnerId]);
+
+  // Save modal state to sessionStorage when modal opens
+  useEffect(() => {
+    if (showOtherPartnersModal && analysis?.otherPartnerMatches && partnerId) {
+      const modalData = {
+        type: 'otherPartners',
+        partnerId: partnerId,
+        analysis: analysis,
+        imageUrl: imageUrl,
+        detectionResult: detectionResult,
+      };
+      sessionStorage.setItem('photoUploadModal', JSON.stringify(modalData));
+    } else if (!showOtherPartnersModal) {
+      // Clear sessionStorage when modal is closed
+      sessionStorage.removeItem('photoUploadModal');
+    }
+  }, [showOtherPartnersModal, analysis, partnerId, imageUrl, detectionResult]);
 
   // Check authentication on mount
   useEffect(() => {
@@ -821,7 +898,7 @@ export function PhotoUploadWithFaceMatch({
                         <button
                           onClick={() => {
                             router.push(`/partners/${partner.partner_id}`);
-                            setShowOtherPartnersModal(false);
+                            // Don't close modal - let it persist via sessionStorage
                           }}
                           className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex-shrink-0"
                         >
@@ -836,6 +913,7 @@ export function PhotoUploadWithFaceMatch({
                 <button
                   onClick={() => {
                     setShowOtherPartnersModal(false);
+                    sessionStorage.removeItem('photoUploadModal');
                     resetState();
                   }}
                   className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
@@ -843,7 +921,10 @@ export function PhotoUploadWithFaceMatch({
                   Cancel
                 </button>
                 <button
-                  onClick={handleProceedAnyway}
+                  onClick={() => {
+                    sessionStorage.removeItem('photoUploadModal');
+                    handleProceedAnyway();
+                  }}
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
                   Upload Anyway
@@ -882,6 +963,14 @@ export function PhotoUploadWithFaceMatch({
           </div>
         </div>
       )}
+
+      {/* Alert Dialog */}
+      <AlertDialog
+        open={alertDialog.open}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        onClose={() => setAlertDialog({ open: false, title: '', message: '' })}
+      />
 
     </div>
   );

@@ -5,6 +5,8 @@ import { createSupabaseClient } from '@/lib/supabase/client';
 import { PartnerNote, PartnerNoteType, FREE_TIER_NOTE_LIMIT } from '@/shared';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import ConfirmDialog from './ConfirmDialog';
+import AlertDialog from './AlertDialog';
 
 interface PartnerNotesProps {
   partnerId: string;
@@ -19,6 +21,8 @@ export default function PartnerNotes({
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [userAccountType, setUserAccountType] = useState<'free' | 'pro'>('free');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; noteId: string | null }>({ open: false, noteId: null });
+  const [alertDialog, setAlertDialog] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: '', message: '' });
   const supabase = createSupabaseClient();
 
   useEffect(() => {
@@ -52,9 +56,11 @@ export default function PartnerNotes({
     description?: string;
   }) => {
     if (!canAddNote) {
-      alert(
-        `Free accounts are limited to ${FREE_TIER_NOTE_LIMIT} notes. Please upgrade to Pro for unlimited notes.`
-      );
+      setAlertDialog({
+        open: true,
+        title: 'Note Limit Reached',
+        message: `Free accounts are limited to ${FREE_TIER_NOTE_LIMIT} notes. Please upgrade to Pro for unlimited notes.`,
+      });
       return;
     }
 
@@ -67,7 +73,11 @@ export default function PartnerNotes({
 
     if (error) {
       console.error('Error creating note:', error);
-      alert('Error creating note: ' + error.message);
+      setAlertDialog({
+        open: true,
+        title: 'Error',
+        message: 'Error creating note: ' + error.message,
+      });
     } else {
       setNotes([note, ...notes]);
       setShowForm(false);
@@ -75,20 +85,29 @@ export default function PartnerNotes({
     setLoading(false);
   };
 
-  const handleDeleteNote = async (noteId: string) => {
-    if (!confirm('Are you sure you want to delete this note?')) return;
+  const handleDeleteClick = (noteId: string) => {
+    setDeleteConfirm({ open: true, noteId });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.noteId) return;
 
     const { error } = await supabase
       .from('partner_notes')
       .delete()
-      .eq('id', noteId);
+      .eq('id', deleteConfirm.noteId);
 
     if (error) {
       console.error('Error deleting note:', error);
-      alert('Error deleting note: ' + error.message);
+      setAlertDialog({
+        open: true,
+        title: 'Error',
+        message: 'Error deleting note: ' + error.message,
+      });
     } else {
-      setNotes(notes.filter((n) => n.id !== noteId));
+      setNotes(notes.filter((n) => n.id !== deleteConfirm.noteId));
     }
+    setDeleteConfirm({ open: false, noteId: null });
   };
 
   return (
@@ -162,7 +181,7 @@ export default function PartnerNotes({
                   )}
                 </div>
                 <button
-                  onClick={() => handleDeleteNote(note.id)}
+                  onClick={() => handleDeleteClick(note.id)}
                   className="text-red-600 hover:text-red-800 ml-4"
                 >
                   Delete
@@ -174,6 +193,24 @@ export default function PartnerNotes({
           <p className="text-gray-600 text-center py-8">No notes yet.</p>
         )}
       </div>
+
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        title="Delete Note"
+        message="Are you sure you want to delete this note?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteConfirm({ open: false, noteId: null })}
+        confirmButtonClass="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+      />
+
+      <AlertDialog
+        open={alertDialog.open}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        onClose={() => setAlertDialog({ open: false, title: '', message: '' })}
+      />
     </div>
   );
 }

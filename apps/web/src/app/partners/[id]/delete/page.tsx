@@ -8,6 +8,7 @@ import { Partner } from '@/shared';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { getPartnerProfilePictureUrl } from '@/lib/photo-utils';
+import AlertDialog from '@/components/AlertDialog';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,7 @@ export default function DeletePartnerPage() {
   const [deleting, setDeleting] = useState(false);
   const [accountType, setAccountType] = useState<string | null>(null);
   const [partner, setPartner] = useState<Partner | null>(null);
+  const [alertDialog, setAlertDialog] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: '', message: '' });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -71,7 +73,11 @@ export default function DeletePartnerPage() {
       router.push('/partners');
     } catch (error) {
       console.error('Error deleting partner:', error);
-      alert(`Failed to delete partner: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setAlertDialog({
+        open: true,
+        title: 'Delete Error',
+        message: `Failed to delete partner: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
       setDeleting(false);
     }
   };
@@ -155,6 +161,13 @@ export default function DeletePartnerPage() {
           </div>
         </div>
       </main>
+
+      <AlertDialog
+        open={alertDialog.open}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        onClose={() => setAlertDialog({ open: false, title: '', message: '' })}
+      />
     </div>
   );
 }

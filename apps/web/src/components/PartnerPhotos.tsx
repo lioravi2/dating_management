@@ -5,6 +5,7 @@ import { createSupabaseClient } from '@/lib/supabase/client';
 import { PartnerPhoto } from '@/shared';
 import { PhotoUploadWithFaceMatch } from './PhotoUploadWithFaceMatch';
 import { useRouter } from 'next/navigation';
+import ConfirmDialog from './ConfirmDialog';
 
 interface PartnerPhotosProps {
   partnerId: string;
@@ -15,6 +16,7 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
   const [photos, setPhotos] = useState<PartnerPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; photoId: string | null }>({ open: false, photoId: null });
   const supabase = createSupabaseClient();
 
   useEffect(() => {
@@ -43,13 +45,15 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
     }
   };
 
-  const handleDelete = async (photoId: string) => {
-    if (!confirm('Are you sure you want to delete this photo?')) {
-      return;
-    }
+  const handleDeleteClick = (photoId: string) => {
+    setDeleteConfirm({ open: true, photoId });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.photoId) return;
 
     try {
-      const response = await fetch(`/api/partners/${partnerId}/photos/${photoId}`, {
+      const response = await fetch(`/api/partners/${partnerId}/photos/${deleteConfirm.photoId}`, {
         method: 'DELETE',
       });
 
@@ -61,10 +65,12 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
       // Reload photos
       await loadPhotos();
       router.refresh();
+      setDeleteConfirm({ open: false, photoId: null });
     } catch (err) {
       console.error('Error deleting photo:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete photo. Please try again.');
       setTimeout(() => setError(null), 5000);
+      setDeleteConfirm({ open: false, photoId: null });
     }
   };
 
@@ -124,7 +130,7 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
                 className="w-full h-48 object-cover rounded-lg border border-gray-200"
               />
               <button
-                onClick={() => handleDelete(photo.id)}
+                onClick={() => handleDeleteClick(photo.id)}
                 className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-xs opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-red-700"
               >
                 Delete
@@ -136,7 +142,17 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        title="Delete Photo"
+        message="Are you sure you want to delete this photo?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteConfirm({ open: false, photoId: null })}
+        confirmButtonClass="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+      />
     </div>
   );
 }
-
