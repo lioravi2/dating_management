@@ -15,10 +15,10 @@ export default function PartnerCard({ partner, lastActivityDescription, showDele
   const profilePictureUrl = getPartnerProfilePictureUrl(partner, supabaseUrl);
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow flex gap-4 relative group">
+    <div className="relative group">
       <Link
         href={`/partners/${partner.id}`}
-        className="flex gap-4 flex-1 min-w-0"
+        className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow flex gap-4 block"
       >
         {profilePictureUrl ? (
           <img
@@ -63,7 +63,7 @@ export default function PartnerCard({ partner, lastActivityDescription, showDele
         <Link
           href={`/partners/${partner.id}/delete`}
           onClick={(e) => e.stopPropagation()}
-          className="text-red-600 hover:text-red-800 text-sm self-start opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-6 right-6 text-red-600 hover:text-red-800 text-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
         >
           Delete
         </Link>
