@@ -31,6 +31,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   const [showSuggestion, setShowSuggestion] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const suggestionRef = useRef<HTMLSpanElement>(null);
+  const touchStartX = useRef<number | null>(null);
 
   // Fetch last activity description if partner has no description
   useEffect(() => {
@@ -55,17 +56,25 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
 
   // Update suggestion text based on current input
   useEffect(() => {
-    if (lastActivityDescription && formData.description && !partner?.description) {
-      const input = formData.description.toLowerCase();
-      const suggestion = lastActivityDescription.toLowerCase();
-      
-      // Check if suggestion starts with input
-      if (suggestion.startsWith(input) && input.length < suggestion.length) {
-        setSuggestionText(lastActivityDescription.substring(input.length));
+    if (lastActivityDescription && !partner?.description) {
+      // If field is empty, show full suggestion
+      if (!formData.description) {
+        setSuggestionText(lastActivityDescription);
         setShowSuggestion(true);
       } else {
-        setSuggestionText('');
-        setShowSuggestion(false);
+        // If user has typed something, check if it matches
+        const input = formData.description.toLowerCase();
+        const suggestion = lastActivityDescription.toLowerCase();
+        
+        // Check if suggestion starts with input
+        if (suggestion.startsWith(input) && input.length < suggestion.length) {
+          setSuggestionText(lastActivityDescription.substring(input.length));
+          setShowSuggestion(true);
+        } else {
+          // Input doesn't match, hide suggestion
+          setSuggestionText('');
+          setShowSuggestion(false);
+        }
       }
     } else {
       setSuggestionText('');
@@ -78,7 +87,11 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     // Accept suggestion with Tab or Right Arrow
     if ((e.key === 'Tab' || e.key === 'ArrowRight') && showSuggestion && suggestionText) {
       e.preventDefault();
-      setFormData({ ...formData, description: formData.description + suggestionText });
+      // If field is empty, accept full suggestion, otherwise append remaining part
+      const newDescription = formData.description 
+        ? formData.description + suggestionText 
+        : lastActivityDescription || '';
+      setFormData({ ...formData, description: newDescription });
       setShowSuggestion(false);
       setSuggestionText('');
     }
@@ -92,6 +105,31 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   // Handle input changes
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setFormData({ ...formData, description: e.target.value });
+  };
+
+  // Handle touch events for right swipe gesture
+  const handleTouchStart = (e: React.TouchEvent<HTMLTextAreaElement>) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLTextAreaElement>) => {
+    if (touchStartX.current === null) return;
+    
+    const touchEndX = e.changedTouches[0].clientX;
+    const deltaX = touchEndX - touchStartX.current;
+    
+    // Right swipe gesture (swipe right by at least 50px)
+    if (deltaX > 50 && showSuggestion && suggestionText) {
+      e.preventDefault();
+      const newDescription = formData.description 
+        ? formData.description + suggestionText 
+        : lastActivityDescription || '';
+      setFormData({ ...formData, description: newDescription });
+      setShowSuggestion(false);
+      setSuggestionText('');
+    }
+    
+    touchStartX.current = null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -277,6 +315,8 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
             value={formData.description}
             onChange={handleDescriptionChange}
             onKeyDown={handleDescriptionKeyDown}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
             rows={4}
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent relative z-10 bg-transparent"
             style={{ 
@@ -288,7 +328,11 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
             <button
               type="button"
               onClick={() => {
-                setFormData({ ...formData, description: formData.description + suggestionText });
+                // If field is empty, accept full suggestion, otherwise append remaining part
+                const newDescription = formData.description 
+                  ? formData.description + suggestionText 
+                  : lastActivityDescription || '';
+                setFormData({ ...formData, description: newDescription });
                 setShowSuggestion(false);
                 setSuggestionText('');
                 textareaRef.current?.focus();
@@ -424,14 +468,6 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         >
           {loading ? 'Saving...' : partner ? 'Update Partner' : 'Create Partner'}
         </button>
-        {partner && (
-          <Link
-            href={`/partners/${partner.id}/delete`}
-            className="flex-1 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-center"
-          >
-            Delete Partner
-          </Link>
-        )}
         <button
           type="button"
           onClick={() => router.back()}
