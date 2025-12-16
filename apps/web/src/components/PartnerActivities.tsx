@@ -483,9 +483,8 @@ export default function PartnerActivities({
     
     try {
       setDeleting(true);
-      const result = await handleDeleteActivity(deleteConfirm.activityId);
+      await handleDeleteActivity(deleteConfirm.activityId);
       setDeleteConfirm({ open: false, activityId: null });
-      return result;
     } finally {
       setDeleting(false);
     }

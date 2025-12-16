@@ -13,6 +13,7 @@ export default function NoMatchesPage() {
   const supabase = createSupabaseClient();
   const [accountType, setAccountType] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const imageKey = searchParams.get('imageKey');
   const uploadDataKey = searchParams.get('uploadDataKey');
 
@@ -47,8 +48,7 @@ export default function NoMatchesPage() {
   }, [imageKey, supabase]);
 
   const handleCreateNewPartner = async () => {
-    if (!uploadDataKey) {
-      console.error('No uploadDataKey found');
+    if (!uploadDataKey || creating) {
       return;
     }
 
@@ -60,6 +60,7 @@ export default function NoMatchesPage() {
     }
 
     try {
+      setCreating(true);
       const uploadData = JSON.parse(uploadDataStr);
       const { fileBase64, faceDescriptor, width, height } = uploadData;
 
@@ -94,6 +95,7 @@ export default function NoMatchesPage() {
       if (!response.ok) {
         console.error('Error creating partner:', result.error);
         alert(result.message || result.error || 'Failed to create partner');
+        setCreating(false);
         return;
       }
 
@@ -108,6 +110,8 @@ export default function NoMatchesPage() {
     } catch (error) {
       console.error('Error creating partner:', error);
       alert('Failed to create partner. Please try again.');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -164,9 +168,16 @@ export default function NoMatchesPage() {
             </button>
             <button
               onClick={handleCreateNewPartner}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 w-full sm:w-auto"
+              disabled={creating}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Create New Partner
+              {creating && (
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              )}
+              {creating ? 'Creating...' : 'Create New Partner'}
             </button>
           </div>
         </div>
