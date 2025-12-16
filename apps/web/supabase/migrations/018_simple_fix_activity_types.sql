@@ -39,3 +39,5 @@ END $$;
 ALTER TABLE public.partner_notes
 ADD CONSTRAINT partner_notes_type_check CHECK (type IN ('date', 'chat', 'phone', 'other'));
 
+
+

@@ -287,3 +287,5 @@ CREATE TRIGGER update_partner_photos_updated_at BEFORE UPDATE ON public.partner_
 
 
 
+
+

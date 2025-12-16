@@ -91,7 +91,7 @@ export async function POST(
         return NextResponse.json(
           { 
             error: 'Storage bucket not configured', 
-            details: 'The partner-photos storage bucket does not exist. Please create it in Supabase Dashboard ? Storage.' 
+            details: 'The partner-photos storage bucket does not exist. Please create it in Supabase Dashboard → Storage.' 
           },
           { status: 500 }
         );
@@ -174,3 +174,4 @@ export async function POST(
     );
   }
 }
+

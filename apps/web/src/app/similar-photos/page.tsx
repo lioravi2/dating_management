@@ -27,6 +27,7 @@ export default function SimilarPhotosPage() {
   // Optional partnerId from query params (for when uploading to a specific partner)
   const partnerId = searchParams.get('partnerId') || null;
   const imageKey = searchParams.get('imageKey');
+  const uploadDataKey = searchParams.get('uploadDataKey');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   
   useEffect(() => {
@@ -195,7 +196,7 @@ export default function SimilarPhotosPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
             {imageUrl ? (
               <img
                 src={imageUrl}
@@ -219,9 +220,9 @@ export default function SimilarPhotosPage() {
                 <span className="text-gray-400 text-xs">No preview</span>
               </div>
             )}
-            <div>
-              <h1 className="text-2xl font-bold mb-1">This photo resembles other partners</h1>
-              <p className="text-gray-600">
+            <div className="flex-1">
+              <h1 className="text-xl sm:text-2xl font-bold mb-1">This photo resembles other partners</h1>
+              <p className="text-sm sm:text-base text-gray-600">
                 This photo matches photos from other partners:
               </p>
             </div>
@@ -237,7 +238,7 @@ export default function SimilarPhotosPage() {
                 return (
                   <div
                     key={partner.partner_id}
-                    className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                    className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
                   >
                     {profilePictureUrl ? (
                       <img
@@ -252,7 +253,7 @@ export default function SimilarPhotosPage() {
                         </span>
                       </div>
                     )}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 w-full sm:w-auto">
                       <Link
                         href={`/partners/${partner.partner_id}`}
                         className="text-lg font-semibold text-gray-900 hover:text-primary-600 block truncate"
@@ -264,12 +265,38 @@ export default function SimilarPhotosPage() {
                         {partner.matchCount > 1 && `, ${partner.matchCount} photos`}
                       </p>
                     </div>
-                    <Link
-                      href={`/partners/${partner.partner_id}`}
-                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex-shrink-0"
-                    >
-                      View
-                    </Link>
+                    <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0 w-full sm:w-auto">
+                      <Link
+                        href={`/partners/${partner.partner_id}`}
+                        className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-center text-sm sm:text-base"
+                      >
+                        View
+                      </Link>
+                      <button
+                        onClick={() => {
+                          // Store upload data and navigate to partner page with upload flag
+                          const currentUploadDataKey = uploadDataKey || (() => {
+                            // Try to find uploadDataKey in sessionStorage if not in URL
+                            const keys = Object.keys(sessionStorage).filter(key => 
+                              key.startsWith('upload-photo-data-') || key.startsWith('upload-data-')
+                            );
+                            return keys.length > 0 ? keys[0] : null;
+                          })();
+                          
+                          if (currentUploadDataKey) {
+                            // Store which partner to upload to
+                            sessionStorage.setItem(`uploadToPartner-${currentUploadDataKey}`, partner.partner_id);
+                            router.push(`/partners/${partner.partner_id}?uploadPhoto=true&uploadDataKey=${currentUploadDataKey}`);
+                          } else {
+                            console.error('[SimilarPhotos] No uploadDataKey found');
+                            alert('Upload data not found. Please try uploading again.');
+                          }
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm sm:text-base"
+                      >
+                        Upload Here
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -278,19 +305,44 @@ export default function SimilarPhotosPage() {
             <p className="text-gray-500 mb-6">No similar partners found.</p>
           )}
 
-          <div className="flex gap-4 justify-end pt-4 border-t">
+          <div className="flex flex-col sm:flex-row gap-4 justify-end pt-4 border-t">
             <button
-              onClick={() => router.back()}
-              className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              onClick={() => {
+                // Clean up sessionStorage
+                if (imageKey) {
+                  sessionStorage.removeItem(imageKey);
+                }
+                if (uploadDataKey) {
+                  sessionStorage.removeItem(uploadDataKey);
+                }
+                router.push('/dashboard');
+              }}
+              className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 w-full sm:w-auto"
             >
               Cancel
             </button>
-            <button
-              onClick={handleUploadAnyway}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Upload Anyway
-            </button>
+            {!partnerId && (
+              <button
+                onClick={() => {
+                  // Store upload data for creating new partner
+                  if (uploadDataKey) {
+                    sessionStorage.setItem('pendingPhotoUpload', uploadDataKey);
+                  }
+                  router.push('/partners/new?fromPhotoUpload=true');
+                }}
+                className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 w-full sm:w-auto"
+              >
+                Create New Partner
+              </button>
+            )}
+            {partnerId && (
+              <button
+                onClick={handleUploadAnyway}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 w-full sm:w-auto"
+              >
+                Upload Anyway
+              </button>
+            )}
           </div>
         </div>
       </main>

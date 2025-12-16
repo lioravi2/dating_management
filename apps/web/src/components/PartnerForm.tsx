@@ -203,8 +203,17 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           setIsLimitReached(false);
         }
       } else {
-        // Use full page reload to ensure fresh data from server
-        window.location.href = '/partners';
+        // Check if there's a pending photo upload
+        const pendingPhotoUpload = sessionStorage.getItem('pendingPhotoUpload');
+        if (pendingPhotoUpload && result.data?.id) {
+          // Clean up the pendingPhotoUpload flag
+          sessionStorage.removeItem('pendingPhotoUpload');
+          // Redirect to partner page with upload flag
+          window.location.href = `/partners/${result.data.id}?uploadPhoto=true&uploadDataKey=${pendingPhotoUpload}`;
+        } else {
+          // Use full page reload to ensure fresh data from server
+          window.location.href = '/partners';
+        }
       }
     }
     setLoading(false);

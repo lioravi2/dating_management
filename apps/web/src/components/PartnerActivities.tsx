@@ -1084,4 +1084,3 @@ function ActivityForm({
     </form>
   );
 }
-

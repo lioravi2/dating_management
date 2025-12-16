@@ -89,7 +89,9 @@ export default function NewPartnerPage() {
               </p>
               <p className="text-yellow-700 text-sm mb-4">
                 {partnerCount !== null && partnerCount >= FREE_TIER_PARTNER_LIMIT
-                  ? `Your free subscription is limited to ${FREE_TIER_PARTNER_LIMIT} partners. You currently have ${partnerCount} partners.`
+                  ? partnerCount > FREE_TIER_PARTNER_LIMIT
+                    ? `To add more partners, please upgrade to Pro.`
+                    : `Your free subscription is limited to ${FREE_TIER_PARTNER_LIMIT} partners. You currently have ${partnerCount} partners.`
                   : `Your free subscription is limited to ${FREE_TIER_PARTNER_LIMIT} partners.`}
               </p>
               <Link

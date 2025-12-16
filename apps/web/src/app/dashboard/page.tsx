@@ -147,6 +147,13 @@ export default async function DashboardPage() {
               <h2 className="font-semibold text-lg mb-2">Add Partner</h2>
               <p className="text-sm text-gray-600">Add a new partner</p>
             </Link>
+            <Link
+              href="/upload-photo"
+              className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4 hover:bg-purple-100 transition-colors"
+            >
+              <h2 className="font-semibold text-lg mb-2">Upload Photo</h2>
+              <p className="text-sm text-gray-600">Upload a photo to find or create a partner</p>
+            </Link>
             {user?.account_type === 'pro' && (
               <Link
                 href="/billing"

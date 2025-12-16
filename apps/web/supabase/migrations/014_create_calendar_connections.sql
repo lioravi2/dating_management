@@ -52,3 +52,5 @@ COMMENT ON TABLE public.calendar_connections IS 'Stores OAuth tokens for calenda
 COMMENT ON COLUMN public.calendar_connections.provider IS 'Calendar provider: google or outlook';
 COMMENT ON COLUMN public.calendar_connections.calendar_id IS 'Calendar ID (usually "primary" for main calendar)';
 
+
+

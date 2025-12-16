@@ -10,3 +10,5 @@ WHERE timezone IS NULL;
 -- Add comment for clarity
 COMMENT ON COLUMN public.users.timezone IS 'User timezone (IANA timezone identifier, e.g., Asia/Jerusalem, America/New_York)';
 
+
+

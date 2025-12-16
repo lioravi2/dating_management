@@ -58,14 +58,22 @@ export class FaceApiProvider implements IFaceDetectionProvider {
       };
     }
 
+    let createdCanvas: HTMLCanvasElement | null = null;
+    let originalWidth = 0;
+    let originalHeight = 0;
+
     try {
-      // Convert ImageData to canvas if needed
+      // Resize image to reduce GPU memory usage (max 800px on longest side)
+      const MAX_DIMENSION = 800;
       let input: HTMLImageElement | HTMLCanvasElement;
+      
       if (image instanceof ImageData) {
-        const canvas = document.createElement('canvas');
-        canvas.width = image.width;
-        canvas.height = image.height;
-        const ctx = canvas.getContext('2d');
+        originalWidth = image.width;
+        originalHeight = image.height;
+        createdCanvas = document.createElement('canvas');
+        createdCanvas.width = image.width;
+        createdCanvas.height = image.height;
+        const ctx = createdCanvas.getContext('2d');
         if (!ctx) {
           return {
             descriptor: null,
@@ -75,9 +83,42 @@ export class FaceApiProvider implements IFaceDetectionProvider {
           };
         }
         ctx.putImageData(image, 0, 0);
-        input = canvas;
+        input = createdCanvas;
       } else {
-        input = image;
+        // Get image dimensions
+        if (image instanceof HTMLImageElement) {
+          originalWidth = image.naturalWidth || image.width;
+          originalHeight = image.naturalHeight || image.height;
+        } else {
+          originalWidth = image.width;
+          originalHeight = image.height;
+        }
+
+        // Resize if image is too large
+        if (originalWidth > MAX_DIMENSION || originalHeight > MAX_DIMENSION) {
+          const scale = Math.min(MAX_DIMENSION / originalWidth, MAX_DIMENSION / originalHeight);
+          const newWidth = Math.round(originalWidth * scale);
+          const newHeight = Math.round(originalHeight * scale);
+
+          createdCanvas = document.createElement('canvas');
+          createdCanvas.width = newWidth;
+          createdCanvas.height = newHeight;
+          const ctx = createdCanvas.getContext('2d');
+          if (!ctx) {
+            return {
+              descriptor: null,
+              boundingBox: null,
+              confidence: null,
+              error: 'Failed to create canvas context',
+            };
+          }
+          
+          // Draw resized image
+          ctx.drawImage(image, 0, 0, newWidth, newHeight);
+          input = createdCanvas;
+        } else {
+          input = image;
+        }
       }
 
       const detection = await faceapi
@@ -94,13 +135,19 @@ export class FaceApiProvider implements IFaceDetectionProvider {
         };
       }
 
+      // Scale bounding box back to original size if we resized
+      const inputWidth = createdCanvas ? createdCanvas.width : (image instanceof ImageData ? image.width : (image instanceof HTMLImageElement ? (image.naturalWidth || image.width) : image.width));
+      const inputHeight = createdCanvas ? createdCanvas.height : (image instanceof ImageData ? image.height : (image instanceof HTMLImageElement ? (image.naturalHeight || image.height) : image.height));
+      const scaleX = originalWidth / inputWidth;
+      const scaleY = originalHeight / inputHeight;
+
       return {
         descriptor: Array.from(detection.descriptor),
         boundingBox: {
-          x: detection.detection.box.x,
-          y: detection.detection.box.y,
-          width: detection.detection.box.width,
-          height: detection.detection.box.height,
+          x: detection.detection.box.x * scaleX,
+          y: detection.detection.box.y * scaleY,
+          width: detection.detection.box.width * scaleX,
+          height: detection.detection.box.height * scaleY,
         },
         confidence: detection.detection.score,
         error: null,
@@ -112,6 +159,20 @@ export class FaceApiProvider implements IFaceDetectionProvider {
         confidence: null,
         error: err instanceof Error ? err.message : 'Detection failed',
       };
+    } finally {
+      // Clean up created canvas to free memory
+      if (createdCanvas) {
+        const ctx = createdCanvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, createdCanvas.width, createdCanvas.height);
+        }
+        // Remove canvas from DOM if it was added (it shouldn't be, but just in case)
+        if (createdCanvas.parentNode) {
+          createdCanvas.parentNode.removeChild(createdCanvas);
+        }
+        // Clear canvas reference to help GC
+        createdCanvas = null;
+      }
     }
   }
 
@@ -125,14 +186,22 @@ export class FaceApiProvider implements IFaceDetectionProvider {
       };
     }
 
+    let createdCanvas: HTMLCanvasElement | null = null;
+    let originalWidth = 0;
+    let originalHeight = 0;
+
     try {
-      // Convert ImageData to canvas if needed
+      // Resize image to reduce GPU memory usage (max 800px on longest side)
+      const MAX_DIMENSION = 800;
       let input: HTMLImageElement | HTMLCanvasElement;
+      
       if (image instanceof ImageData) {
-        const canvas = document.createElement('canvas');
-        canvas.width = image.width;
-        canvas.height = image.height;
-        const ctx = canvas.getContext('2d');
+        originalWidth = image.width;
+        originalHeight = image.height;
+        createdCanvas = document.createElement('canvas');
+        createdCanvas.width = image.width;
+        createdCanvas.height = image.height;
+        const ctx = createdCanvas.getContext('2d');
         if (!ctx) {
           return {
             detections: [],
@@ -140,9 +209,40 @@ export class FaceApiProvider implements IFaceDetectionProvider {
           };
         }
         ctx.putImageData(image, 0, 0);
-        input = canvas;
+        input = createdCanvas;
       } else {
-        input = image;
+        // Get image dimensions
+        if (image instanceof HTMLImageElement) {
+          originalWidth = image.naturalWidth || image.width;
+          originalHeight = image.naturalHeight || image.height;
+        } else {
+          originalWidth = image.width;
+          originalHeight = image.height;
+        }
+
+        // Resize if image is too large
+        if (originalWidth > MAX_DIMENSION || originalHeight > MAX_DIMENSION) {
+          const scale = Math.min(MAX_DIMENSION / originalWidth, MAX_DIMENSION / originalHeight);
+          const newWidth = Math.round(originalWidth * scale);
+          const newHeight = Math.round(originalHeight * scale);
+
+          createdCanvas = document.createElement('canvas');
+          createdCanvas.width = newWidth;
+          createdCanvas.height = newHeight;
+          const ctx = createdCanvas.getContext('2d');
+          if (!ctx) {
+            return {
+              detections: [],
+              error: 'Failed to create canvas context',
+            };
+          }
+          
+          // Draw resized image
+          ctx.drawImage(image, 0, 0, newWidth, newHeight);
+          input = createdCanvas;
+        } else {
+          input = image;
+        }
       }
 
       const detections = await faceapi
@@ -150,14 +250,20 @@ export class FaceApiProvider implements IFaceDetectionProvider {
         .withFaceLandmarks()
         .withFaceDescriptors();
 
+      // Scale bounding boxes back to original size if we resized
+      const inputWidth = createdCanvas ? createdCanvas.width : (image instanceof ImageData ? image.width : (image instanceof HTMLImageElement ? (image.naturalWidth || image.width) : image.width));
+      const inputHeight = createdCanvas ? createdCanvas.height : (image instanceof ImageData ? image.height : (image instanceof HTMLImageElement ? (image.naturalHeight || image.height) : image.height));
+      const scaleX = originalWidth / inputWidth;
+      const scaleY = originalHeight / inputHeight;
+
       return {
         detections: detections.map(detection => ({
           descriptor: Array.from(detection.descriptor),
           boundingBox: {
-            x: detection.detection.box.x,
-            y: detection.detection.box.y,
-            width: detection.detection.box.width,
-            height: detection.detection.box.height,
+            x: detection.detection.box.x * scaleX,
+            y: detection.detection.box.y * scaleY,
+            width: detection.detection.box.width * scaleX,
+            height: detection.detection.box.height * scaleY,
           },
           confidence: detection.detection.score,
           error: null,
@@ -169,6 +275,20 @@ export class FaceApiProvider implements IFaceDetectionProvider {
         detections: [],
         error: err instanceof Error ? err.message : 'Detection failed',
       };
+    } finally {
+      // Clean up created canvas to free memory
+      if (createdCanvas) {
+        const ctx = createdCanvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, createdCanvas.width, createdCanvas.height);
+        }
+        // Remove canvas from DOM if it was added (it shouldn't be, but just in case)
+        if (createdCanvas.parentNode) {
+          createdCanvas.parentNode.removeChild(createdCanvas);
+        }
+        // Clear canvas reference to help GC
+        createdCanvas = null;
+      }
     }
   }
 

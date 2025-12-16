@@ -13,6 +13,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Check if user has Pro account (required for calendar connection)
+    const { data: userData } = await supabase
+      .from('users')
+      .select('account_type')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!userData || userData.account_type !== 'pro') {
+      return NextResponse.json(
+        { error: 'Calendar synchronization is only available for Pro accounts. Please upgrade to Pro.' },
+        { status: 403 }
+      );
+    }
+
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,

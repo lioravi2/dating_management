@@ -149,11 +149,17 @@ export async function POST(request: NextRequest) {
         const periodEnd = new Date(subscription.current_period_end * 1000);
         
         if (subscription.status === 'canceled' && now >= periodEnd) {
-          // Period has ended, set to free
-          await supabase
+          // Period has ended, set to free and disconnect calendar
+          await supabaseAdmin
             .from('users')
             .update({ account_type: 'free' })
             .eq('id', subData.user_id);
+          
+          // Disconnect all calendar connections (Pro feature)
+          await supabaseAdmin
+            .from('calendar_connections')
+            .delete()
+            .eq('user_id', subData.user_id);
         } else if (isActive) {
           // Active subscription, set to pro
           await supabase
@@ -170,8 +176,8 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const subscriptionId = subscription.id;
 
-        // Get user by subscription ID
-        const { data: subData } = await supabase
+        // Get user by subscription ID (use admin client to bypass RLS)
+        const { data: subData } = await supabaseAdmin
           .from('subscriptions')
           .select('user_id')
           .eq('stripe_subscription_id', subscriptionId)
@@ -182,8 +188,8 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        // Update subscription to canceled
-        await supabase
+        // Update subscription to canceled (use admin client to bypass RLS)
+        await supabaseAdmin
           .from('subscriptions')
           .update({
             status: 'canceled',
@@ -191,11 +197,17 @@ export async function POST(request: NextRequest) {
           })
           .eq('user_id', subData.user_id);
 
-        // Set user to free
-        await supabase
+        // Set user to free and disconnect calendar
+        await supabaseAdmin
           .from('users')
           .update({ account_type: 'free' })
           .eq('id', subData.user_id);
+        
+        // Disconnect all calendar connections (Pro feature)
+        await supabaseAdmin
+          .from('calendar_connections')
+          .delete()
+          .eq('user_id', subData.user_id);
 
         break;
       }

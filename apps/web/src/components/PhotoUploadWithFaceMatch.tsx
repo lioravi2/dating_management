@@ -491,7 +491,38 @@ export function PhotoUploadWithFaceMatch({
 
         const result = await response.json();
         if (result.decision === 'create_new') {
-          setShowCreateNewPartnerModal(true);
+          // If no partnerId, navigate to no-matches page instead of showing modal
+          if (!partnerId) {
+            // Store image and upload data for later use
+            const fileToConvert = fileRef.current || selectedFile;
+            if (fileToConvert) {
+              try {
+                const base64Url = await convertBlobToBase64(fileToConvert);
+                const imageKey = `upload-photo-image-${Date.now()}`;
+                sessionStorage.setItem(imageKey, base64Url);
+                
+                // Store upload data for creating partner and uploading photo
+                const uploadDataKey = `upload-photo-data-${Date.now()}`;
+                const uploadData = {
+                  fileBase64: base64Url,
+                  faceDescriptor: detection.descriptor,
+                  width: imageDimensions?.width || 0,
+                  height: imageDimensions?.height || 0,
+                };
+                sessionStorage.setItem(uploadDataKey, JSON.stringify(uploadData));
+                
+                router.push(`/upload-photo/no-matches?imageKey=${imageKey}&uploadDataKey=${uploadDataKey}`);
+              } catch (error) {
+                console.error('[PhotoUpload] Failed to convert image to base64:', error);
+                router.push('/upload-photo/no-matches');
+              }
+            } else {
+              router.push('/upload-photo/no-matches');
+            }
+          } else {
+            // If partnerId exists, show modal (existing behavior)
+            setShowCreateNewPartnerModal(true);
+          }
         } else if (result.decision === 'warn_matches') {
           // Set analysis for displaying matches
           const analysis: PhotoUploadAnalysis = {
@@ -517,8 +548,19 @@ export function PhotoUploadWithFaceMatch({
               // Store in sessionStorage with a unique key
               const imageKey = `similar-photos-image-${Date.now()}`;
               sessionStorage.setItem(imageKey, base64Url);
-              // Pass the key in URL instead of the full image
-              router.push(`/similar-photos?analysis=${analysisParam}&imageKey=${imageKey}`);
+              
+              // Store upload data for uploading to selected partner
+              const uploadDataKey = `upload-photo-data-${Date.now()}`;
+              const uploadData = {
+                fileBase64: base64Url,
+                faceDescriptor: detection.descriptor,
+                width: imageDimensions?.width || 0,
+                height: imageDimensions?.height || 0,
+              };
+              sessionStorage.setItem(uploadDataKey, JSON.stringify(uploadData));
+              
+              // Pass both keys in URL
+              router.push(`/similar-photos?analysis=${analysisParam}&imageKey=${imageKey}&uploadDataKey=${uploadDataKey}`);
             } catch (error) {
               console.error('[PhotoUpload] Failed to convert image to base64:', error);
               console.warn('[PhotoUpload] Navigating without image preview due to conversion failure');
@@ -637,9 +679,143 @@ export function PhotoUploadWithFaceMatch({
     setMounted(true);
   }, []);
 
-  // Check for uploadAnyway query param and restore/upload if needed
+  // Check for uploadPhoto query param with uploadDataKey and restore/upload if needed
   useEffect(() => {
     if (!mounted || !partnerId) return;
+    
+    const uploadPhotoParam = searchParams.get('uploadPhoto');
+    const uploadDataKey = searchParams.get('uploadDataKey');
+    
+    if (uploadPhotoParam === 'true' && uploadDataKey) {
+      // Add a small delay to ensure navigation has completed and sessionStorage is accessible
+      const checkAndUpload = () => {
+      console.log('[PhotoUpload] uploadPhoto=true with uploadDataKey detected, checking for stored upload data');
+      console.log('[PhotoUpload] Looking for key:', uploadDataKey);
+      console.log('[PhotoUpload] All sessionStorage keys:', Object.keys(sessionStorage));
+      
+      let storedData = sessionStorage.getItem(uploadDataKey);
+      let actualKey = uploadDataKey;
+      
+      // If exact key not found, try to find any upload data key
+      if (!storedData) {
+        console.log('[PhotoUpload] Exact key not found, searching for any upload data...');
+        const allKeys = Object.keys(sessionStorage);
+        const uploadDataKeys = allKeys.filter(key => 
+          key.startsWith('upload-photo-data-') || key.startsWith('upload-data-')
+        );
+        console.log('[PhotoUpload] Found upload data keys:', uploadDataKeys);
+        
+        if (uploadDataKeys.length > 0) {
+          // Try the most recent one (highest timestamp)
+          const sortedKeys = uploadDataKeys.sort((a, b) => {
+            const timestampA = parseInt(a.split('-').pop() || '0');
+            const timestampB = parseInt(b.split('-').pop() || '0');
+            return timestampB - timestampA;
+          });
+          const fallbackKey = sortedKeys[0];
+          console.log('[PhotoUpload] Using fallback key:', fallbackKey);
+          storedData = sessionStorage.getItem(fallbackKey);
+          actualKey = fallbackKey;
+          
+          // If we found data with fallback key, update the URL to use it
+          if (storedData) {
+            router.replace(`/partners/${partnerId}?uploadPhoto=true&uploadDataKey=${fallbackKey}`);
+          }
+        }
+      }
+      
+      if (storedData) {
+        (async () => {
+          try {
+            const uploadData = JSON.parse(storedData);
+            console.log('[PhotoUpload] Restoring upload data from sessionStorage');
+            
+            // Convert base64 back to File
+            const base64Data = uploadData.fileBase64.split(',')[1] || uploadData.fileBase64;
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            // Try to detect MIME type from base64 or default to image/jpeg
+            const mimeType = uploadData.fileBase64.startsWith('data:') 
+              ? uploadData.fileBase64.split(';')[0].split(':')[1] 
+              : 'image/jpeg';
+            const blob = new Blob([byteArray], { type: mimeType });
+            const file = new File([blob], `photo-${Date.now()}.jpg`, { type: mimeType });
+            
+            // Restore state
+            fileRef.current = file;
+            setSelectedFile(file);
+            const dims = { width: uploadData.width, height: uploadData.height };
+            dimensionsRef.current = dims;
+            setImageDimensions(dims);
+            
+            // Create detection result from stored descriptor
+            const restoredDetection: FaceDetectionResult = {
+              descriptor: uploadData.faceDescriptor,
+              boundingBox: null,
+              confidence: 1.0,
+              error: null,
+            };
+            setDetectionResult(restoredDetection);
+            
+            // Trigger upload
+            console.log('[PhotoUpload] Triggering upload with restored data');
+            await uploadPhoto(
+              restoredDetection.descriptor,
+              file,
+              dims
+            );
+            
+            // Clean up sessionStorage after successful upload
+            // Don't clean up immediately - wait a bit to ensure upload completes
+            setTimeout(() => {
+              sessionStorage.removeItem(actualKey);
+              // Clean up related image key if exists
+              const imageKey = searchParams.get('imageKey');
+              if (imageKey) {
+                sessionStorage.removeItem(imageKey);
+              }
+              // Clean up any other related keys
+              Object.keys(sessionStorage).forEach(key => {
+                if (key.startsWith(`uploadToPartner-${actualKey}`)) {
+                  sessionStorage.removeItem(key);
+                }
+              });
+            }, 1000);
+            
+            // Remove query params from URL and navigate to partner page
+            router.replace(`/partners/${partnerId}`);
+          } catch (error) {
+            console.error('[PhotoUpload] Failed to restore and upload:', error);
+            setAlertDialog({
+              open: true,
+              title: 'Upload Failed',
+              message: 'Failed to restore upload data. Please try uploading again.',
+            });
+            // Remove query params from URL
+            router.replace(`/partners/${partnerId}`);
+          }
+        })();
+      } else {
+        console.warn('[PhotoUpload] uploadPhoto=true but no stored data found for key:', uploadDataKey);
+        console.warn('[PhotoUpload] Available sessionStorage keys:', Object.keys(sessionStorage));
+        setAlertDialog({
+          open: true,
+          title: 'Upload Data Not Found',
+          message: 'The upload data could not be found. Please try uploading the photo again from the similar photos page.',
+        });
+        // Remove query params from URL
+        router.replace(`/partners/${partnerId}`);
+      }
+      };
+      
+      // Small delay to ensure sessionStorage is accessible after navigation
+      setTimeout(checkAndUpload, 100);
+      return;
+    }
     
     const uploadAnyway = searchParams.get('uploadAnyway');
     if (uploadAnyway === 'true') {

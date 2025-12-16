@@ -66,3 +66,5 @@ export interface CalendarProvider {
   ): Promise<Omit<CalendarConnection, 'id' | 'user_id' | 'provider' | 'created_at' | 'updated_at'>>;
 }
 
+
+

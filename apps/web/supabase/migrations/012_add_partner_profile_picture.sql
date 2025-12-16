@@ -12,3 +12,5 @@ CREATE INDEX IF NOT EXISTS idx_partners_profile_picture
   ON public.partners(profile_picture_storage_path) 
   WHERE profile_picture_storage_path IS NOT NULL;
 
+
+
