@@ -7,14 +7,30 @@ const nextConfig = {
       'tpidbrwziqoujspvradj.supabase.co', // Your Supabase project domain
     ],
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, webpack }) => {
     // Fix for face-api.js Node.js module warnings
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
         encoding: false,
+        path: false,
+        crypto: false,
+        stream: false,
+        http: false,
+        https: false,
+        zlib: false,
+        url: false,
+        util: false,
       };
+      // Ignore encoding module when required by node-fetch (used by face-api.js)
+      config.plugins = config.plugins || [];
+      config.plugins.push(
+        new webpack.IgnorePlugin({
+          resourceRegExp: /^encoding$/,
+          contextRegExp: /node-fetch/,
+        })
+      );
     }
     return config;
   },

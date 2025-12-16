@@ -27,13 +27,14 @@ export default function PartnerActivities({
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string | React.ReactNode } | null>(null);
   const [userAccountType, setUserAccountType] = useState<'free' | 'pro'>('free');
   const [hasCalendarConnection, setHasCalendarConnection] = useState<boolean>(false);
+  const [totalActivityCount, setTotalActivityCount] = useState<number | null>(null);
   const [syncingActivities, setSyncingActivities] = useState<Set<string>>(new Set());
   const [syncErrors, setSyncErrors] = useState<Map<string, string>>(new Map());
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; activityId: string | null }>({ open: false, activityId: null });
   const supabase = createSupabaseClient();
 
   useEffect(() => {
-    // Get user account type and calendar connection
+    // Get user account type, calendar connection, and total activity count
     const fetchUserData = async () => {
       const {
         data: { user },
@@ -50,14 +51,36 @@ export default function PartnerActivities({
         }
 
         // Check for calendar connection
-        const { data: calendarData } = await supabase
+        const { data: calendarData, error: calendarError } = await supabase
           .from('calendar_connections')
           .select('id')
           .eq('user_id', user.id)
           .eq('provider', 'google')
-          .single();
+          .maybeSingle();
         
-        setHasCalendarConnection(!!calendarData);
+        // Only set connection if data exists (ignore errors for missing connections)
+        setHasCalendarConnection(!!calendarData && !calendarError);
+
+        // Get total activity count across all partners (for free users)
+        if (userData?.account_type === 'free') {
+          // First get all partner IDs for this user
+          const { data: userPartners } = await supabase
+            .from('partners')
+            .select('id')
+            .eq('user_id', user.id);
+          
+          if (userPartners && userPartners.length > 0) {
+            const partnerIds = userPartners.map(p => p.id);
+            const { count } = await supabase
+              .from('partner_notes')
+              .select('*', { count: 'exact', head: true })
+              .in('partner_id', partnerIds);
+            
+            setTotalActivityCount(count ?? null);
+          } else {
+            setTotalActivityCount(0);
+          }
+        }
       }
     };
     fetchUserData();
@@ -70,14 +93,26 @@ export default function PartnerActivities({
       return;
     }
 
-    // For free users, check actual count from database before showing form
-    const { count, error } = await supabase
-      .from('partner_notes')
-      .select('*', { count: 'exact', head: true })
-      .eq('partner_id', partnerId);
+    // For free users, check total activity count across all partners
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setMessage({
+        type: 'error',
+        text: 'Unable to verify user. Please try again.'
+      });
+      return;
+    }
 
-    if (error) {
-      console.error('Error checking activity limit:', error);
+    // First get all partner IDs for this user
+    const { data: userPartners, error: partnersError } = await supabase
+      .from('partners')
+      .select('id')
+      .eq('user_id', user.id);
+
+    if (partnersError) {
+      console.error('Error fetching partners:', partnersError);
       setMessage({
         type: 'error',
         text: 'Unable to verify activity limit. Please try again.'
@@ -85,12 +120,31 @@ export default function PartnerActivities({
       return;
     }
 
+    let count = 0;
+    if (userPartners && userPartners.length > 0) {
+      const partnerIds = userPartners.map(p => p.id);
+      const { count: notesCount, error: notesError } = await supabase
+        .from('partner_notes')
+        .select('*', { count: 'exact', head: true })
+        .in('partner_id', partnerIds);
+
+      if (notesError) {
+        console.error('Error checking activity limit:', notesError);
+        setMessage({
+          type: 'error',
+          text: 'Unable to verify activity limit. Please try again.'
+        });
+        return;
+      }
+      count = notesCount ?? 0;
+    }
+
     if (count !== null && count >= FREE_TIER_ACTIVITY_LIMIT) {
       setMessage({
         type: 'error',
         text: (
           <>
-            Free accounts are limited to {FREE_TIER_ACTIVITY_LIMIT} activities. You currently have {count} activities. Please{' '}
+            Free accounts are limited to {FREE_TIER_ACTIVITY_LIMIT} total activities. You currently have {count} activities. Please{' '}
             <Link href="/upgrade" className="underline font-semibold">
               upgrade to Pro
             </Link>{' '}
@@ -112,12 +166,70 @@ export default function PartnerActivities({
     location?: string;
     description?: string;
   }) => {
-    if (!canAddActivity) {
-      setMessage({
-        type: 'error',
-        text: `Free accounts are limited to ${FREE_TIER_ACTIVITY_LIMIT} activities. Please upgrade to Pro for unlimited activities.`
-      });
-      return;
+    // Double-check limit before submitting (in case limit was reached between button click and form submit)
+    if (userAccountType === 'free') {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setMessage({
+          type: 'error',
+          text: 'Unable to verify user. Please try again.'
+        });
+        setShowForm(false);
+        return;
+      }
+
+      // First get all partner IDs for this user
+      const { data: userPartners, error: partnersError } = await supabase
+        .from('partners')
+        .select('id')
+        .eq('user_id', user.id);
+
+      if (partnersError) {
+        setMessage({
+          type: 'error',
+          text: 'Unable to verify activity limit. Please try again.'
+        });
+        setShowForm(false);
+        return;
+      }
+
+      let count = 0;
+      if (userPartners && userPartners.length > 0) {
+        const partnerIds = userPartners.map(p => p.id);
+        const { count: notesCount, error: notesError } = await supabase
+          .from('partner_notes')
+          .select('*', { count: 'exact', head: true })
+          .in('partner_id', partnerIds);
+
+        if (notesError) {
+          setMessage({
+            type: 'error',
+            text: 'Unable to verify activity limit. Please try again.'
+          });
+          setShowForm(false);
+          return;
+        }
+        count = notesCount ?? 0;
+      }
+
+      if (count !== null && count >= FREE_TIER_ACTIVITY_LIMIT) {
+        setMessage({
+          type: 'error',
+          text: (
+            <>
+              Free accounts are limited to {FREE_TIER_ACTIVITY_LIMIT} total activities. You currently have {count} activities. Please{' '}
+              <Link href="/upgrade" className="underline font-semibold">
+                upgrade to Pro
+              </Link>{' '}
+              for unlimited activities.
+            </>
+          )
+        });
+        setShowForm(false);
+        return;
+      }
     }
 
     setLoading(true);
@@ -142,6 +254,10 @@ export default function PartnerActivities({
         .eq('id', partnerId);
       
       setActivities([activity, ...activities]);
+      // Update total activity count for free users
+      if (userAccountType === 'free' && totalActivityCount !== null) {
+        setTotalActivityCount(totalActivityCount + 1);
+      }
       setShowForm(false);
       setMessage({
         type: 'success',
@@ -219,17 +335,35 @@ export default function PartnerActivities({
     const activity = activities.find((a) => a.id === activityId);
     if (!activity) return;
 
+    // Check if user has Pro account (required for calendar sync)
+    if (userAccountType !== 'pro') {
+      setMessage({
+        type: 'error',
+        text: (
+          <>
+            Calendar synchronization is only available for Pro accounts. Please{' '}
+            <Link href="/upgrade" className="underline font-semibold">
+              upgrade to Pro
+            </Link>{' '}
+            to sync activities with your calendar.
+          </>
+        ),
+      });
+      setTimeout(() => setMessage(null), 5000);
+      return;
+    }
+
     // Check if calendar is connected
     if (!hasCalendarConnection) {
       setMessage({
         type: 'error',
         text: (
           <>
-            Calendar not available -{' '}
+            Calendar not connected -{' '}
             <Link href="/profile" className="underline font-semibold">
               click here
             </Link>{' '}
-            to synchronize your calendar from your profile page
+            to connect your calendar from your profile page
           </>
         ),
       });
@@ -330,6 +464,10 @@ export default function PartnerActivities({
       return false;
     } else {
       setActivities(activities.filter((a) => a.id !== activityId));
+      // Update total activity count for free users
+      if (userAccountType === 'free' && totalActivityCount !== null && totalActivityCount > 0) {
+        setTotalActivityCount(totalActivityCount - 1);
+      }
       setMessage({
         type: 'success',
         text: 'Activity deleted successfully!'
@@ -394,10 +532,10 @@ export default function PartnerActivities({
         </div>
       )}
 
-      {userAccountType === 'free' && (
+      {userAccountType === 'free' && totalActivityCount !== null && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
           <p className="text-sm text-yellow-800">
-            Free account: {activities.length} / {FREE_TIER_ACTIVITY_LIMIT} activities used
+            Free account: {totalActivityCount} / {FREE_TIER_ACTIVITY_LIMIT} total activities used
           </p>
         </div>
       )}
@@ -503,7 +641,9 @@ export default function PartnerActivities({
                                 onClick={() => handleSyncActivity(activity.id)}
                                 disabled={syncingActivities.has(activity.id)}
                                 className={`p-2 rounded transition-colors ${
-                                  !hasCalendarConnection
+                                  userAccountType !== 'pro'
+                                    ? 'text-red-600 hover:text-red-800 hover:bg-red-50'
+                                    : !hasCalendarConnection
                                     ? 'text-red-600 hover:text-red-800 hover:bg-red-50'
                                     : activity.google_calendar_event_id
                                     ? 'text-green-600 hover:text-green-800 hover:bg-green-50'
@@ -512,7 +652,9 @@ export default function PartnerActivities({
                                     : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
                                 } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 title={
-                                  !hasCalendarConnection
+                                  userAccountType !== 'pro'
+                                    ? 'Calendar sync requires Pro account - upgrade to Pro'
+                                    : !hasCalendarConnection
                                     ? 'Calendar not connected - click to connect'
                                     : syncingActivities.has(activity.id)
                                     ? 'Syncing...'

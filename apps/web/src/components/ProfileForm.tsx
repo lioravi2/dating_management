@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { User } from '@/shared';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import ConfirmDialog from './ConfirmDialog';
 
 interface ProfileFormProps {
@@ -38,7 +39,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
   const router = useRouter();
   const supabase = createSupabaseClient();
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<string | React.ReactNode>('');
   const [calendarConnections, setCalendarConnections] = useState<Array<{ provider: string; connected: boolean }>>([]);
   const [connectingCalendar, setConnectingCalendar] = useState(false);
   const [disconnectConfirm, setDisconnectConfirm] = useState<{ open: boolean; provider: string | null }>({ open: false, provider: null });
@@ -108,6 +109,20 @@ export default function ProfileForm({ user }: ProfileFormProps) {
   };
 
   const handleConnectCalendar = async (provider: string) => {
+    // Check if user has Pro account (required for calendar connection)
+    if (user.account_type !== 'pro') {
+      setMessage(
+        <>
+          Calendar synchronization is only available for Pro accounts. Please{' '}
+          <Link href="/upgrade" className="underline font-semibold">
+            upgrade to Pro
+          </Link>{' '}
+          to connect your calendar.
+        </>
+      );
+      return;
+    }
+
     if (provider === 'google') {
       setConnectingCalendar(true);
       try {
@@ -117,6 +132,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
           window.location.href = data.authUrl;
         } else {
           setMessage('Error: ' + (data.error || 'Failed to initiate calendar connection'));
+          setConnectingCalendar(false);
         }
       } catch (error: any) {
         setMessage('Error connecting calendar: ' + error.message);
@@ -156,7 +172,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
       {message && (
         <div
           className={`mb-4 p-3 rounded ${
-            message.includes('successfully')
+            typeof message === 'string' && message.includes('successfully')
               ? 'bg-green-50 text-green-800'
               : 'bg-red-50 text-red-800'
           }`}
