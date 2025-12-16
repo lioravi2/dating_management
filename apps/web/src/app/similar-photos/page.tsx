@@ -127,6 +127,8 @@ export default function SimilarPhotosPage() {
   const handleUploadAnyway = async () => {
     // Navigate back appropriately
     if (partnerId) {
+      // Navigate to partner page with uploadAnyway flag
+      // The PhotoUploadWithFaceMatch component will detect this and trigger upload
       router.push(`/partners/${partnerId}?uploadAnyway=true`);
     } else {
       // For no partnerId case, go back to where they came from or home

@@ -5,7 +5,7 @@ import { useFaceDetection } from '@/lib/hooks/useFaceDetection';
 import { FaceSelectionUI } from './FaceSelectionUI';
 import { FaceDetectionResult, MultipleFaceDetectionResult } from '@/lib/face-detection/types';
 import { PhotoUploadAnalysis, FaceMatch, FREE_TIER_PHOTO_LIMIT } from '@/shared';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { getPhotoUrl } from '@/lib/photo-utils';
 import Link from 'next/link';
@@ -23,6 +23,7 @@ export function PhotoUploadWithFaceMatch({
   onCancel,
 }: PhotoUploadWithFaceMatchProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { modelsLoaded, loading, error: detectionError, detectFace, detectAllFaces } = useFaceDetection();
 
@@ -441,25 +442,37 @@ export function PhotoUploadWithFaceMatch({
           console.log('[PhotoUpload] Navigating to similar photos page');
           // Navigate to dedicated page instead of showing modal
           const analysisParam = encodeURIComponent(JSON.stringify(analysis));
-          // Store image in sessionStorage instead of URL params (base64 URLs are too long)
+          // Store image and upload data in sessionStorage for "Upload Anyway" functionality
           const fileToConvert = fileRef.current || selectedFile;
-          if (fileToConvert) {
+          const uploadDataKey = `upload-data-${partnerId}-${Date.now()}`;
+          
+          if (fileToConvert && detection.descriptor) {
             try {
-              console.log('[PhotoUpload] Converting image to base64, file size:', fileToConvert.size);
+              console.log('[PhotoUpload] Storing upload data for "Upload Anyway" functionality');
+              // Convert file to base64 for storage
               const base64Url = await convertBlobToBase64(fileToConvert);
-              console.log('[PhotoUpload] Base64 conversion successful, length:', base64Url.length);
-              // Store in sessionStorage with a unique key
               const imageKey = `similar-photos-image-${Date.now()}`;
               sessionStorage.setItem(imageKey, base64Url);
-              // Pass the key in URL instead of the full image
-              router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}&imageKey=${imageKey}`);
+              
+              // Store upload data (file as base64, descriptor, dimensions)
+              const uploadData = {
+                fileBase64: base64Url,
+                faceDescriptor: detection.descriptor,
+                dimensions: dimensionsRef.current || imageDimensions,
+                fileName: fileToConvert.name,
+                fileType: fileToConvert.type,
+              };
+              sessionStorage.setItem(uploadDataKey, JSON.stringify(uploadData));
+              
+              // Pass keys in URL
+              router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}&imageKey=${imageKey}&uploadDataKey=${uploadDataKey}`);
             } catch (error) {
-              console.error('[PhotoUpload] Failed to convert image to base64:', error);
-              console.warn('[PhotoUpload] Navigating without image preview due to conversion failure');
+              console.error('[PhotoUpload] Failed to store upload data:', error);
+              console.warn('[PhotoUpload] Navigating without upload data');
               router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}`);
             }
           } else {
-            console.log('[PhotoUpload] No file available for conversion');
+            console.log('[PhotoUpload] No file or descriptor available for storage');
             router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}`);
           }
         }
@@ -623,6 +636,90 @@ export function PhotoUploadWithFaceMatch({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Check for uploadAnyway query param and restore/upload if needed
+  useEffect(() => {
+    if (!mounted || !partnerId) return;
+    
+    const uploadAnyway = searchParams.get('uploadAnyway');
+    if (uploadAnyway === 'true') {
+      console.log('[PhotoUpload] uploadAnyway=true detected, checking for stored upload data');
+      
+      // Find the most recent upload data key for this partner
+      const uploadDataKeys = Object.keys(sessionStorage)
+        .filter(key => key.startsWith(`upload-data-${partnerId}-`))
+        .sort((a, b) => {
+          // Extract timestamp and sort descending (newest first)
+          const timestampA = parseInt(a.split('-').pop() || '0');
+          const timestampB = parseInt(b.split('-').pop() || '0');
+          return timestampB - timestampA;
+        });
+      
+      if (uploadDataKeys.length > 0) {
+        const latestKey = uploadDataKeys[0];
+        const storedData = sessionStorage.getItem(latestKey);
+        
+        if (storedData) {
+          (async () => {
+            try {
+              const uploadData = JSON.parse(storedData);
+              console.log('[PhotoUpload] Restoring upload data from sessionStorage');
+              
+              // Convert base64 back to File
+              const base64Response = await fetch(uploadData.fileBase64);
+              const blob = await base64Response.blob();
+              const file = new File([blob], uploadData.fileName, { type: uploadData.fileType });
+              
+              // Restore state
+              fileRef.current = file;
+              setSelectedFile(file);
+              dimensionsRef.current = uploadData.dimensions;
+              setImageDimensions(uploadData.dimensions);
+              
+              // Create detection result from stored descriptor
+              const restoredDetection: FaceDetectionResult = {
+                descriptor: uploadData.faceDescriptor,
+                boundingBox: null, // We don't need bounding box for upload
+                confidence: 1.0,
+              };
+              setDetectionResult(restoredDetection);
+              
+              // Trigger upload
+              console.log('[PhotoUpload] Triggering upload with restored data');
+              await uploadPhoto(
+                restoredDetection.descriptor,
+                file,
+                uploadData.dimensions
+              );
+              
+              // Clean up sessionStorage
+              sessionStorage.removeItem(latestKey);
+              // Clean up all other upload data keys for this partner
+              uploadDataKeys.slice(1).forEach(key => sessionStorage.removeItem(key));
+              
+              // Remove uploadAnyway from URL
+              router.replace(`/partners/${partnerId}`);
+            } catch (error) {
+              console.error('[PhotoUpload] Failed to restore and upload:', error);
+              setAlertDialog({
+                open: true,
+                title: 'Upload Failed',
+                message: 'Failed to restore upload data. Please try uploading again.',
+              });
+              // Remove uploadAnyway from URL
+              router.replace(`/partners/${partnerId}`);
+            }
+          })();
+        } else {
+          console.warn('[PhotoUpload] uploadAnyway=true but no stored data found');
+          router.replace(`/partners/${partnerId}`);
+        }
+      } else {
+        console.warn('[PhotoUpload] uploadAnyway=true but no upload data keys found');
+        router.replace(`/partners/${partnerId}`);
+      }
+    }
+  }, [mounted, partnerId, searchParams, router]);
 
   // Check authentication on mount
   useEffect(() => {

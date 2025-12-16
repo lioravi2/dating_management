@@ -124,7 +124,8 @@ export default function SimilarPhotosPage() {
   }, [partnerId, searchParams, supabase]);
 
   const handleUploadAnyway = async () => {
-    // Navigate back to partner page and trigger upload
+    // Navigate back to partner page with uploadAnyway flag
+    // The PhotoUploadWithFaceMatch component will detect this and trigger upload
     router.push(`/partners/${partnerId}?uploadAnyway=true`);
   };
 
