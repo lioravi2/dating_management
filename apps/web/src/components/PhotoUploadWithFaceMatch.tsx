@@ -34,6 +34,7 @@ export function PhotoUploadWithFaceMatch({
   // Use refs to preserve file and dimensions across async operations
   const fileRef = useRef<File | null>(null);
   const dimensionsRef = useRef<{ width: number; height: number } | null>(null);
+  const handleFileSelectRef = useRef<typeof handleFileSelect | null>(null);
   const [detectionResult, setDetectionResult] = useState<FaceDetectionResult | null>(null);
   const [multipleDetections, setMultipleDetections] = useState<FaceDetectionResult[] | null>(null);
   const [analysis, setAnalysis] = useState<PhotoUploadAnalysis | null>(null);
@@ -272,6 +273,65 @@ export function PhotoUploadWithFaceMatch({
 
     img.src = url;
   };
+
+  // Store handleFileSelect in ref for paste handler
+  // Update ref on every render to always have the latest function
+  useEffect(() => {
+    handleFileSelectRef.current = handleFileSelect;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+
+  // Handle clipboard paste events
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      // Only handle paste if component is ready and not currently processing
+      if (uploading || analyzing || !modelsLoaded) {
+        return;
+      }
+
+      // Check if clipboard contains image data
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        
+        // Check if the item is an image
+        if (item.type.indexOf('image') !== -1) {
+          const blob = item.getAsFile();
+          if (!blob) continue; // Skip this item and check the next one
+          
+          e.preventDefault(); // Only prevent default if we have a valid blob
+
+          // Convert blob to File object with appropriate name
+          const fileExtension = blob.type.split('/')[1] || 'png';
+          const fileName = `pasted-image-${Date.now()}.${fileExtension}`;
+          const file = new File([blob], fileName, {
+            type: blob.type || 'image/png'
+          });
+
+          // Create a synthetic event to reuse existing handleFileSelect logic
+          const syntheticEvent = {
+            target: {
+              files: [file]
+            }
+          } as React.ChangeEvent<HTMLInputElement>;
+
+          if (handleFileSelectRef.current) {
+            await handleFileSelectRef.current(syntheticEvent);
+          }
+          break; // Successfully processed an image, exit loop
+        }
+      }
+    };
+
+    // Add paste event listener to document
+    document.addEventListener('paste', handlePaste);
+    
+    return () => {
+      document.removeEventListener('paste', handlePaste);
+    };
+  }, [uploading, analyzing, modelsLoaded]);
 
   const cropImageToFace = async (
     imageUrl: string,
@@ -1000,13 +1060,18 @@ export function PhotoUploadWithFaceMatch({
         className="hidden"
       />
 
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        disabled={uploading || analyzing}
-        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-      >
-        {uploading ? 'Uploading...' : analyzing ? 'Analyzing face...' : 'Select Photo'}
-      </button>
+      <div className="space-y-2">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading || analyzing}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+        >
+          {uploading ? 'Uploading...' : analyzing ? 'Analyzing face...' : 'Select Photo'}
+        </button>
+        <p className="text-xs text-gray-500 text-center">
+          Or paste an image from clipboard (Ctrl+V / Cmd+V)
+        </p>
+      </div>
 
       {(analyzing || uploading) && (
         <div className="p-4 bg-blue-50 border border-blue-200 rounded">
