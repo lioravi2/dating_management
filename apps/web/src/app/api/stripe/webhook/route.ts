@@ -93,8 +93,8 @@ export async function POST(request: NextRequest) {
             })
             .eq('user_id', userId);
 
-          // Update user account type
-          await supabase
+          // Update user account type (use admin client to bypass RLS)
+          await supabaseAdmin
             .from('users')
             .update({ account_type: 'pro' })
             .eq('id', userId);
@@ -107,8 +107,8 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const subscriptionId = subscription.id;
 
-        // Get user by subscription ID
-        const { data: subData } = await supabase
+        // Get user by subscription ID (use admin client to bypass RLS)
+        const { data: subData } = await supabaseAdmin
           .from('subscriptions')
           .select('user_id')
           .eq('stripe_subscription_id', subscriptionId)
@@ -161,8 +161,8 @@ export async function POST(request: NextRequest) {
             .delete()
             .eq('user_id', subData.user_id);
         } else if (isActive) {
-          // Active subscription, set to pro
-          await supabase
+          // Active subscription, set to pro (use admin client to bypass RLS)
+          await supabaseAdmin
             .from('users')
             .update({ account_type: 'pro' })
             .eq('id', subData.user_id);
