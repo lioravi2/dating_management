@@ -63,38 +63,47 @@ export default function PartnerActivities({
     fetchUserData();
   }, [supabase]);
 
-  // Check activity limit from database (more accurate than activities.length)
-  const [activityLimitChecked, setActivityLimitChecked] = useState(false);
-  const [canAddActivity, setCanAddActivity] = useState(true);
-  
-  useEffect(() => {
-    const checkActivityLimit = async () => {
-      if (userAccountType === 'pro') {
-        setCanAddActivity(true);
-        setActivityLimitChecked(true);
-        return;
-      }
-
-      // For free users, check actual count from database
-      const { count, error } = await supabase
-        .from('partner_notes')
-        .select('*', { count: 'exact', head: true })
-        .eq('partner_id', partnerId);
-
-      if (!error && count !== null) {
-        setCanAddActivity(count < FREE_TIER_ACTIVITY_LIMIT);
-      } else {
-        // If error, allow but log it
-        console.error('Error checking activity limit:', error);
-        setCanAddActivity(true);
-      }
-      setActivityLimitChecked(true);
-    };
-
-    if (userAccountType !== null) {
-      checkActivityLimit();
+  // Check activity limit when button is clicked (before showing form)
+  const handleAddActivityClick = async () => {
+    if (userAccountType === 'pro') {
+      setShowForm(!showForm);
+      return;
     }
-  }, [userAccountType, partnerId, supabase]);
+
+    // For free users, check actual count from database before showing form
+    const { count, error } = await supabase
+      .from('partner_notes')
+      .select('*', { count: 'exact', head: true })
+      .eq('partner_id', partnerId);
+
+    if (error) {
+      console.error('Error checking activity limit:', error);
+      setMessage({
+        type: 'error',
+        text: 'Unable to verify activity limit. Please try again.'
+      });
+      return;
+    }
+
+    if (count !== null && count >= FREE_TIER_ACTIVITY_LIMIT) {
+      setMessage({
+        type: 'error',
+        text: (
+          <>
+            Free accounts are limited to {FREE_TIER_ACTIVITY_LIMIT} activities. You currently have {count} activities. Please{' '}
+            <Link href="/upgrade" className="underline font-semibold">
+              upgrade to Pro
+            </Link>{' '}
+            for unlimited activities.
+          </>
+        )
+      });
+      return;
+    }
+
+    // Limit check passed, show form
+    setShowForm(!showForm);
+  };
 
   const handleAddActivity = async (formData: {
     start_time: string;
@@ -365,28 +374,12 @@ export default function PartnerActivities({
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Activity Timeline</h2>
-        {!activityLimitChecked ? (
-          <button
-            disabled
-            className="bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed"
-          >
-            Checking...
-          </button>
-        ) : canAddActivity ? (
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            + Add Activity
-          </button>
-        ) : (
-          <Link
-            href="/upgrade"
-            className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors"
-          >
-            Upgrade to Add More Activities
-          </Link>
-        )}
+        <button
+          onClick={handleAddActivityClick}
+          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+        >
+          + Add Activity
+        </button>
       </div>
 
       {message && (

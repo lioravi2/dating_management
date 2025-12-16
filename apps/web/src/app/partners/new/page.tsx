@@ -21,31 +21,38 @@ export default function NewPartnerPage() {
 
   useEffect(() => {
     const checkLimit = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('account_type')
-          .eq('id', user.id)
-          .single();
-        setAccountType(userData?.account_type || null);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('account_type')
+            .eq('id', user.id)
+            .single();
+          setAccountType(userData?.account_type || null);
 
-        // Check partner limit for free users before showing form
-        if (userData?.account_type === 'free') {
-          const { count, error: countError } = await supabase
-            .from('partners')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id);
+          // Check partner limit for free users before showing form
+          if (userData?.account_type === 'free') {
+            const { count, error: countError } = await supabase
+              .from('partners')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', user.id);
 
-          if (!countError && count !== null) {
-            setPartnerCount(count);
-            if (count >= FREE_TIER_PARTNER_LIMIT) {
-              setLimitReached(true);
+            if (!countError && count !== null) {
+              setPartnerCount(count);
+              if (count >= FREE_TIER_PARTNER_LIMIT) {
+                setLimitReached(true);
+              }
             }
           }
         }
+      } catch (error) {
+        console.error('Error checking partner limit:', error);
+        // On error, allow user to proceed (fail open)
+        // They'll get an error from the API if limit is actually reached
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     checkLimit();
   }, [supabase]);
