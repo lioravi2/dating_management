@@ -17,6 +17,7 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; photoId: string | null }>({ open: false, photoId: null });
+  const [deleting, setDeleting] = useState(false);
   const supabase = createSupabaseClient();
 
   useEffect(() => {
@@ -50,9 +51,10 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deleteConfirm.photoId) return;
+    if (!deleteConfirm.photoId || deleting) return;
 
     try {
+      setDeleting(true);
       const response = await fetch(`/api/partners/${partnerId}/photos/${deleteConfirm.photoId}`, {
         method: 'DELETE',
       });
@@ -71,6 +73,8 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
       setError(err instanceof Error ? err.message : 'Failed to delete photo. Please try again.');
       setTimeout(() => setError(null), 5000);
       setDeleteConfirm({ open: false, photoId: null });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -150,8 +154,14 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
         confirmLabel="Delete"
         cancelLabel="Cancel"
         onConfirm={handleDeleteConfirm}
-        onCancel={() => setDeleteConfirm({ open: false, photoId: null })}
+        onCancel={() => {
+          if (!deleting) {
+            setDeleteConfirm({ open: false, photoId: null });
+          }
+        }}
         confirmButtonClass="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+        loading={deleting}
+        loadingLabel="Deleting..."
       />
     </div>
   );

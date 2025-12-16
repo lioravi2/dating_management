@@ -129,6 +129,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Create checkout session with daily pricing for testing
+    // Note: For daily subscriptions, Stripe may charge for multiple days upfront
+    // This is normal behavior - the first charge covers the current period plus the next period
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
@@ -149,6 +151,10 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'subscription',
+      subscription_data: {
+        // Set billing cycle anchor to current timestamp to avoid prorating
+        billing_cycle_anchor: Math.floor(Date.now() / 1000),
+      },
       success_url: `${request.nextUrl.origin}/profile?success=true`,
       cancel_url: `${request.nextUrl.origin}/upgrade?canceled=true`,
       metadata: {

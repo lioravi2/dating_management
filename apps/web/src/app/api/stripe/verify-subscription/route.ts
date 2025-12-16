@@ -142,6 +142,44 @@ export async function POST(request: NextRequest) {
                   console.error('Error updating user account type:', userUpdateError);
                 }
 
+                // Also try to sync the initial payment from the invoice
+                try {
+                  if (stripeSubscription.latest_invoice) {
+                    const invoice = await stripe.invoices.retrieve(
+                      stripeSubscription.latest_invoice as string
+                    );
+                    
+                    if (invoice.amount_paid > 0) {
+                      // Check if payment already exists
+                      const { data: existingPayment } = await supabaseAdmin
+                        .from('payments')
+                        .select('id')
+                        .eq('stripe_invoice_id', invoice.id)
+                        .maybeSingle();
+
+                      if (!existingPayment) {
+                        await supabaseAdmin
+                          .from('payments')
+                          .insert({
+                            user_id: userId,
+                            stripe_payment_intent_id: invoice.payment_intent as string,
+                            stripe_invoice_id: invoice.id,
+                            amount: invoice.amount_paid,
+                            currency: invoice.currency,
+                            status: invoice.status === 'paid' ? 'succeeded' : 'pending',
+                            paid_at: invoice.status === 'paid' 
+                              ? new Date(invoice.created * 1000).toISOString()
+                              : null,
+                          });
+                        console.log('Initial payment synced from invoice');
+                      }
+                    }
+                  }
+                } catch (invoiceError) {
+                  console.error('Error syncing initial payment:', invoiceError);
+                  // Don't fail the whole verification if payment sync fails
+                }
+
                 console.log('Subscription verified and updated from checkout session');
                 return NextResponse.json({ 
                   success: true,

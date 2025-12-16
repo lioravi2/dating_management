@@ -105,7 +105,7 @@ export default async function BillingPage() {
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">Payment History</h2>
-            {(!payments || payments.length === 0) && user?.account_type === 'pro' && (
+            {user?.account_type === 'pro' && (
               <SyncPaymentsButton />
             )}
           </div>

@@ -46,12 +46,69 @@ export default function NoMatchesPage() {
     }
   }, [imageKey, supabase]);
 
-  const handleCreateNewPartner = () => {
-    // Store upload data key in sessionStorage so the partner form can access it
-    if (uploadDataKey) {
-      sessionStorage.setItem('pendingPhotoUpload', uploadDataKey);
+  const handleCreateNewPartner = async () => {
+    if (!uploadDataKey) {
+      console.error('No uploadDataKey found');
+      return;
     }
-    router.push('/partners/new?fromPhotoUpload=true');
+
+    // Get upload data from sessionStorage
+    const uploadDataStr = sessionStorage.getItem(uploadDataKey);
+    if (!uploadDataStr) {
+      console.error('Upload data not found in sessionStorage');
+      return;
+    }
+
+    try {
+      const uploadData = JSON.parse(uploadDataStr);
+      const { fileBase64, faceDescriptor, width, height } = uploadData;
+
+      // Convert base64 back to File
+      const base64Data = fileBase64.split(',')[1] || fileBase64;
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/jpeg' });
+      const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+
+      // Create FormData
+      const formData = new FormData();
+      formData.append('file', file);
+      if (faceDescriptor) {
+        formData.append('faceDescriptor', JSON.stringify(faceDescriptor));
+      }
+      if (width) formData.append('width', width.toString());
+      if (height) formData.append('height', height.toString());
+
+      // Create partner with photo via API
+      const response = await fetch('/api/partners/create-with-photo', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('Error creating partner:', result.error);
+        alert(result.message || result.error || 'Failed to create partner');
+        return;
+      }
+
+      // Clean up sessionStorage
+      sessionStorage.removeItem(uploadDataKey);
+      if (imageKey) {
+        sessionStorage.removeItem(imageKey);
+      }
+
+      // Redirect to partner page (not edit mode)
+      router.push(`/partners/${result.partner.id}`);
+    } catch (error) {
+      console.error('Error creating partner:', error);
+      alert('Failed to create partner. Please try again.');
+    }
   };
 
   const handleCancel = () => {

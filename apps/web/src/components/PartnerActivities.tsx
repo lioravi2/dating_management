@@ -31,6 +31,7 @@ export default function PartnerActivities({
   const [syncingActivities, setSyncingActivities] = useState<Set<string>>(new Set());
   const [syncErrors, setSyncErrors] = useState<Map<string, string>>(new Map());
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; activityId: string | null }>({ open: false, activityId: null });
+  const [deleting, setDeleting] = useState(false);
   const supabase = createSupabaseClient();
 
   useEffect(() => {
@@ -478,10 +479,16 @@ export default function PartnerActivities({
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deleteConfirm.activityId) return;
-    const result = await handleDeleteActivity(deleteConfirm.activityId);
-    setDeleteConfirm({ open: false, activityId: null });
-    return result;
+    if (!deleteConfirm.activityId || deleting) return;
+    
+    try {
+      setDeleting(true);
+      const result = await handleDeleteActivity(deleteConfirm.activityId);
+      setDeleteConfirm({ open: false, activityId: null });
+      return result;
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Group activities by date
@@ -514,8 +521,15 @@ export default function PartnerActivities({
         <h2 className="text-2xl font-bold">Activity Timeline</h2>
         <button
           onClick={handleAddActivityClick}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+          disabled={loading}
+          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
+          {loading && (
+            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          )}
           + Add Activity
         </button>
       </div>
@@ -748,8 +762,14 @@ export default function PartnerActivities({
         confirmLabel="Delete"
         cancelLabel="Cancel"
         onConfirm={handleDeleteConfirm}
-        onCancel={() => setDeleteConfirm({ open: false, activityId: null })}
+        onCancel={() => {
+          if (!deleting) {
+            setDeleteConfirm({ open: false, activityId: null });
+          }
+        }}
         confirmButtonClass="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+        loading={deleting}
+        loadingLabel="Deleting..."
       />
     </div>
   );
@@ -1065,8 +1085,14 @@ function ActivityForm({
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 bg-primary-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50"
+            className="flex-1 bg-primary-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
+            {loading && (
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            )}
             {loading 
               ? (activity ? 'Updating...' : 'Creating...') 
               : (activity ? 'Update Activity' : 'Create Activity')

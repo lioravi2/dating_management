@@ -98,6 +98,47 @@ export async function POST(request: NextRequest) {
             .from('users')
             .update({ account_type: 'pro' })
             .eq('id', userId);
+
+          // Create payment record for the initial checkout payment
+          // Get the invoice from the subscription
+          if (subscription.latest_invoice) {
+            try {
+              const invoice = await stripe.invoices.retrieve(
+                subscription.latest_invoice as string
+              );
+              
+              if (invoice.amount_paid > 0) {
+                // Check if payment already exists (to prevent duplicates)
+                const { data: existingPayment } = await supabaseAdmin
+                  .from('payments')
+                  .select('id')
+                  .eq('stripe_invoice_id', invoice.id)
+                  .maybeSingle();
+
+                if (!existingPayment) {
+                  const { error: paymentError } = await supabaseAdmin
+                    .from('payments')
+                    .insert({
+                      user_id: userId,
+                      stripe_payment_intent_id: invoice.payment_intent as string,
+                      stripe_invoice_id: invoice.id,
+                      amount: invoice.amount_paid,
+                      currency: invoice.currency,
+                      status: invoice.status === 'paid' ? 'succeeded' : 'pending',
+                      paid_at: invoice.status === 'paid' 
+                        ? new Date(invoice.created * 1000).toISOString()
+                        : null,
+                    });
+
+                  if (paymentError) {
+                    console.error('Error storing payment in checkout.session.completed:', paymentError);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('Error retrieving invoice in checkout.session.completed:', error);
+            }
+          }
         }
 
         break;
@@ -233,20 +274,29 @@ export async function POST(request: NextRequest) {
         }
 
         // Store payment record (use admin client to bypass RLS)
-        const { error: paymentError } = await supabaseAdmin
+        // Check if payment already exists (to prevent duplicates)
+        const { data: existingPayment } = await supabaseAdmin
           .from('payments')
-          .insert({
-            user_id: subData.user_id,
-            stripe_payment_intent_id: invoice.payment_intent as string,
-            stripe_invoice_id: invoice.id,
-            amount: invoice.amount_paid,
-            currency: invoice.currency,
-            status: 'succeeded',
-            paid_at: new Date(invoice.created * 1000).toISOString(),
-          });
+          .select('id')
+          .eq('stripe_invoice_id', invoice.id)
+          .maybeSingle();
 
-        if (paymentError) {
-          console.error('Error storing payment:', paymentError);
+        if (!existingPayment) {
+          const { error: paymentError } = await supabaseAdmin
+            .from('payments')
+            .insert({
+              user_id: subData.user_id,
+              stripe_payment_intent_id: invoice.payment_intent as string,
+              stripe_invoice_id: invoice.id,
+              amount: invoice.amount_paid,
+              currency: invoice.currency,
+              status: 'succeeded',
+              paid_at: new Date(invoice.created * 1000).toISOString(),
+            });
+
+          if (paymentError) {
+            console.error('Error storing payment in invoice.payment_succeeded:', paymentError);
+          }
         }
 
         break;
