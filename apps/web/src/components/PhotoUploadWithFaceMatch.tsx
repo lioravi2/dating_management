@@ -666,8 +666,15 @@ export function PhotoUploadWithFaceMatch({
               console.log('[PhotoUpload] Restoring upload data from sessionStorage');
               
               // Convert base64 back to File
-              const base64Response = await fetch(uploadData.fileBase64);
-              const blob = await base64Response.blob();
+              // base64 data URL format: data:image/jpeg;base64,/9j/4AAQ...
+              const base64Data = uploadData.fileBase64.split(',')[1] || uploadData.fileBase64;
+              const byteCharacters = atob(base64Data);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: uploadData.fileType });
               const file = new File([blob], uploadData.fileName, { type: uploadData.fileType });
               
               // Restore state
@@ -681,6 +688,7 @@ export function PhotoUploadWithFaceMatch({
                 descriptor: uploadData.faceDescriptor,
                 boundingBox: null, // We don't need bounding box for upload
                 confidence: 1.0,
+                error: null, // No error for restored detection
               };
               setDetectionResult(restoredDetection);
               
@@ -712,6 +720,9 @@ export function PhotoUploadWithFaceMatch({
           })();
         } else {
           console.warn('[PhotoUpload] uploadAnyway=true but no stored data found');
+          // Clean up orphaned key before navigating
+          sessionStorage.removeItem(latestKey);
+          uploadDataKeys.slice(1).forEach(key => sessionStorage.removeItem(key));
           router.replace(`/partners/${partnerId}`);
         }
       } else {

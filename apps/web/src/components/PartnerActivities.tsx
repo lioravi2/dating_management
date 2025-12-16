@@ -63,8 +63,38 @@ export default function PartnerActivities({
     fetchUserData();
   }, [supabase]);
 
-  const canAddActivity =
-    userAccountType === 'pro' || activities.length < FREE_TIER_ACTIVITY_LIMIT;
+  // Check activity limit from database (more accurate than activities.length)
+  const [activityLimitChecked, setActivityLimitChecked] = useState(false);
+  const [canAddActivity, setCanAddActivity] = useState(true);
+  
+  useEffect(() => {
+    const checkActivityLimit = async () => {
+      if (userAccountType === 'pro') {
+        setCanAddActivity(true);
+        setActivityLimitChecked(true);
+        return;
+      }
+
+      // For free users, check actual count from database
+      const { count, error } = await supabase
+        .from('partner_notes')
+        .select('*', { count: 'exact', head: true })
+        .eq('partner_id', partnerId);
+
+      if (!error && count !== null) {
+        setCanAddActivity(count < FREE_TIER_ACTIVITY_LIMIT);
+      } else {
+        // If error, allow but log it
+        console.error('Error checking activity limit:', error);
+        setCanAddActivity(true);
+      }
+      setActivityLimitChecked(true);
+    };
+
+    if (userAccountType !== null) {
+      checkActivityLimit();
+    }
+  }, [userAccountType, partnerId, supabase]);
 
   const handleAddActivity = async (formData: {
     start_time: string;
@@ -335,7 +365,14 @@ export default function PartnerActivities({
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Activity Timeline</h2>
-        {canAddActivity ? (
+        {!activityLimitChecked ? (
+          <button
+            disabled
+            className="bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed"
+          >
+            Checking...
+          </button>
+        ) : canAddActivity ? (
           <button
             onClick={() => setShowForm(!showForm)}
             className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
