@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
         width: width ? parseInt(width) : null,
         height: height ? parseInt(height) : null,
         face_descriptor: parsedFaceDescriptor,
-        face_detection_attempted: faceDescriptor !== null,
+        face_detection_attempted: parsedFaceDescriptor !== null,
       })
       .select()
       .single();
