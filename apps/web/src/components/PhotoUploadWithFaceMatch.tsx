@@ -315,7 +315,7 @@ export function PhotoUploadWithFaceMatch({
             target: {
               files: [file]
             }
-          } as React.ChangeEvent<HTMLInputElement>;
+          } as unknown as React.ChangeEvent<HTMLInputElement>;
 
           if (handleFileSelectRef.current) {
             await handleFileSelectRef.current(syntheticEvent);
