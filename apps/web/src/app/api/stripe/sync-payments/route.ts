@@ -108,9 +108,21 @@ export async function POST(request: NextRequest) {
     let skippedCount = 0;
     let errorCount = 0;
 
+    // Get customer balance information to understand credit usage
+    let customerBalance = 0;
+    try {
+      const customer = await stripe.customers.retrieve(customerId);
+      if (customer && !customer.deleted) {
+        customerBalance = customer.balance || 0;
+        console.log(`[SyncPayments] Customer balance: ${customerBalance} cents (${(customerBalance / 100).toFixed(2)} ${customer.currency || 'usd'})`);
+      }
+    } catch (error) {
+      console.warn(`[SyncPayments] Could not retrieve customer balance:`, error);
+    }
+
     // Sync each paid invoice as a payment
     for (const invoice of invoices.data) {
-      // Log all invoice details for debugging
+      // Log all invoice details for debugging, including credit information
       console.log(`[SyncPayments] Processing invoice ${invoice.id}:`, {
         status: invoice.status,
         amount_paid: invoice.amount_paid,
@@ -119,6 +131,12 @@ export async function POST(request: NextRequest) {
         currency: invoice.currency,
         created: new Date(invoice.created * 1000).toISOString(),
         payment_intent: invoice.payment_intent,
+        // Credit-related fields
+        amount_remaining: invoice.amount_remaining,
+        starting_balance: invoice.starting_balance, // Customer balance before this invoice
+        ending_balance: invoice.ending_balance, // Customer balance after this invoice
+        // If amount_paid is 0 but invoice is paid, it was likely paid with credits
+        paid_with_credits: invoice.status === 'paid' && (invoice.amount_paid === 0 || invoice.amount_paid === null) && invoice.total > 0,
       });
       
       // Sync all paid invoices, including:
