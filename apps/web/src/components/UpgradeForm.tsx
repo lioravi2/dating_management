@@ -90,11 +90,6 @@ export default function UpgradeForm({ user }: UpgradeFormProps) {
         onClick={handleCheckout}
         disabled={loading}
         className="w-full bg-primary-600 text-white py-4 px-6 rounded-lg font-semibold text-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        // #region agent log
-        onMouseEnter={() => {
-          fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'UpgradeForm.tsx:89',message:'Subscribe to Pro button hover',data:{loading,userAccountType:user.account_type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        }}
-        // #endregion
       >
         {loading && (
           <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

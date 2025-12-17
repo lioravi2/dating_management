@@ -40,11 +40,20 @@ export async function POST(request: NextRequest) {
     const userId = session.user.id;
 
     // Get user's subscription to find customer ID
-    const { data: subscription } = await supabaseAdmin
+    // Include all subscriptions (active, canceled, canceling) to find customer ID
+    const { data: subscription, error: subError } = await supabaseAdmin
       .from('subscriptions')
-      .select('stripe_customer_id, stripe_subscription_id')
+      .select('stripe_customer_id, stripe_subscription_id, status, cancel_at_period_end')
       .eq('user_id', userId)
       .maybeSingle();
+
+    if (subError) {
+      console.error('[SyncPayments] Error fetching subscription:', subError);
+      return NextResponse.json({ 
+        success: false,
+        message: `Error fetching subscription: ${subError.message}`,
+      });
+    }
 
     if (!subscription) {
       return NextResponse.json({ 
@@ -52,6 +61,8 @@ export async function POST(request: NextRequest) {
         message: 'No subscription found. Please sync your subscription first.',
       });
     }
+
+    console.log(`[SyncPayments] Found subscription: status=${subscription.status}, cancel_at_period_end=${subscription.cancel_at_period_end}, customer_id=${subscription.stripe_customer_id}`);
 
     // Get customer ID - either from subscription record or from Stripe
     let customerId = subscription.stripe_customer_id;
@@ -99,9 +110,19 @@ export async function POST(request: NextRequest) {
 
     // Sync each paid invoice as a payment
     for (const invoice of invoices.data) {
-      console.log(`[SyncPayments] Processing invoice ${invoice.id}: status=${invoice.status}, amount_paid=${invoice.amount_paid}`);
+      // Log all invoice details for debugging
+      console.log(`[SyncPayments] Processing invoice ${invoice.id}:`, {
+        status: invoice.status,
+        amount_paid: invoice.amount_paid,
+        amount_due: invoice.amount_due,
+        total: invoice.total,
+        currency: invoice.currency,
+        created: new Date(invoice.created * 1000).toISOString(),
+      });
       
-      if (invoice.status === 'paid' && invoice.amount_paid > 0) {
+      // Sync all paid invoices, including small amounts (e.g., $0.10 = 10 cents)
+      // Note: amount_paid is in cents, so $0.10 = 10 cents
+      if (invoice.status === 'paid' && invoice.amount_paid !== null && invoice.amount_paid > 0) {
         // Check if payment already exists
         const { data: existingPayment } = await supabaseAdmin
           .from('payments')
@@ -116,11 +137,13 @@ export async function POST(request: NextRequest) {
         }
 
         // Insert payment record
+        // Use amount_paid (in cents), which should be > 0 for paid invoices
+        // For $0.10, amount_paid should be 10 (cents)
         const paymentData = {
           user_id: userId,
           stripe_payment_intent_id: invoice.payment_intent as string | null,
           stripe_invoice_id: invoice.id,
-          amount: invoice.amount_paid,
+          amount: invoice.amount_paid || 0,
           currency: invoice.currency,
           status: 'succeeded' as const,
           paid_at: new Date(invoice.created * 1000).toISOString(),
@@ -140,7 +163,7 @@ export async function POST(request: NextRequest) {
           console.error(`[SyncPayments] Error inserting payment for invoice ${invoice.id}:`, insertError);
         }
       } else {
-        console.log(`[SyncPayments] Skipping invoice ${invoice.id}: status=${invoice.status}, amount_paid=${invoice.amount_paid}`);
+        console.log(`[SyncPayments] Skipping invoice ${invoice.id}: status=${invoice.status}, amount_paid=${invoice.amount_paid}, amount_due=${invoice.amount_due}`);
       }
     }
 

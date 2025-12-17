@@ -1038,7 +1038,14 @@ export function PhotoUploadWithFaceMatch({
 
       <div className="space-y-2">
         <button
-          onClick={() => imagePickerRef.current?.open()}
+          onClick={() => {
+            // Prevent opening file picker if already processing
+            if (uploading || analyzing) {
+              console.log('[PhotoUpload] Ignoring button click - already processing');
+              return;
+            }
+            imagePickerRef.current?.open();
+          }}
           disabled={uploading || analyzing}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >

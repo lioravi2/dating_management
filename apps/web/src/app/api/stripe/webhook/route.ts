@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
                 } else {
                   const paymentData = {
                     user_id: userId,
-                    stripe_payment_intent_id: invoice.payment_intent as string,
+                    stripe_payment_intent_id: invoice.payment_intent as string | null,
                     stripe_invoice_id: invoice.id,
                     amount: invoice.amount_paid,
                     currency: invoice.currency,
@@ -320,7 +320,7 @@ export async function POST(request: NextRequest) {
         } else {
           const paymentData = {
             user_id: subData.user_id,
-            stripe_payment_intent_id: invoice.payment_intent as string,
+            stripe_payment_intent_id: invoice.payment_intent as string | null,
             stripe_invoice_id: invoice.id,
             amount: invoice.amount_paid,
             currency: invoice.currency,

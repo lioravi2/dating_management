@@ -42,16 +42,6 @@ export default async function BillingPage() {
     .eq('user_id', session.user.id)
     .maybeSingle();
 
-  // #region agent log
-  console.log('[BillingPage] User and subscription state:', {
-    userId: session.user.id,
-    accountType: user.account_type,
-    subscriptionId: subscription?.id,
-    subscriptionStatus: subscription?.status,
-    subscriptionCancelAtPeriodEnd: subscription?.cancel_at_period_end,
-  });
-  // #endregion
-
   // Check if subscription has expired and update user account type if needed
   if (subscription && user.account_type === 'pro') {
     const now = new Date();
