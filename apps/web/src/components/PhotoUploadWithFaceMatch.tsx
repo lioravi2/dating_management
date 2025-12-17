@@ -10,6 +10,7 @@ import { createSupabaseClient } from '@/lib/supabase/client';
 import { getPhotoUrl } from '@/lib/photo-utils';
 import Link from 'next/link';
 import AlertDialog from './AlertDialog';
+import { ImagePicker, ImagePickerRef } from './ImagePicker';
 
 interface PhotoUploadWithFaceMatchProps {
   partnerId?: string; // If provided, upload to this partner. If not, analyze across all partners.
@@ -24,7 +25,7 @@ export function PhotoUploadWithFaceMatch({
 }: PhotoUploadWithFaceMatchProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imagePickerRef = useRef<ImagePickerRef>(null);
   const { modelsLoaded, loading, error: detectionError, detectFace, detectAllFaces } = useFaceDetection();
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -34,7 +35,6 @@ export function PhotoUploadWithFaceMatch({
   // Use refs to preserve file and dimensions across async operations
   const fileRef = useRef<File | null>(null);
   const dimensionsRef = useRef<{ width: number; height: number } | null>(null);
-  const handleFileSelectRef = useRef<typeof handleFileSelect | null>(null);
   const [detectionResult, setDetectionResult] = useState<FaceDetectionResult | null>(null);
   const [multipleDetections, setMultipleDetections] = useState<FaceDetectionResult[] | null>(null);
   const [analysis, setAnalysis] = useState<PhotoUploadAnalysis | null>(null);
@@ -95,8 +95,8 @@ export function PhotoUploadWithFaceMatch({
     });
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Handle file selection from ImagePicker (receives File directly)
+  const handleFileSelect = async (file: File) => {
     if (!file) return;
 
     // Clear any existing modal state from sessionStorage when selecting a new photo
@@ -130,10 +130,6 @@ export function PhotoUploadWithFaceMatch({
             type: 'error',
             text: 'Unable to verify photo limit. Please try again or contact support.'
           });
-          // Reset file input
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
           setTimeout(() => setPhotoLimitMessage(null), 5000);
           return;
         }
@@ -152,10 +148,6 @@ export function PhotoUploadWithFaceMatch({
               type: 'error',
               text: 'Unable to verify photo limit. Please try again or contact support.'
             });
-            // Reset file input
-            if (fileInputRef.current) {
-              fileInputRef.current.value = '';
-            }
             setTimeout(() => setPhotoLimitMessage(null), 5000);
             return;
           }
@@ -173,10 +165,6 @@ export function PhotoUploadWithFaceMatch({
                 </>
               ),
             });
-            // Reset file input
-            if (fileInputRef.current) {
-              fileInputRef.current.value = '';
-            }
             // Clear message after 10 seconds
             setTimeout(() => setPhotoLimitMessage(null), 10000);
             return;
@@ -274,13 +262,6 @@ export function PhotoUploadWithFaceMatch({
     img.src = url;
   };
 
-  // Store handleFileSelect in ref for paste handler
-  // Update ref on every render to always have the latest function
-  useEffect(() => {
-    handleFileSelectRef.current = handleFileSelect;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  });
-
   // Handle clipboard paste events
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
@@ -310,16 +291,8 @@ export function PhotoUploadWithFaceMatch({
             type: blob.type || 'image/png'
           });
 
-          // Create a synthetic event to reuse existing handleFileSelect logic
-          const syntheticEvent = {
-            target: {
-              files: [file]
-            }
-          } as unknown as React.ChangeEvent<HTMLInputElement>;
-
-          if (handleFileSelectRef.current) {
-            await handleFileSelectRef.current(syntheticEvent);
-          }
+          // Call handleFileSelect directly with the File
+          await handleFileSelect(file);
           break; // Successfully processed an image, exit loop
         }
       }
@@ -729,9 +702,6 @@ export function PhotoUploadWithFaceMatch({
     setAnalyzing(false);
     setUploading(false);
     setPhotoLimitMessage(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
   // Set mounted state to prevent hydration errors
@@ -1052,17 +1022,16 @@ export function PhotoUploadWithFaceMatch({
         </div>
       )}
 
-      <input
-        ref={fileInputRef}
-        type="file"
+      <ImagePicker
+        ref={imagePickerRef}
+        onSelect={handleFileSelect}
         accept="image/*"
-        onChange={handleFileSelect}
-        className="hidden"
+        disabled={uploading || analyzing}
       />
 
       <div className="space-y-2">
         <button
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => imagePickerRef.current?.open()}
           disabled={uploading || analyzing}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
