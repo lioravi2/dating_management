@@ -46,16 +46,48 @@ export async function POST(request: NextRequest) {
       .eq('user_id', userId)
       .maybeSingle();
 
-    if (!subscription?.stripe_customer_id) {
+    if (!subscription) {
       return NextResponse.json({ 
         success: false,
         message: 'No subscription found. Please sync your subscription first.',
       });
     }
 
+    // Get customer ID - either from subscription record or from Stripe
+    let customerId = subscription.stripe_customer_id;
+    
+    if (!customerId && subscription.stripe_subscription_id) {
+      // Fetch customer ID from Stripe subscription
+      try {
+        const stripeSubscription = await stripe.subscriptions.retrieve(
+          subscription.stripe_subscription_id
+        );
+        customerId = stripeSubscription.customer as string;
+        
+        // Update subscription record with customer ID for future use
+        await supabaseAdmin
+          .from('subscriptions')
+          .update({ stripe_customer_id: customerId })
+          .eq('user_id', userId);
+      } catch (error) {
+        console.error('Error fetching subscription from Stripe:', error);
+        return NextResponse.json({ 
+          success: false,
+          message: 'Unable to retrieve subscription information from Stripe.',
+        });
+      }
+    }
+
+    if (!customerId) {
+      return NextResponse.json({ 
+        success: false,
+        message: 'No customer ID found. Please sync your subscription first.',
+      });
+    }
+
     // Get all invoices for this customer
     const invoices = await stripe.invoices.list({
-      customer: subscription.stripe_customer_id,
+      customer: customerId,
       limit: 100,
     });
 

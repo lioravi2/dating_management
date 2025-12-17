@@ -15,16 +15,16 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const supabase = createSupabaseServerComponentClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
-    redirect('/auth/signin');
-  }
-
   try {
+    const supabase = createSupabaseServerComponentClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      redirect('/auth/signin');
+    }
+
     // Get user profile and subscription
     const { data: user, error: userError } = await supabase
       .from('users')
@@ -222,6 +222,5 @@ export default async function DashboardPage() {
     );
   }
 }
-
 
 
