@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import VersionFooter from '@/components/VersionFooter';
+import DebugLogger from '@/components/DebugLogger';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
+        <DebugLogger />
         {children}
         <VersionFooter />
       </body>
