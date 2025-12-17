@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { environment } from '@/lib/environment';
 
 export default function VerifySubscriptionButton() {
   const [loading, setLoading] = useState(false);
