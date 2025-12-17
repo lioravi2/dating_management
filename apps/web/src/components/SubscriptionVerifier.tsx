@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { environment } from '@/lib/environment';
 
 export default function SubscriptionVerifier() {
   const searchParams = useSearchParams();
