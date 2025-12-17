@@ -12,7 +12,7 @@ interface PartnerFormProps {
 
 export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   const router = useRouter();
-  const [formData, setFormData] = useState({
+  const getInitialFormData = () => ({
     first_name: partner?.first_name || '',
     last_name: partner?.last_name || '',
     email: partner?.email || '',
@@ -23,6 +23,9 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     linkedin_profile: partner?.linkedin_profile || '',
     instagram_profile: partner?.instagram_profile || '',
   });
+
+  const [formData, setFormData] = useState(getInitialFormData());
+  const [initialFormData, setInitialFormData] = useState(getInitialFormData());
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [isLimitReached, setIsLimitReached] = useState(false);
@@ -53,6 +56,14 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     };
     fetchLastActivity();
   }, [partner]);
+
+  // Update initial form data when partner changes
+  useEffect(() => {
+    const initial = getInitialFormData();
+    setFormData(initial);
+    setInitialFormData(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partner?.id]);
 
   // Update suggestion text based on current input
   useEffect(() => {
@@ -132,8 +143,27 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     touchStartX.current = null;
   };
 
+  // Check if form has changes (only for edit mode)
+  const hasChanges: boolean = partner ? (
+    formData.first_name !== initialFormData.first_name ||
+    formData.last_name !== initialFormData.last_name ||
+    formData.email !== initialFormData.email ||
+    formData.phone_number !== initialFormData.phone_number ||
+    formData.description !== initialFormData.description ||
+    formData.facebook_profile !== initialFormData.facebook_profile ||
+    formData.x_profile !== initialFormData.x_profile ||
+    formData.linkedin_profile !== initialFormData.linkedin_profile ||
+    formData.instagram_profile !== initialFormData.instagram_profile
+  ) : true; // Always allow submission for new partners
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent submission if no changes (edit mode only)
+    if (partner && !hasChanges) {
+      return;
+    }
+    
     setLoading(true);
     setMessage('');
 
@@ -472,7 +502,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       <div className="flex space-x-4">
         <button
           type="submit"
-          disabled={loading || isLimitReached}
+          disabled={loading || isLimitReached || (partner ? !hasChanges : false)}
           className="flex-1 bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {loading && (
@@ -486,7 +516,8 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         <button
           type="button"
           onClick={() => router.back()}
-          className="flex-1 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+          disabled={loading}
+          className="flex-1 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Cancel
         </button>

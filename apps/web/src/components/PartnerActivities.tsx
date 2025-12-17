@@ -835,17 +835,61 @@ function ActivityForm({
   };
 
   const [formData, setFormData] = useState(getInitialFormData());
+  const [initialFormData, setInitialFormData] = useState(getInitialFormData());
 
   // Update form data when activity changes (for edit mode)
   useEffect(() => {
     if (activity) {
-      setFormData(getInitialFormData());
+      const initial = getInitialFormData();
+      setFormData(initial);
+      setInitialFormData(initial);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activity?.id]); // Only update when activity ID changes
 
+  // Check if form has changes (only for edit mode)
+  const hasChanges = activity ? (() => {
+    // Compare current form data with initial data
+    const currentStartDate = formData.start_date;
+    const currentStartTime = formData.start_time;
+    const currentEndDate = formData.end_date;
+    const currentEndTime = formData.end_time;
+    const currentAllDay = formData.all_day;
+    const currentHasEndTime = formData.has_end_time;
+    const currentType = formData.type;
+    const currentLocation = formData.location || '';
+    const currentDescription = formData.description || '';
+
+    const initialStartDate = initialFormData.start_date;
+    const initialStartTime = initialFormData.start_time;
+    const initialEndDate = initialFormData.end_date;
+    const initialEndTime = initialFormData.end_time;
+    const initialAllDay = initialFormData.all_day;
+    const initialHasEndTime = initialFormData.has_end_time;
+    const initialType = initialFormData.type;
+    const initialLocation = initialFormData.location || '';
+    const initialDescription = initialFormData.description || '';
+
+    return (
+      currentStartDate !== initialStartDate ||
+      currentStartTime !== initialStartTime ||
+      currentEndDate !== initialEndDate ||
+      currentEndTime !== initialEndTime ||
+      currentAllDay !== initialAllDay ||
+      currentHasEndTime !== initialHasEndTime ||
+      currentType !== initialType ||
+      currentLocation !== initialLocation ||
+      currentDescription !== initialDescription
+    );
+  })() : true; // Always allow submission for new activities
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent submission if no changes (edit mode only)
+    if (activity && !hasChanges) {
+      return;
+    }
     
     const startDateTime = formData.all_day
       ? new Date(`${formData.start_date}T00:00:00`).toISOString()
@@ -1071,20 +1115,10 @@ function ActivityForm({
         </div>
 
         <div className="flex space-x-4">
-          {activity && onDelete && (
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={loading}
-              className="bg-red-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-700 transition-colors disabled:opacity-50"
-            >
-              Delete
-            </button>
-          )}
           <button
             type="submit"
-            disabled={loading}
-            className="flex-1 bg-primary-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            disabled={loading || (activity && !hasChanges)}
+            className="flex-1 bg-primary-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading && (
               <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1100,7 +1134,8 @@ function ActivityForm({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+            disabled={loading}
+            className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>

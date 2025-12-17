@@ -949,6 +949,7 @@ export function PhotoUploadWithFaceMatch({
   }, []);
 
   const handleProceedAnyway = async () => {
+    if (uploading) return; // Prevent double-clicks
     if (detectionResult?.descriptor) {
       await uploadPhoto(
         detectionResult.descriptor, 
@@ -1092,12 +1093,14 @@ export function PhotoUploadWithFaceMatch({
                   setShowNoFaceModal(false);
                   resetState();
                 }}
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                disabled={uploading}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Try Again
               </button>
               <button
                 onClick={async () => {
+                  if (uploading) return; // Prevent double-clicks
                   // Upload without face descriptor when no face is detected
                   await uploadPhoto(
                     null, // No face descriptor
@@ -1106,9 +1109,16 @@ export function PhotoUploadWithFaceMatch({
                   );
                   setShowNoFaceModal(false);
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                disabled={uploading}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Upload Anyway
+                {uploading && (
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {uploading ? 'Uploading...' : 'Upload Anyway'}
               </button>
               {onCancel && (
                 <button
@@ -1116,7 +1126,8 @@ export function PhotoUploadWithFaceMatch({
                     setShowNoFaceModal(false);
                     onCancel();
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                  disabled={uploading}
+                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
@@ -1153,15 +1164,23 @@ export function PhotoUploadWithFaceMatch({
                   setShowSamePersonModal(false);
                   resetState();
                 }}
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                disabled={uploading}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 onClick={handleProceedAnyway}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                disabled={uploading}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Upload Anyway
+                {uploading && (
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {uploading ? 'Uploading...' : 'Upload Anyway'}
               </button>
             </div>
           </div>
@@ -1183,15 +1202,23 @@ export function PhotoUploadWithFaceMatch({
                   setShowCreateNewPartnerModal(false);
                   resetState();
                 }}
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                disabled={uploading || analyzing}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateNewPartner}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                disabled={uploading || analyzing}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Create New Partner
+                {(uploading || analyzing) && (
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {(uploading || analyzing) ? 'Processing...' : 'Create New Partner'}
               </button>
             </div>
           </div>

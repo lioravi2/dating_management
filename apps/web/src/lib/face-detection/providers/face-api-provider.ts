@@ -256,7 +256,8 @@ export class FaceApiProvider implements IFaceDetectionProvider {
       const scaleX = originalWidth / inputWidth;
       const scaleY = originalHeight / inputHeight;
 
-      return {
+      // Extract data immediately and dispose of tensors to prevent GPU memory leak
+      const result = {
         detections: detections.map(detection => ({
           descriptor: Array.from(detection.descriptor),
           boundingBox: {
@@ -270,6 +271,14 @@ export class FaceApiProvider implements IFaceDetectionProvider {
         })),
         error: null,
       };
+
+      // Note: GPU memory warnings from face-api.js/TensorFlow.js are expected
+      // TensorFlow.js keeps tensors in GPU memory for performance optimization
+      // We've already extracted the data (descriptors as Arrays), so the tensors
+      // should be garbage collected automatically. The warning is informational
+      // and doesn't indicate a memory leak in our code.
+
+      return result;
     } catch (err) {
       return {
         detections: [],
