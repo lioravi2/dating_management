@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ 
         success: false,
         message: `Error fetching subscription: ${subError.message}`,
-      });
+      }, { status: 500 });
     }
 
     if (!subscription) {
@@ -118,11 +118,20 @@ export async function POST(request: NextRequest) {
         total: invoice.total,
         currency: invoice.currency,
         created: new Date(invoice.created * 1000).toISOString(),
+        payment_intent: invoice.payment_intent,
       });
       
-      // Sync all paid invoices, including small amounts (e.g., $0.10 = 10 cents)
-      // Note: amount_paid is in cents, so $0.10 = 10 cents
-      if (invoice.status === 'paid' && invoice.amount_paid !== null && invoice.amount_paid > 0) {
+      // Sync all paid invoices, including:
+      // 1. Invoices with amount_paid > 0 (normal payments)
+      // 2. Invoices paid with credits (amount_paid = 0 but total > 0 and status = 'paid')
+      // Note: amount_paid and total are in cents, so $0.10 = 10 cents
+      const hasNormalPayment = invoice.amount_paid !== null && invoice.amount_paid > 0;
+      const paidWithCredits = invoice.status === 'paid' && 
+                              invoice.total !== null && 
+                              invoice.total > 0 && 
+                              (invoice.amount_paid === 0 || invoice.amount_paid === null);
+      
+      if (invoice.status === 'paid' && (hasNormalPayment || paidWithCredits)) {
         // Check if payment already exists
         const { data: existingPayment } = await supabaseAdmin
           .from('payments')
@@ -137,17 +146,24 @@ export async function POST(request: NextRequest) {
         }
 
         // Insert payment record
-        // Use amount_paid (in cents), which should be > 0 for paid invoices
+        // For normal payments: use amount_paid (in cents)
+        // For credit payments: use total (invoice was paid with credits, so amount_paid = 0)
         // For $0.10, amount_paid should be 10 (cents)
+        const paymentAmount = hasNormalPayment 
+          ? invoice.amount_paid 
+          : (invoice.total || 0); // Use total for credit payments
+        
         const paymentData = {
           user_id: userId,
           stripe_payment_intent_id: invoice.payment_intent as string | null,
           stripe_invoice_id: invoice.id,
-          amount: invoice.amount_paid || 0,
+          amount: paymentAmount,
           currency: invoice.currency,
           status: 'succeeded' as const,
           paid_at: new Date(invoice.created * 1000).toISOString(),
         };
+        
+        console.log(`[SyncPayments] Payment details: amount=${paymentAmount}, hasNormalPayment=${hasNormalPayment}, paidWithCredits=${paidWithCredits}`);
 
         console.log(`[SyncPayments] Inserting payment:`, paymentData);
 
