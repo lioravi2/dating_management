@@ -98,6 +98,12 @@ export function PhotoUploadWithFaceMatch({
   // Handle file selection from ImagePicker (receives File directly)
   const handleFileSelect = async (file: File) => {
     if (!file) return;
+    
+    // Prevent multiple file selections while processing
+    if (uploading || analyzing) {
+      console.log('[PhotoUpload] Ignoring file selection - already processing');
+      return;
+    }
 
     // Clear any existing modal state from sessionStorage when selecting a new photo
     sessionStorage.removeItem('photoUploadModal');
