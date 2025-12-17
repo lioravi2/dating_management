@@ -11,6 +11,7 @@ import { getPhotoUrl } from '@/lib/photo-utils';
 import Link from 'next/link';
 import AlertDialog from './AlertDialog';
 import { ImagePicker, ImagePickerRef } from './ImagePicker';
+import { fileUtils } from '@/lib/file-utils';
 
 interface PhotoUploadWithFaceMatchProps {
   partnerId?: string; // If provided, upload to this partner. If not, analyze across all partners.
@@ -78,22 +79,6 @@ export function PhotoUploadWithFaceMatch({
     };
     fetchAccountType();
   }, []);
-
-  // Helper function to convert File/Blob to base64 data URL
-  const convertBlobToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          resolve(reader.result);
-        } else {
-          reject(new Error('Failed to convert file to base64'));
-        }
-      };
-      reader.onerror = () => reject(new Error('FileReader error'));
-      reader.readAsDataURL(file);
-    });
-  };
 
   // Handle file selection from ImagePicker (receives File directly)
   const handleFileSelect = async (file: File) => {
@@ -489,7 +474,7 @@ export function PhotoUploadWithFaceMatch({
             try {
               console.log('[PhotoUpload] Storing upload data for "Upload Anyway" functionality');
               // Convert file to base64 for storage
-              const base64Url = await convertBlobToBase64(fileToConvert);
+              const base64Url = await fileUtils.fileToBase64(fileToConvert);
               const imageKey = `similar-photos-image-${Date.now()}`;
               sessionStorage.setItem(imageKey, base64Url);
               
@@ -536,7 +521,7 @@ export function PhotoUploadWithFaceMatch({
             const fileToConvert = fileRef.current || selectedFile;
             if (fileToConvert) {
               try {
-                const base64Url = await convertBlobToBase64(fileToConvert);
+                const base64Url = await fileUtils.fileToBase64(fileToConvert);
                 const imageKey = `upload-photo-image-${Date.now()}`;
                 sessionStorage.setItem(imageKey, base64Url);
                 
@@ -582,7 +567,7 @@ export function PhotoUploadWithFaceMatch({
           if (fileToConvert) {
             try {
               console.log('[PhotoUpload] Converting image to base64, file size:', fileToConvert.size);
-              const base64Url = await convertBlobToBase64(fileToConvert);
+              const base64Url = await fileUtils.fileToBase64(fileToConvert);
               console.log('[PhotoUpload] Base64 conversion successful, length:', base64Url.length);
               // Store in sessionStorage with a unique key
               const imageKey = `similar-photos-image-${Date.now()}`;
