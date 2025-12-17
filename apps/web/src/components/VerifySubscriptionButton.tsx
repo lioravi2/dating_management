@@ -21,7 +21,7 @@ export default function VerifySubscriptionButton() {
         setMessage('Subscription verified! Your account has been upgraded to Pro.');
         // Reload page after a short delay
         setTimeout(() => {
-          window.location.reload();
+          environment.reload();
         }, 2000);
       } else {
         setMessage(data.message || 'Could not verify subscription. Please check your Stripe dashboard or contact support.');

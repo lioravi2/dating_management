@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import { environment } from '@/lib/environment';
 import { User } from '@/shared';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -130,7 +131,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
         const response = await fetch('/api/calendar/google/initiate');
         const data = await response.json();
         if (data.authUrl) {
-          window.location.href = data.authUrl;
+          environment.redirect(data.authUrl);
         } else {
           setMessage('Error: ' + (data.error || 'Failed to initiate calendar connection'));
           setConnectingCalendar(false);

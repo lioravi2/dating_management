@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { environment } from '@/lib/environment';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,8 +34,8 @@ export default function SignInPage() {
       }
 
       // Check for error in URL params only if no session
-      const params = new URLSearchParams(window.location.search);
-      const error = params.get('error');
+      const queryParams = environment.getQueryParams();
+      const error = queryParams.error;
       if (error) {
         setMessage(decodeURIComponent(error));
       }
@@ -72,7 +73,7 @@ export default function SignInPage() {
     const { data, error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${environment.getOrigin()}/auth/callback`,
         shouldCreateUser: false, // Don't auto-create user on sign-in
       },
     });
@@ -102,7 +103,7 @@ export default function SignInPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${environment.getOrigin()}/auth/callback`,
       },
     });
 
@@ -117,7 +118,7 @@ export default function SignInPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'facebook',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${environment.getOrigin()}/auth/callback`,
       },
     });
 

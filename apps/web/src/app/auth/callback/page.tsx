@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import { environment } from '@/lib/environment';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -20,11 +21,11 @@ export default function AuthCallbackPage() {
       const supabase = createSupabaseClient();
 
       // Check for hash fragment (access_token, etc.)
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
-      const error = hashParams.get('error');
-      const errorDescription = hashParams.get('error_description');
+      const hashParams = environment.getHashParams();
+      const accessToken = hashParams.access_token;
+      const refreshToken = hashParams.refresh_token;
+      const error = hashParams.error;
+      const errorDescription = hashParams.error_description;
 
       // Check for query parameters (code from PKCE flow)
       const code = searchParams.get('code');
@@ -44,13 +45,13 @@ export default function AuthCallbackPage() {
         
         if (exchangeError) {
           console.error('Error exchanging code for session:', exchangeError);
-          window.location.href = `/auth/signin?error=${encodeURIComponent(exchangeError.message)}`;
+          environment.redirect(`/auth/signin?error=${encodeURIComponent(exchangeError.message)}`);
           return;
         }
 
         if (!data.session) {
           console.error('No session created after code exchange');
-          window.location.href = '/auth/signin?error=Failed to create session';
+          environment.redirect('/auth/signin?error=Failed to create session');
           return;
         }
 
@@ -58,7 +59,7 @@ export default function AuthCallbackPage() {
         const { data: { session: verifiedSession } } = await supabase.auth.getSession();
         if (!verifiedSession) {
           console.error('Session not found after exchange');
-          window.location.href = '/auth/signin?error=Session verification failed';
+          environment.redirect('/auth/signin?error=Session verification failed');
           return;
         }
 
@@ -82,8 +83,8 @@ export default function AuthCallbackPage() {
         await new Promise(resolve => setTimeout(resolve, 300));
         
         // Clear hash and redirect to dashboard with full page reload
-        window.location.hash = '';
-        window.location.href = '/dashboard';
+        environment.clearHash();
+        environment.redirect('/dashboard');
         return;
       }
 
@@ -104,7 +105,7 @@ export default function AuthCallbackPage() {
         const { data: { session: verifiedSession } } = await supabase.auth.getSession();
         if (!verifiedSession) {
           console.error('Session not found after setSession');
-          window.location.href = '/auth/signin?error=Session verification failed';
+          environment.redirect('/auth/signin?error=Session verification failed');
           return;
         }
 
@@ -128,13 +129,13 @@ export default function AuthCallbackPage() {
         await new Promise(resolve => setTimeout(resolve, 300));
         
         // Clear hash and redirect to dashboard with full page reload
-        window.location.hash = '';
-        window.location.href = '/dashboard';
+        environment.clearHash();
+        environment.redirect('/dashboard');
         return;
       }
 
       // No valid auth data found
-      window.location.href = '/auth/signin?error=No authorization code provided';
+      environment.redirect('/auth/signin?error=No authorization code provided');
     };
 
     handleCallback();

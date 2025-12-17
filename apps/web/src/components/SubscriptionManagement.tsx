@@ -50,7 +50,7 @@ export default function SubscriptionManagement({
       // Force a full page reload to ensure server-side account_type is updated
       // router.refresh() may not update server component props properly
       setTimeout(() => {
-        window.location.reload();
+        environment.reload();
       }, 500);
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message || 'Error resuming subscription' });

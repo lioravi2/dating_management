@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import { environment } from '@/lib/environment';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -64,7 +65,7 @@ export default function SignUpPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${environment.getOrigin()}/auth/callback`,
       },
     });
 
@@ -91,7 +92,7 @@ export default function SignUpPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${environment.getOrigin()}/auth/callback`,
       },
     });
 
@@ -106,7 +107,7 @@ export default function SignUpPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'facebook',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${environment.getOrigin()}/auth/callback`,
       },
     });
 
