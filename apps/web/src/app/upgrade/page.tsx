@@ -35,6 +35,14 @@ export default async function UpgradePage() {
   // Handle missing account_type (for users created before migration)
   const accountType = user.account_type || 'free';
   
+  // #region agent log
+  console.log('[UpgradePage] Account type check:', {
+    userId: session.user.id,
+    accountType,
+    willRedirect: accountType === 'pro',
+  });
+  // #endregion
+
   if (accountType === 'pro') {
     redirect('/profile');
   }

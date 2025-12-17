@@ -103,41 +103,61 @@ export async function POST(request: NextRequest) {
           // Get the invoice from the subscription
           if (subscription.latest_invoice) {
             try {
+              console.log(`[Webhook] checkout.session.completed: Retrieving invoice ${subscription.latest_invoice}`);
               const invoice = await stripe.invoices.retrieve(
                 subscription.latest_invoice as string
               );
               
+              console.log(`[Webhook] checkout.session.completed: Invoice ${invoice.id}: status=${invoice.status}, amount_paid=${invoice.amount_paid}`);
+              
               if (invoice.amount_paid > 0) {
                 // Check if payment already exists (to prevent duplicates)
-                const { data: existingPayment } = await supabaseAdmin
+                const { data: existingPayment, error: checkError } = await supabaseAdmin
                   .from('payments')
                   .select('id')
                   .eq('stripe_invoice_id', invoice.id)
                   .maybeSingle();
 
-                if (!existingPayment) {
-                  const { error: paymentError } = await supabaseAdmin
+                if (checkError) {
+                  console.error('[Webhook] checkout.session.completed: Error checking existing payment:', checkError);
+                }
+
+                if (existingPayment) {
+                  console.log(`[Webhook] checkout.session.completed: Payment already exists for invoice ${invoice.id}, skipping`);
+                } else {
+                  const paymentData = {
+                    user_id: userId,
+                    stripe_payment_intent_id: invoice.payment_intent as string,
+                    stripe_invoice_id: invoice.id,
+                    amount: invoice.amount_paid,
+                    currency: invoice.currency,
+                    status: invoice.status === 'paid' ? 'succeeded' : 'pending',
+                    paid_at: invoice.status === 'paid' 
+                      ? new Date(invoice.created * 1000).toISOString()
+                      : null,
+                  };
+
+                  console.log(`[Webhook] checkout.session.completed: Inserting payment:`, paymentData);
+
+                  const { error: paymentError, data: insertedPayment } = await supabaseAdmin
                     .from('payments')
-                    .insert({
-                      user_id: userId,
-                      stripe_payment_intent_id: invoice.payment_intent as string,
-                      stripe_invoice_id: invoice.id,
-                      amount: invoice.amount_paid,
-                      currency: invoice.currency,
-                      status: invoice.status === 'paid' ? 'succeeded' : 'pending',
-                      paid_at: invoice.status === 'paid' 
-                        ? new Date(invoice.created * 1000).toISOString()
-                        : null,
-                    });
+                    .insert(paymentData)
+                    .select();
 
                   if (paymentError) {
-                    console.error('Error storing payment in checkout.session.completed:', paymentError);
+                    console.error('[Webhook] checkout.session.completed: Error storing payment:', paymentError);
+                  } else {
+                    console.log(`[Webhook] checkout.session.completed: Successfully stored payment:`, insertedPayment);
                   }
                 }
+              } else {
+                console.log(`[Webhook] checkout.session.completed: Invoice ${invoice.id} has no amount_paid, skipping payment record`);
               }
             } catch (error) {
-              console.error('Error retrieving invoice in checkout.session.completed:', error);
+              console.error('[Webhook] checkout.session.completed: Error retrieving invoice:', error);
             }
+          } else {
+            console.log('[Webhook] checkout.session.completed: No latest_invoice in subscription');
           }
         }
 
@@ -257,45 +277,68 @@ export async function POST(request: NextRequest) {
         const invoice = event.data.object as Stripe.Invoice;
         const subscriptionId = invoice.subscription as string;
 
+        console.log(`[Webhook] invoice.payment_succeeded: invoice=${invoice.id}, subscription=${subscriptionId}, amount_paid=${invoice.amount_paid}`);
+
         if (!subscriptionId) {
+          console.error('[Webhook] invoice.payment_succeeded: No subscription ID in invoice');
           break;
         }
 
         // Get user by subscription ID (use admin client to bypass RLS)
-        const { data: subData } = await supabaseAdmin
+        const { data: subData, error: subError } = await supabaseAdmin
           .from('subscriptions')
           .select('user_id')
           .eq('stripe_subscription_id', subscriptionId)
-          .single();
+          .maybeSingle();
 
-        if (!subData) {
-          console.error('Subscription not found for invoice:', subscriptionId);
+        if (subError) {
+          console.error('[Webhook] invoice.payment_succeeded: Error fetching subscription:', subError);
           break;
         }
 
+        if (!subData) {
+          console.error(`[Webhook] invoice.payment_succeeded: Subscription not found: ${subscriptionId}`);
+          break;
+        }
+
+        console.log(`[Webhook] invoice.payment_succeeded: Found user ${subData.user_id} for subscription ${subscriptionId}`);
+
         // Store payment record (use admin client to bypass RLS)
         // Check if payment already exists (to prevent duplicates)
-        const { data: existingPayment } = await supabaseAdmin
+        const { data: existingPayment, error: checkError } = await supabaseAdmin
           .from('payments')
           .select('id')
           .eq('stripe_invoice_id', invoice.id)
           .maybeSingle();
 
-        if (!existingPayment) {
-          const { error: paymentError } = await supabaseAdmin
+        if (checkError) {
+          console.error('[Webhook] invoice.payment_succeeded: Error checking existing payment:', checkError);
+        }
+
+        if (existingPayment) {
+          console.log(`[Webhook] invoice.payment_succeeded: Payment already exists for invoice ${invoice.id}, skipping`);
+        } else {
+          const paymentData = {
+            user_id: subData.user_id,
+            stripe_payment_intent_id: invoice.payment_intent as string,
+            stripe_invoice_id: invoice.id,
+            amount: invoice.amount_paid,
+            currency: invoice.currency,
+            status: 'succeeded' as const,
+            paid_at: new Date(invoice.created * 1000).toISOString(),
+          };
+
+          console.log(`[Webhook] invoice.payment_succeeded: Inserting payment:`, paymentData);
+
+          const { error: paymentError, data: insertedPayment } = await supabaseAdmin
             .from('payments')
-            .insert({
-              user_id: subData.user_id,
-              stripe_payment_intent_id: invoice.payment_intent as string,
-              stripe_invoice_id: invoice.id,
-              amount: invoice.amount_paid,
-              currency: invoice.currency,
-              status: 'succeeded',
-              paid_at: new Date(invoice.created * 1000).toISOString(),
-            });
+            .insert(paymentData)
+            .select();
 
           if (paymentError) {
-            console.error('Error storing payment in invoice.payment_succeeded:', paymentError);
+            console.error('[Webhook] invoice.payment_succeeded: Error storing payment:', paymentError);
+          } else {
+            console.log(`[Webhook] invoice.payment_succeeded: Successfully stored payment:`, insertedPayment);
           }
         }
 

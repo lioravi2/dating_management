@@ -36,18 +36,18 @@ export default function CancelSubscriptionPage() {
 
       // Show success briefly, then redirect
       setMessage({ type: 'success', text: data.message || 'Subscription will be canceled at the end of the billing period.' });
-      setLoading(true); // Keep loading state to show loader during redirect
+      // Keep loading state true to show loader during redirect
       
       // Redirect to billing page after 1 second
       setTimeout(() => {
         router.push('/billing');
         router.refresh();
       }, 1000);
+      // Don't set loading to false here - let it stay true until redirect
     } catch (error: any) {
       console.error('Cancel subscription error:', error);
       setMessage({ type: 'error', text: error.message || 'Error canceling subscription' });
-    } finally {
-      setLoading(false);
+      setLoading(false); // Only set loading to false on error
     }
   };
 

@@ -46,7 +46,12 @@ export default function SubscriptionManagement({
       }
 
       setMessage({ type: 'success', text: data.message || 'Subscription has been resumed.' });
-      router.refresh();
+      
+      // Force a full page reload to ensure server-side account_type is updated
+      // router.refresh() may not update server component props properly
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message || 'Error resuming subscription' });
     } finally {

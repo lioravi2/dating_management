@@ -88,6 +88,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Ensure user account_type is set to 'pro' when resuming
+    const { data: userData } = await supabaseAdmin
+      .from('users')
+      .select('account_type')
+      .eq('id', session.user.id)
+      .single();
+
+    if (userData && userData.account_type !== 'pro') {
+      const { error: userUpdateError } = await supabaseAdmin
+        .from('users')
+        .update({ account_type: 'pro' })
+        .eq('id', session.user.id);
+
+      if (userUpdateError) {
+        console.error('Error updating user account type:', userUpdateError);
+      }
+    }
+
     return NextResponse.json({
       message: 'Subscription has been resumed',
     });

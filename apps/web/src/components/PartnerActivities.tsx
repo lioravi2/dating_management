@@ -618,16 +618,8 @@ export default function PartnerActivities({
                         
                         {/* Activity card - clickable to edit */}
                         <div 
-                          className={`ml-6 bg-gray-50 rounded-lg p-4 transition-colors ${
-                            syncingActivities.has(activity.id)
-                              ? 'opacity-50 cursor-not-allowed'
-                              : 'hover:bg-gray-100 cursor-pointer'
-                          }`}
+                          className="ml-6 bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors cursor-pointer"
                           onClick={() => {
-                            // Prevent editing while syncing
-                            if (syncingActivities.has(activity.id)) {
-                              return;
-                            }
                             setEditingActivity(activity);
                             setShowForm(false);
                           }}

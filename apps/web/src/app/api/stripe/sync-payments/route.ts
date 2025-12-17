@@ -91,10 +91,16 @@ export async function POST(request: NextRequest) {
       limit: 100,
     });
 
+    console.log(`[SyncPayments] Found ${invoices.data.length} invoices for customer ${customerId}`);
+
     let syncedCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
 
     // Sync each paid invoice as a payment
     for (const invoice of invoices.data) {
+      console.log(`[SyncPayments] Processing invoice ${invoice.id}: status=${invoice.status}, amount_paid=${invoice.amount_paid}`);
+      
       if (invoice.status === 'paid' && invoice.amount_paid > 0) {
         // Check if payment already exists
         const { data: existingPayment } = await supabaseAdmin
@@ -103,33 +109,49 @@ export async function POST(request: NextRequest) {
           .eq('stripe_invoice_id', invoice.id)
           .maybeSingle();
 
-        if (!existingPayment) {
-          // Insert payment record
-          const { error: insertError } = await supabaseAdmin
-            .from('payments')
-            .insert({
-              user_id: userId,
-              stripe_payment_intent_id: invoice.payment_intent as string,
-              stripe_invoice_id: invoice.id,
-              amount: invoice.amount_paid,
-              currency: invoice.currency,
-              status: 'succeeded',
-              paid_at: new Date(invoice.created * 1000).toISOString(),
-            });
-
-          if (!insertError) {
-            syncedCount++;
-          } else {
-            console.error('Error inserting payment:', insertError);
-          }
+        if (existingPayment) {
+          console.log(`[SyncPayments] Payment already exists for invoice ${invoice.id}, skipping`);
+          skippedCount++;
+          continue;
         }
+
+        // Insert payment record
+        const paymentData = {
+          user_id: userId,
+          stripe_payment_intent_id: invoice.payment_intent as string | null,
+          stripe_invoice_id: invoice.id,
+          amount: invoice.amount_paid,
+          currency: invoice.currency,
+          status: 'succeeded' as const,
+          paid_at: new Date(invoice.created * 1000).toISOString(),
+        };
+
+        console.log(`[SyncPayments] Inserting payment:`, paymentData);
+
+        const { error: insertError } = await supabaseAdmin
+          .from('payments')
+          .insert(paymentData);
+
+        if (!insertError) {
+          syncedCount++;
+          console.log(`[SyncPayments] Successfully synced payment for invoice ${invoice.id}`);
+        } else {
+          errorCount++;
+          console.error(`[SyncPayments] Error inserting payment for invoice ${invoice.id}:`, insertError);
+        }
+      } else {
+        console.log(`[SyncPayments] Skipping invoice ${invoice.id}: status=${invoice.status}, amount_paid=${invoice.amount_paid}`);
       }
     }
 
+    console.log(`[SyncPayments] Sync complete: ${syncedCount} synced, ${skippedCount} skipped, ${errorCount} errors`);
+
     return NextResponse.json({ 
       success: true,
-      message: `Synced ${syncedCount} payment(s) from Stripe`,
+      message: `Synced ${syncedCount} payment(s) from Stripe (${skippedCount} already existed, ${errorCount} errors)`,
       syncedCount,
+      skippedCount,
+      errorCount,
     });
   } catch (error: any) {
     console.error('Sync payments error:', error);
