@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import { environment } from '@/lib/environment';
 import Link from 'next/link';
 import type { Partner } from '@/shared';
 
@@ -210,7 +211,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         setMessage(error.message);
       } else {
         // Use full page reload to ensure fresh data from server
-        window.location.href = `/partners/${partner.id}`;
+        environment.redirect(`/partners/${partner.id}`);
       }
     } else {
       // Create new partner via API route (for server-side validation)
@@ -239,10 +240,10 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           // Clean up the pendingPhotoUpload flag
           sessionStorage.removeItem('pendingPhotoUpload');
           // Redirect to partner page with upload flag
-          window.location.href = `/partners/${result.data.id}?uploadPhoto=true&uploadDataKey=${pendingPhotoUpload}`;
+          environment.redirect(`/partners/${result.data.id}?uploadPhoto=true&uploadDataKey=${pendingPhotoUpload}`);
         } else {
           // Use full page reload to ensure fresh data from server
-          window.location.href = '/partners';
+          environment.redirect('/partners');
         }
       }
     }

@@ -27,7 +27,7 @@ export default function SubscriptionVerifier() {
             setMessage('Subscription activated! Your account has been upgraded to Pro.');
             // Reload page after a short delay to show updated status
             setTimeout(() => {
-              window.location.href = '/profile';
+              environment.redirect('/profile');
             }, 2000);
             setIsVerifying(false);
             return;

@@ -97,7 +97,7 @@ export default function AuthCallbackPage() {
 
         if (sessionError) {
           console.error('Error setting session:', sessionError);
-          window.location.href = `/auth/signin?error=${encodeURIComponent(sessionError.message)}`;
+          environment.redirect(`/auth/signin?error=${encodeURIComponent(sessionError.message)}`);
           return;
         }
 
