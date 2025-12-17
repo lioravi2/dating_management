@@ -1,13 +1,13 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 
 export default function BackButton() {
-  const router = useRouter();
+  const navigation = useNavigation();
 
   return (
     <button
-      onClick={() => router.back()}
+      onClick={() => navigation.goBack()}
       className="text-primary-600 hover:text-primary-700 flex items-center"
     >
       ← Back
