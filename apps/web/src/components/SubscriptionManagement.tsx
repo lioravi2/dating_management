@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatPrice } from '@/lib/pricing';
+import { environment } from '@/lib/environment';
 
 interface Subscription {
   id: string;
