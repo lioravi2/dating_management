@@ -15,16 +15,16 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
+  const supabase = createSupabaseServerComponentClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    redirect('/auth/signin');
+  }
+
   try {
-    const supabase = createSupabaseServerComponentClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      redirect('/auth/signin');
-    }
-
     // Get user profile and subscription
     const { data: user, error: userError } = await supabase
       .from('users')
@@ -197,14 +197,6 @@ export default async function DashboardPage() {
     </div>
     );
   } catch (error) {
-    // Re-throw redirect errors - Next.js redirect() throws a special error
-    if (error && typeof error === 'object' && 'digest' in error) {
-      const digest = (error as { digest?: string }).digest;
-      if (digest?.startsWith('NEXT_REDIRECT')) {
-        throw error;
-      }
-    }
-    
     console.error('Dashboard error:', error);
     return (
       <div className="min-h-screen bg-gray-50">
@@ -222,5 +214,4 @@ export default async function DashboardPage() {
     );
   }
 }
-
 
