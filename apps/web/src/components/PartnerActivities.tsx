@@ -127,8 +127,7 @@ export default function PartnerActivities({
     if (userPartners && userPartners.length > 0) {
       const partnerIds = userPartners.map(p => p.id);
       // Use a simpler query approach to avoid 406 errors
-      // Fetch with a limit to get count, or use count query without head option
-      const { data, count: notesCount, error: notesError } = await supabase
+      const { count: notesCount, error: notesError } = await supabase
         .from('partner_notes')
         .select('id', { count: 'exact' })
         .in('partner_id', partnerIds)
