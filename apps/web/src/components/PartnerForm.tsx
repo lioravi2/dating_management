@@ -23,6 +23,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     x_profile: partner?.x_profile || '',
     linkedin_profile: partner?.linkedin_profile || '',
     instagram_profile: partner?.instagram_profile || '',
+    black_flag: partner?.black_flag || false,
   });
 
   const [formData, setFormData] = useState(getInitialFormData());
@@ -157,11 +158,17 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     formData.instagram_profile !== initialFormData.instagram_profile
   ) : true; // Always allow submission for new partners
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Prevent submission if no changes (edit mode only)
     if (partner && !hasChanges) {
+      return;
+    }
+    
+    // Validate: description is mandatory when black_flag is enabled
+    if (formData.black_flag && !formData.description?.trim()) {
+      setMessage('Description is required when black flag is enabled.');
       return;
     }
     
@@ -193,6 +200,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       x_profile: formData.x_profile || null,
       linkedin_profile: formData.linkedin_profile || null,
       instagram_profile: formData.instagram_profile || null,
+      black_flag: formData.black_flag || false,
     };
 
     // Update description_time if description changed (only on update, not create)
@@ -330,7 +338,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           htmlFor="description"
           className="block text-sm font-medium text-gray-700 mb-1"
         >
-          Description
+          Description{formData.black_flag ? ' *' : ''}
         </label>
         <div className="relative">
           {/* Suggestion overlay - positioned behind textarea to show inline autocomplete */}
@@ -358,6 +366,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
             rows={4}
+            required={formData.black_flag}
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent relative z-10 bg-transparent"
             style={{ 
               caretColor: 'inherit',
@@ -477,6 +486,34 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           </div>
         </div>
       </div>
+
+      {/* Black Flag - Only show when editing */}
+      {partner && (
+        <div className="border-t pt-4">
+          <div className="flex items-start gap-3">
+            <input
+              id="black_flag"
+              type="checkbox"
+              checked={formData.black_flag}
+              onChange={(e) =>
+                setFormData({ ...formData, black_flag: e.target.checked })
+              }
+              className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+            />
+            <div className="flex-1">
+              <label
+                htmlFor="black_flag"
+                className="block text-sm font-medium text-gray-700 mb-1 cursor-pointer"
+              >
+                Black Flag
+              </label>
+              <p className="text-xs text-gray-500">
+                Mark this partner with a black flag. When enabled, description becomes mandatory.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {message && (
         <div

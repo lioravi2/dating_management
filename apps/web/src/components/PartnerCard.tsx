@@ -34,10 +34,17 @@ export default function PartnerCard({ partner, lastActivityDescription, showDele
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h2 className="text-xl font-semibold mb-2">
-            {partner.first_name || partner.last_name || 'Unnamed Partner'}
-            {partner.first_name && partner.last_name && ` ${partner.last_name}`}
-          </h2>
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="text-xl font-semibold">
+              {partner.first_name || partner.last_name || 'Unnamed Partner'}
+              {partner.first_name && partner.last_name && ` ${partner.last_name}`}
+            </h2>
+            {partner.black_flag && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-black text-white" title="Black Flag">
+                ⚫
+              </span>
+            )}
+          </div>
           {partner.email && (
             <p className="text-sm text-gray-600 mb-1 truncate">{partner.email}</p>
           )}

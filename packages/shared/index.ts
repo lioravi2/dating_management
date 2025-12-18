@@ -49,6 +49,7 @@ export interface Partner {
   linkedin_profile: string | null;
   instagram_profile: string | null;
   profile_picture_storage_path: string | null;
+  black_flag: boolean;
   created_at: string;
   updated_at: string;
 }

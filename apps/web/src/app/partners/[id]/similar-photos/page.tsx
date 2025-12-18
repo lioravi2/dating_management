@@ -18,6 +18,7 @@ interface SimilarPartner {
   partner_profile_picture: string | null;
   confidence: number;
   matchCount: number;
+  black_flag?: boolean;
 }
 
 export default function SimilarPhotosPage() {
@@ -108,6 +109,7 @@ export default function SimilarPhotosPage() {
               partner_profile_picture: bestMatch.partner_profile_picture || null,
               confidence: bestMatch.confidence,
               matchCount: matches.length,
+              black_flag: (bestMatch as any).black_flag || false,
             };
           });
 
@@ -238,12 +240,19 @@ export default function SimilarPhotosPage() {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <Link
-                        href={`/partners/${partner.partner_id}`}
-                        className="text-lg font-semibold text-gray-900 hover:text-primary-600 block truncate"
-                      >
-                        {partner.partner_name || 'Unknown Partner'}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/partners/${partner.partner_id}`}
+                          className="text-lg font-semibold text-gray-900 hover:text-primary-600 block truncate"
+                        >
+                          {partner.partner_name || 'Unknown Partner'}
+                        </Link>
+                        {partner.black_flag && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-black text-white flex-shrink-0" title="Black Flag">
+                            ⚫
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-gray-500">
                         {Math.round(partner.confidence)}% match
                         {partner.matchCount > 1 && `, ${partner.matchCount} photos`}

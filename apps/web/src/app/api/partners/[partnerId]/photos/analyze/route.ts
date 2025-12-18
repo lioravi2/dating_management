@@ -80,7 +80,7 @@ export async function POST(
     // First get all other partner IDs for this user
     const { data: otherPartners, error: otherPartnersError } = await supabase
       .from('partners')
-      .select('id, first_name, last_name, profile_picture_storage_path')
+      .select('id, first_name, last_name, profile_picture_storage_path, black_flag')
       .eq('user_id', userId)
       .neq('id', partnerId);
 
@@ -131,7 +131,7 @@ export async function POST(
     );
 
     // Populate partner names and profile pictures in matches
-    const enrichedOtherMatches: FaceMatch[] = otherPartnerMatches.map((match) => {
+    const enrichedOtherMatches: (FaceMatch & { black_flag?: boolean })[] = otherPartnerMatches.map((match) => {
       const photo = otherPartnerPhotos.find(p => p.id === match.photo_id);
       if (photo) {
         const partner = partnerMap.get(photo.partner_id);
@@ -141,6 +141,7 @@ export async function POST(
             ? `${partner.first_name || ''} ${partner.last_name || ''}`.trim() || null
             : null,
           partner_profile_picture: partner?.profile_picture_storage_path || null,
+          black_flag: partner?.black_flag || false,
         };
       }
       return match;
