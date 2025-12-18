@@ -63,30 +63,45 @@ class WebCanvasContext implements ICanvasContext {
   }
 
   drawImage(image: IImage | ICanvas, ...args: number[]): void {
-    // Handle different drawImage overloads
+    // Validate argument count - must be 2, 4, or 8 numeric arguments
+    if (args.length !== 2 && args.length !== 4 && args.length !== 8) {
+      throw new Error(
+        `drawImage requires 2, 4, or 8 numeric arguments, but received ${args.length}. ` +
+        `Supported signatures: (image, dx, dy), (image, dx, dy, dw, dh), ` +
+        `or (image, sx, sy, sw, sh, dx, dy, dw, dh)`
+      );
+    }
+
+    // Get native element using type-safe approach
+    // Both WebCanvas and WebImage implement the interfaces but have internal methods
+    let nativeElement: HTMLImageElement | HTMLCanvasElement;
+    
     if (image instanceof WebCanvas) {
-      const nativeCanvas = (image as any).getNativeCanvas();
-      if (args.length === 2) {
-        // drawImage(image, dx, dy)
-        this.ctx.drawImage(nativeCanvas, args[0], args[1]);
-      } else if (args.length === 4) {
-        // drawImage(image, dx, dy, dw, dh)
-        this.ctx.drawImage(nativeCanvas, args[0], args[1], args[2], args[3]);
-      } else if (args.length === 8) {
-        // drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh)
-        this.ctx.drawImage(nativeCanvas, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]);
-      }
+      nativeElement = image.getNativeCanvas();
     } else if (image instanceof WebImage) {
-      const nativeImage = (image as any).getNativeImage();
-      if (args.length === 2) {
-        this.ctx.drawImage(nativeImage, args[0], args[1]);
-      } else if (args.length === 4) {
-        this.ctx.drawImage(nativeImage, args[0], args[1], args[2], args[3]);
-      } else if (args.length === 8) {
-        this.ctx.drawImage(nativeImage, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]);
-      }
+      nativeElement = image.getNativeImage();
     } else {
-      throw new Error('Unsupported image type for drawImage');
+      // If it's not a WebCanvas or WebImage, it's an invalid implementation
+      throw new Error(
+        'Unsupported image type for drawImage. Expected WebCanvas or WebImage instance. ' +
+        'Other implementations must provide compatible native elements.'
+      );
+    }
+
+    // Call the appropriate drawImage overload based on argument count
+    if (args.length === 2) {
+      // drawImage(image, dx, dy)
+      this.ctx.drawImage(nativeElement, args[0], args[1]);
+    } else if (args.length === 4) {
+      // drawImage(image, dx, dy, dw, dh)
+      this.ctx.drawImage(nativeElement, args[0], args[1], args[2], args[3]);
+    } else {
+      // args.length === 8: drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh)
+      this.ctx.drawImage(
+        nativeElement,
+        args[0], args[1], args[2], args[3], // sx, sy, sw, sh
+        args[4], args[5], args[6], args[7]  // dx, dy, dw, dh
+      );
     }
   }
 
@@ -148,7 +163,11 @@ class WebCanvasContext implements ICanvasContext {
 }
 
 class WebImage implements IImage {
-  constructor(private img: HTMLImageElement) {}
+  private objectUrl: string | null = null; // Track object URL for cleanup
+
+  constructor(private img: HTMLImageElement, objectUrl?: string | null) {
+    this.objectUrl = objectUrl || null;
+  }
 
   get width(): number {
     return this.img.naturalWidth || this.img.width;
@@ -172,6 +191,21 @@ class WebImage implements IImage {
   getNativeImage(): HTMLImageElement {
     return this.img;
   }
+
+  // Cleanup method to revoke object URL (call when image is no longer needed)
+  // Note: Once the image has loaded, the browser has the image data, so it's safe to revoke
+  cleanup(): void {
+    if (this.objectUrl) {
+      URL.revokeObjectURL(this.objectUrl);
+      this.objectUrl = null;
+    }
+  }
+
+  // Clear object URL reference (used after immediate cleanup in loadImage)
+  // This is called after URL.revokeObjectURL() to mark the URL as already cleaned up
+  clearObjectUrl(): void {
+    this.objectUrl = null;
+  }
 }
 
 export class WebImageProcessor implements IImageProcessor {
@@ -185,21 +219,45 @@ export class WebImageProcessor implements IImageProcessor {
   async loadImage(src: string | File | Blob, crossOrigin?: string): Promise<IImage> {
     return new Promise((resolve, reject) => {
       const img = new Image();
+      let objectUrl: string | null = null;
+      
       // Set crossOrigin BEFORE setting src (critical for CORS with Supabase storage)
       // This must be done before src is set, otherwise CORS may fail
       if (crossOrigin !== undefined) {
         img.crossOrigin = crossOrigin;
       }
       
-      img.onload = () => resolve(new WebImage(img));
+      img.onload = () => {
+        // Once the image has loaded, the browser has the image data in memory
+        // It's safe to revoke the object URL immediately to prevent memory leaks
+        // The image element retains the image data even after the URL is revoked
+        const webImage = new WebImage(img, objectUrl);
+        
+        // Revoke object URL immediately after load to prevent memory leak
+        // The image data is already in the browser's memory, so this is safe
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+          // Clear the objectUrl reference in WebImage since it's been revoked
+          // This ensures cleanup() becomes a no-op if called later
+          webImage.clearObjectUrl();
+        }
+        
+        resolve(webImage);
+      };
+      
       img.onerror = (error) => {
+        // Clean up object URL on error
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+        }
         console.error('[ImageProcessor] Failed to load image:', error, src);
         reject(error);
       };
       
       // Set src after crossOrigin and event handlers are set
       if (src instanceof File || src instanceof Blob) {
-        img.src = URL.createObjectURL(src);
+        objectUrl = URL.createObjectURL(src);
+        img.src = objectUrl;
       } else {
         img.src = src;
       }
