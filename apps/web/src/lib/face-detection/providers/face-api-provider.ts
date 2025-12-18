@@ -6,6 +6,8 @@ import {
   MultipleFaceDetectionResult,
   FaceDescriptor 
 } from '../types';
+import { imageProcessor } from '@/lib/image-processing';
+import { WebCanvas, WebImage } from '@/lib/image-processing/web-processor';
 
 export class FaceApiProvider implements IFaceDetectionProvider {
   private modelsLoaded = false;
@@ -72,10 +74,9 @@ export class FaceApiProvider implements IFaceDetectionProvider {
       if (image instanceof ImageData) {
         originalWidth = image.width;
         originalHeight = image.height;
-        createdCanvas = document.createElement('canvas');
-        createdCanvas.width = image.width;
-        createdCanvas.height = image.height;
-        const ctx = createdCanvas.getContext('2d');
+        // Use abstraction to create canvas and put ImageData
+        const canvas = imageProcessor.createCanvas(image.width, image.height);
+        const ctx = canvas.getContext('2d');
         if (!ctx) {
           return {
             descriptor: null,
@@ -85,6 +86,8 @@ export class FaceApiProvider implements IFaceDetectionProvider {
           };
         }
         ctx.putImageData(image, 0, 0);
+        // Get native canvas for face-api.js
+        createdCanvas = (canvas as WebCanvas).getNativeCanvas();
         input = createdCanvas;
       } else {
         // Get image dimensions
@@ -102,10 +105,9 @@ export class FaceApiProvider implements IFaceDetectionProvider {
           const newWidth = Math.round(originalWidth * scale);
           const newHeight = Math.round(originalHeight * scale);
 
-          createdCanvas = document.createElement('canvas');
-          createdCanvas.width = newWidth;
-          createdCanvas.height = newHeight;
-          const ctx = createdCanvas.getContext('2d');
+          // Use abstraction to create canvas and resize image
+          const canvas = imageProcessor.createCanvas(newWidth, newHeight);
+          const ctx = canvas.getContext('2d');
           if (!ctx) {
             return {
               descriptor: null,
@@ -116,7 +118,17 @@ export class FaceApiProvider implements IFaceDetectionProvider {
           }
           
           // Draw resized image
-          ctx.drawImage(image, 0, 0, newWidth, newHeight);
+          // Convert HTMLImageElement/HTMLCanvasElement to IImage/ICanvas for abstraction
+          if (image instanceof HTMLImageElement) {
+            const webImage = new WebImage(image);
+            ctx.drawImage(webImage, 0, 0, newWidth, newHeight);
+          } else {
+            const webCanvas = new WebCanvas(image);
+            ctx.drawImage(webCanvas, 0, 0, newWidth, newHeight);
+          }
+          
+          // Get native canvas for face-api.js
+          createdCanvas = (canvas as WebCanvas).getNativeCanvas();
           input = createdCanvas;
         } else {
           input = image;
@@ -175,9 +187,11 @@ export class FaceApiProvider implements IFaceDetectionProvider {
     } finally {
       // Clean up created canvas to free memory
       if (createdCanvas) {
-        const ctx = createdCanvas.getContext('2d');
+        // Use abstraction for cleanup
+        const canvas = new WebCanvas(createdCanvas);
+        const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.clearRect(0, 0, createdCanvas.width, createdCanvas.height);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
         // Remove canvas from DOM if it was added (it shouldn't be, but just in case)
         if (createdCanvas.parentNode) {
@@ -212,10 +226,9 @@ export class FaceApiProvider implements IFaceDetectionProvider {
       if (image instanceof ImageData) {
         originalWidth = image.width;
         originalHeight = image.height;
-        createdCanvas = document.createElement('canvas');
-        createdCanvas.width = image.width;
-        createdCanvas.height = image.height;
-        const ctx = createdCanvas.getContext('2d');
+        // Use abstraction to create canvas and put ImageData
+        const canvas = imageProcessor.createCanvas(image.width, image.height);
+        const ctx = canvas.getContext('2d');
         if (!ctx) {
           return {
             detections: [],
@@ -223,6 +236,8 @@ export class FaceApiProvider implements IFaceDetectionProvider {
           };
         }
         ctx.putImageData(image, 0, 0);
+        // Get native canvas for face-api.js
+        createdCanvas = (canvas as WebCanvas).getNativeCanvas();
         input = createdCanvas;
       } else {
         // Get image dimensions
@@ -240,10 +255,9 @@ export class FaceApiProvider implements IFaceDetectionProvider {
           const newWidth = Math.round(originalWidth * scale);
           const newHeight = Math.round(originalHeight * scale);
 
-          createdCanvas = document.createElement('canvas');
-          createdCanvas.width = newWidth;
-          createdCanvas.height = newHeight;
-          const ctx = createdCanvas.getContext('2d');
+          // Use abstraction to create canvas and resize image
+          const canvas = imageProcessor.createCanvas(newWidth, newHeight);
+          const ctx = canvas.getContext('2d');
           if (!ctx) {
             return {
               detections: [],
@@ -252,7 +266,17 @@ export class FaceApiProvider implements IFaceDetectionProvider {
           }
           
           // Draw resized image
-          ctx.drawImage(image, 0, 0, newWidth, newHeight);
+          // Convert HTMLImageElement/HTMLCanvasElement to IImage/ICanvas for abstraction
+          if (image instanceof HTMLImageElement) {
+            const webImage = new WebImage(image);
+            ctx.drawImage(webImage, 0, 0, newWidth, newHeight);
+          } else {
+            const webCanvas = new WebCanvas(image);
+            ctx.drawImage(webCanvas, 0, 0, newWidth, newHeight);
+          }
+          
+          // Get native canvas for face-api.js
+          createdCanvas = (canvas as WebCanvas).getNativeCanvas();
           input = createdCanvas;
         } else {
           input = image;
@@ -309,9 +333,11 @@ export class FaceApiProvider implements IFaceDetectionProvider {
     } finally {
       // Clean up created canvas to free memory
       if (createdCanvas) {
-        const ctx = createdCanvas.getContext('2d');
+        // Use abstraction for cleanup
+        const canvas = new WebCanvas(createdCanvas);
+        const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.clearRect(0, 0, createdCanvas.width, createdCanvas.height);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
         // Remove canvas from DOM if it was added (it shouldn't be, but just in case)
         if (createdCanvas.parentNode) {

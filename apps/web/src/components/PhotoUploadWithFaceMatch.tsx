@@ -12,6 +12,7 @@ import Link from 'next/link';
 import AlertDialog from './AlertDialog';
 import { ImagePicker, ImagePickerRef } from './ImagePicker';
 import { fileUtils } from '@/lib/file-utils';
+import { imageProcessor } from '@/lib/image-processing';
 
 interface PhotoUploadWithFaceMatchProps {
   partnerId?: string; // If provided, upload to this partner. If not, analyze across all partners.
@@ -301,65 +302,50 @@ export function PhotoUploadWithFaceMatch({
     boundingBox: { x: number; y: number; width: number; height: number },
     originalFileName?: string
   ): Promise<{ file: File; dimensions: { width: number; height: number } }> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
+    try {
+      // Load image using abstraction
+      const webImage = await imageProcessor.loadImage(imageUrl);
       
-      img.onload = () => {
-        // Create a canvas for the cropped face
-        const canvas = document.createElement('canvas');
-        canvas.width = boundingBox.width;
-        canvas.height = boundingBox.height;
-        
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Failed to get canvas context'));
-          return;
-        }
-        
-        // Draw the cropped region
-        ctx.drawImage(
-          img,
-          boundingBox.x,
-          boundingBox.y,
-          boundingBox.width,
-          boundingBox.height,
-          0,
-          0,
-          boundingBox.width,
-          boundingBox.height
-        );
-        
-        // Convert canvas to blob, then to File
-        canvas.toBlob((blob) => {
-          if (!blob) {
-            reject(new Error('Failed to create blob from canvas'));
-            return;
-          }
-          
-          // Get original file name and extension
-          const fileName = originalFileName || 'face.jpg';
-          const fileExt = fileName.split('.').pop() || 'jpg';
-          const croppedFileName = `cropped_face.${fileExt}`;
-          
-          const file = new File([blob], croppedFileName, {
-            type: blob.type || 'image/jpeg',
-            lastModified: Date.now(),
-          });
-          
-          resolve({
-            file,
-            dimensions: { width: boundingBox.width, height: boundingBox.height },
-          });
-        }, 'image/jpeg', 0.95); // Use JPEG with 95% quality
+      // Create canvas for the cropped face using abstraction
+      const canvas = imageProcessor.createCanvas(boundingBox.width, boundingBox.height);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Failed to get canvas context');
+      }
+      
+      // Draw the cropped region using abstraction
+      ctx.drawImage(
+        webImage,
+        boundingBox.x,
+        boundingBox.y,
+        boundingBox.width,
+        boundingBox.height,
+        0,
+        0,
+        boundingBox.width,
+        boundingBox.height
+      );
+      
+      // Convert canvas to blob using abstraction
+      const blob = await canvas.toBlob('image/jpeg', 0.95); // Use JPEG with 95% quality
+      
+      // Get original file name and extension
+      const fileName = originalFileName || 'face.jpg';
+      const fileExt = fileName.split('.').pop() || 'jpg';
+      const croppedFileName = `cropped_face.${fileExt}`;
+      
+      const file = new File([blob], croppedFileName, {
+        type: blob.type || 'image/jpeg',
+        lastModified: Date.now(),
+      });
+      
+      return {
+        file,
+        dimensions: { width: boundingBox.width, height: boundingBox.height },
       };
-      
-      img.onerror = () => {
-        reject(new Error('Failed to load image for cropping'));
-      };
-      
-      img.src = imageUrl;
-    });
+    } catch (error) {
+      throw error instanceof Error ? error : new Error('Failed to crop face from image');
+    }
   };
 
   const handleFaceSelection = async (detection: FaceDetectionResult) => {

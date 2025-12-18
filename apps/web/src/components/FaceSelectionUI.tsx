@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { FaceDetectionResult } from '@/lib/face-detection/types';
+import { WebCanvas, WebImage } from '@/lib/image-processing/web-processor';
+import { imageProcessor } from '@/lib/image-processing';
 
 interface FaceSelectionUIProps {
   imageUrl: string;
@@ -34,14 +36,18 @@ export function FaceSelectionUI({
     // Use ref instead of state to avoid async state update issue
     if (!canvas || !img || !imageLoadedRef.current) return;
 
-    const ctx = canvas.getContext('2d');
+    // Use abstraction for canvas operations
+    const webCanvas = new WebCanvas(canvas);
+    const ctx = webCanvas.getContext('2d');
     if (!ctx) return;
 
     // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, webCanvas.width, webCanvas.height);
 
     // Draw image (from ref, no reload needed)
-    ctx.drawImage(img, 0, 0);
+    // Convert HTMLImageElement to WebImage for abstraction
+    const webImage = new WebImage(img);
+    ctx.drawImage(webImage, 0, 0);
 
     // Draw bounding boxes for all faces
     detections.forEach((detection, index) => {
