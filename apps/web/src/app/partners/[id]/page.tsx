@@ -61,10 +61,17 @@ export default async function PartnerDetailPage({
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h1 className="text-3xl font-bold">
-                {partner.first_name || partner.last_name || 'Unnamed Partner'}
-                {partner.first_name && partner.last_name && ` ${partner.last_name}`}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold">
+                  {partner.first_name || partner.last_name || 'Unnamed Partner'}
+                  {partner.first_name && partner.last_name && ` ${partner.last_name}`}
+                </h1>
+                {partner.black_flag && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-black text-white" title="Black Flag">
+                    ⚫
+                  </span>
+                )}
+              </div>
               <p className="text-gray-600 mt-2">
                 Added {new Date(partner.created_at).toLocaleDateString()}
               </p>

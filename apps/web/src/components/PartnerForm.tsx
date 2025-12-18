@@ -217,9 +217,16 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
 
       if (error) {
         setMessage(error.message);
+        setLoading(false);
+        return;
       } else {
-        // Use full page reload to ensure fresh data from server
-        environment.redirect(`/partners/${partner.id}`);
+        // Use navigation.replace to avoid hydration mismatch errors
+        // Use setTimeout to ensure navigation happens after state updates complete
+        // Don't set loading to false here - component will unmount on navigation
+        setTimeout(() => {
+          navigation.replace(`/partners/${partner.id}`);
+        }, 0);
+        return;
       }
     } else {
       // Create new partner via API route (for server-side validation)
