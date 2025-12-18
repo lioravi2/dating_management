@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { PartnerPhoto } from '@/shared';
 import { PhotoUploadWithFaceMatch } from './PhotoUploadWithFaceMatch';
+import { useNavigation } from '@/lib/navigation';
 import ConfirmDialog from './ConfirmDialog';
 
 interface PartnerPhotosProps {
