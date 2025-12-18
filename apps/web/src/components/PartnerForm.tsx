@@ -37,6 +37,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const suggestionRef = useRef<HTMLSpanElement>(null);
   const touchStartX = useRef<number | null>(null);
+  const isNavigatingRef = useRef(false); // Prevent double submission during navigation
 
   // Fetch last activity description if partner has no description
   useEffect(() => {
@@ -161,6 +162,11 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Prevent double submission during navigation
+    if (isNavigatingRef.current) {
+      return;
+    }
+    
     // Prevent submission if no changes (edit mode only)
     if (partner && !hasChanges) {
       return;
@@ -220,8 +226,10 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         setLoading(false);
         return;
       } else {
-        // Reset loading state before navigation to prevent UI freeze if navigation is delayed
-        setLoading(false);
+        // Mark as navigating to prevent double submission
+        isNavigatingRef.current = true;
+        // Keep loading state true - component will unmount on successful navigation
+        // If navigation fails, loading stays true to indicate something went wrong
         // Use navigation.replace to avoid hydration mismatch errors
         // Use setTimeout to ensure navigation happens after state updates complete
         setTimeout(() => {
