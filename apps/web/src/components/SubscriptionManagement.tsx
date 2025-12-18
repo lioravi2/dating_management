@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 import { formatPrice } from '@/lib/pricing';
 import { environment } from '@/lib/environment';
 
@@ -25,10 +25,10 @@ export default function SubscriptionManagement({
 }: SubscriptionManagementProps) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const router = useRouter();
+  const navigation = useNavigation();
 
   const handleCancel = () => {
-    router.push('/billing/cancel');
+    navigation.push('/billing/cancel');
   };
 
   const handleResume = async () => {
@@ -90,7 +90,8 @@ export default function SubscriptionManagement({
       }
 
       setMessage({ type: 'success', text: data.message || 'Subscription verified successfully!' });
-      router.refresh();
+      // Note: router.refresh() is Next.js specific, using environment.reload() instead
+      environment.reload();
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message || 'Error verifying subscription' });
     } finally {

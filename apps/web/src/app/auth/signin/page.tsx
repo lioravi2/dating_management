@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 import { environment } from '@/lib/environment';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +17,7 @@ export default function SignInPage() {
   const [message, setMessage] = useState('');
   // Use useMemo to create supabase client only once
   const supabase = useMemo(() => createSupabaseClient(), []);
-  const router = useRouter();
+  const navigation = useNavigation();
   const hasCheckedSession = useRef(false);
 
   // Check if user is already logged in
@@ -29,7 +29,7 @@ export default function SignInPage() {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        router.push('/dashboard');
+        navigation.push('/dashboard');
         return;
       }
 
@@ -41,7 +41,7 @@ export default function SignInPage() {
       }
     };
     checkUser();
-  }, [supabase, router]);
+  }, [supabase, navigation]);
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();

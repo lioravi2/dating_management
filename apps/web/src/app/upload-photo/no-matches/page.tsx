@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import { useNavigation } from '@/lib/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
 
 export default function NoMatchesPage() {
-  const router = useRouter();
+  const navigation = useNavigation();
   const searchParams = useSearchParams();
   const supabase = createSupabaseClient();
   const [accountType, setAccountType] = useState<string | null>(null);
@@ -106,7 +107,7 @@ export default function NoMatchesPage() {
       }
 
       // Redirect to partner page (not edit mode)
-      router.push(`/partners/${result.partner.id}`);
+      navigation.push(`/partners/${result.partner.id}`);
     } catch (error) {
       console.error('Error creating partner:', error);
       alert('Failed to create partner. Please try again.');
@@ -123,7 +124,7 @@ export default function NoMatchesPage() {
     if (uploadDataKey) {
       sessionStorage.removeItem(uploadDataKey);
     }
-    router.push('/dashboard');
+    navigation.push('/dashboard');
   };
 
   return (

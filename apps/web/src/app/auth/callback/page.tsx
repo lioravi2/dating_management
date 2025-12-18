@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { environment } from '@/lib/environment';
+import { useNavigation } from '@/lib/navigation';
 
 export default function AuthCallbackPage() {
-  const router = useRouter();
+  const navigation = useNavigation();
   const searchParams = useSearchParams();
   const hasProcessed = useRef(false);
 
@@ -35,7 +36,7 @@ export default function AuthCallbackPage() {
       // Handle errors
       if (error || errorCode || errorDesc || errorDescription) {
         const errorMsg = errorDescription || errorDesc || error || 'Authentication failed';
-        router.push(`/auth/signin?error=${encodeURIComponent(errorMsg)}`);
+        navigation.push('/auth/signin', { error: errorMsg });
         return;
       }
 
@@ -139,7 +140,7 @@ export default function AuthCallbackPage() {
     };
 
     handleCallback();
-  }, [router, searchParams]);
+  }, [navigation, searchParams]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

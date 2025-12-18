@@ -5,7 +5,7 @@ import { useFaceDetection } from '@/lib/hooks/useFaceDetection';
 import { FaceSelectionUI } from './FaceSelectionUI';
 import { FaceDetectionResult, MultipleFaceDetectionResult } from '@/lib/face-detection/types';
 import { PhotoUploadAnalysis, FaceMatch, FREE_TIER_PHOTO_LIMIT } from '@/shared';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { getPhotoUrl } from '@/lib/photo-utils';
 import Link from 'next/link';
@@ -24,8 +24,7 @@ export function PhotoUploadWithFaceMatch({
   onSuccess,
   onCancel,
 }: PhotoUploadWithFaceMatchProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const navigation = useNavigation();
   const imagePickerRef = useRef<ImagePickerRef>(null);
   const { modelsLoaded, loading, error: detectionError, detectFace, detectAllFaces } = useFaceDetection();
 
@@ -489,15 +488,15 @@ export function PhotoUploadWithFaceMatch({
               sessionStorage.setItem(uploadDataKey, JSON.stringify(uploadData));
               
               // Pass keys in URL
-              router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}&imageKey=${imageKey}&uploadDataKey=${uploadDataKey}`);
+              navigation.push(`/partners/${partnerId}/similar-photos`, { analysis: analysisParam, imageKey, uploadDataKey });
             } catch (error) {
               console.error('[PhotoUpload] Failed to store upload data:', error);
               console.warn('[PhotoUpload] Navigating without upload data');
-              router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}`);
+              navigation.push(`/partners/${partnerId}/similar-photos`, { analysis: analysisParam });
             }
           } else {
             console.log('[PhotoUpload] No file or descriptor available for storage');
-            router.push(`/partners/${partnerId}/similar-photos?analysis=${analysisParam}`);
+            navigation.push(`/partners/${partnerId}/similar-photos`, { analysis: analysisParam });
           }
         }
       } else {
@@ -535,13 +534,13 @@ export function PhotoUploadWithFaceMatch({
                 };
                 sessionStorage.setItem(uploadDataKey, JSON.stringify(uploadData));
                 
-                router.push(`/upload-photo/no-matches?imageKey=${imageKey}&uploadDataKey=${uploadDataKey}`);
+                navigation.push('/upload-photo/no-matches', { imageKey, uploadDataKey });
               } catch (error) {
                 console.error('[PhotoUpload] Failed to convert image to base64:', error);
-                router.push('/upload-photo/no-matches');
+                navigation.push('/upload-photo/no-matches');
               }
             } else {
-              router.push('/upload-photo/no-matches');
+              navigation.push('/upload-photo/no-matches');
             }
           } else {
             // If partnerId exists, show modal (existing behavior)
@@ -584,15 +583,15 @@ export function PhotoUploadWithFaceMatch({
               sessionStorage.setItem(uploadDataKey, JSON.stringify(uploadData));
               
               // Pass both keys in URL
-              router.push(`/similar-photos?analysis=${analysisParam}&imageKey=${imageKey}&uploadDataKey=${uploadDataKey}`);
+              navigation.push('/similar-photos', { analysis: analysisParam, imageKey, uploadDataKey });
             } catch (error) {
               console.error('[PhotoUpload] Failed to convert image to base64:', error);
               console.warn('[PhotoUpload] Navigating without image preview due to conversion failure');
-              router.push(`/similar-photos?analysis=${analysisParam}`);
+              navigation.push('/similar-photos', { analysis: analysisParam });
             }
           } else {
             console.log('[PhotoUpload] No file available for conversion');
-            router.push(`/similar-photos?analysis=${analysisParam}`);
+            navigation.push('/similar-photos', { analysis: analysisParam });
           }
         }
       }
@@ -704,8 +703,9 @@ export function PhotoUploadWithFaceMatch({
   useEffect(() => {
     if (!mounted || !partnerId) return;
     
-    const uploadPhotoParam = searchParams.get('uploadPhoto');
-    const uploadDataKey = searchParams.get('uploadDataKey');
+    const params = navigation.getParams();
+    const uploadPhotoParam = params.uploadPhoto;
+    const uploadDataKey = params.uploadDataKey as string | undefined;
     
     if (uploadPhotoParam === 'true' && uploadDataKey) {
       // Add a small delay to ensure navigation has completed and sessionStorage is accessible
@@ -740,7 +740,7 @@ export function PhotoUploadWithFaceMatch({
           
           // If we found data with fallback key, update the URL to use it
           if (storedData) {
-            router.replace(`/partners/${partnerId}?uploadPhoto=true&uploadDataKey=${fallbackKey}`);
+            navigation.replace(`/partners/${partnerId}`, { uploadPhoto: 'true', uploadDataKey: fallbackKey });
           }
         }
       }
@@ -795,7 +795,7 @@ export function PhotoUploadWithFaceMatch({
             setTimeout(() => {
               sessionStorage.removeItem(actualKey);
               // Clean up related image key if exists
-              const imageKey = searchParams.get('imageKey');
+              const imageKey = params.imageKey as string | undefined;
               if (imageKey) {
                 sessionStorage.removeItem(imageKey);
               }
@@ -808,7 +808,7 @@ export function PhotoUploadWithFaceMatch({
             }, 1000);
             
             // Remove query params from URL and navigate to partner page
-            router.replace(`/partners/${partnerId}`);
+            navigation.replace(`/partners/${partnerId}`);
           } catch (error) {
             console.error('[PhotoUpload] Failed to restore and upload:', error);
             setAlertDialog({
@@ -817,7 +817,7 @@ export function PhotoUploadWithFaceMatch({
               message: 'Failed to restore upload data. Please try uploading again.',
             });
             // Remove query params from URL
-            router.replace(`/partners/${partnerId}`);
+            navigation.replace(`/partners/${partnerId}`);
           }
         })();
       } else {
@@ -829,7 +829,7 @@ export function PhotoUploadWithFaceMatch({
           message: 'The upload data could not be found. Please try uploading the photo again from the similar photos page.',
         });
         // Remove query params from URL
-        router.replace(`/partners/${partnerId}`);
+        navigation.replace(`/partners/${partnerId}`);
       }
       };
       
@@ -838,7 +838,7 @@ export function PhotoUploadWithFaceMatch({
       return;
     }
     
-    const uploadAnyway = searchParams.get('uploadAnyway');
+    const uploadAnyway = params.uploadAnyway;
     if (uploadAnyway === 'true') {
       console.log('[PhotoUpload] uploadAnyway=true detected, checking for stored upload data');
       
@@ -903,7 +903,7 @@ export function PhotoUploadWithFaceMatch({
               uploadDataKeys.slice(1).forEach(key => sessionStorage.removeItem(key));
               
               // Remove uploadAnyway from URL
-              router.replace(`/partners/${partnerId}`);
+              navigation.replace(`/partners/${partnerId}`);
             } catch (error) {
               console.error('[PhotoUpload] Failed to restore and upload:', error);
               setAlertDialog({
@@ -912,7 +912,7 @@ export function PhotoUploadWithFaceMatch({
                 message: 'Failed to restore upload data. Please try uploading again.',
               });
               // Remove uploadAnyway from URL
-              router.replace(`/partners/${partnerId}`);
+              navigation.replace(`/partners/${partnerId}`);
             }
           })();
         } else {
@@ -920,14 +920,14 @@ export function PhotoUploadWithFaceMatch({
           // Clean up orphaned key before navigating
           sessionStorage.removeItem(latestKey);
           uploadDataKeys.slice(1).forEach(key => sessionStorage.removeItem(key));
-          router.replace(`/partners/${partnerId}`);
+          navigation.replace(`/partners/${partnerId}`);
         }
       } else {
         console.warn('[PhotoUpload] uploadAnyway=true but no upload data keys found');
-        router.replace(`/partners/${partnerId}`);
+        navigation.replace(`/partners/${partnerId}`);
       }
     }
-  }, [mounted, partnerId, searchParams, router]);
+  }, [mounted, partnerId, navigation]);
 
   // Check authentication on mount
   useEffect(() => {
@@ -954,7 +954,7 @@ export function PhotoUploadWithFaceMatch({
   // Removed handleViewPartners - now each match has its own button in the modal
 
   const handleCreateNewPartner = () => {
-    router.push('/partners/new');
+    navigation.push('/partners/new');
     setShowCreateNewPartnerModal(false);
   };
 
@@ -975,7 +975,7 @@ export function PhotoUploadWithFaceMatch({
           You need to be logged in to upload photos. Please sign in first.
         </p>
         <button
-          onClick={() => router.push('/auth/signin')}
+          onClick={() => navigation.push('/auth/signin')}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
           Sign In

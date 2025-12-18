@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import Header from '@/components/Header';
@@ -21,7 +22,7 @@ interface SimilarPartner {
 
 export default function SimilarPhotosPage() {
   const params = useParams();
-  const router = useRouter();
+  const navigation = useNavigation();
   const searchParams = useSearchParams();
   const partnerId = params.id as string;
   const imageKey = searchParams.get('imageKey');
@@ -126,7 +127,7 @@ export default function SimilarPhotosPage() {
   const handleUploadAnyway = async () => {
     // Navigate back to partner page with uploadAnyway flag
     // The PhotoUploadWithFaceMatch component will detect this and trigger upload
-    router.push(`/partners/${partnerId}?uploadAnyway=true`);
+      navigation.push(`/partners/${partnerId}`, { uploadAnyway: 'true' });
   };
 
   if (loading) {

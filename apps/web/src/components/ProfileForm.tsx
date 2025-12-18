@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { environment } from '@/lib/environment';
 import { User } from '@/shared';
-import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 import Link from 'next/link';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -37,7 +37,7 @@ const COMMON_TIMEZONES = [
 ];
 
 export default function ProfileForm({ user }: ProfileFormProps) {
-  const router = useRouter();
+  const navigation = useNavigation();
   const supabase = createSupabaseClient();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | React.ReactNode>('');
@@ -104,7 +104,8 @@ export default function ProfileForm({ user }: ProfileFormProps) {
       setMessage('Profile updated successfully!');
       // Update original name to current value
       setTimeout(() => {
-        router.refresh();
+        // Note: router.refresh() is Next.js specific, using environment.reload() instead
+        environment.reload();
       }, 1000);
     }
     setLoading(false);

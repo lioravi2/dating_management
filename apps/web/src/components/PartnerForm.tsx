@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { environment } from '@/lib/environment';
 import Link from 'next/link';
@@ -12,7 +12,7 @@ interface PartnerFormProps {
 }
 
 export default function PartnerForm({ partner }: PartnerFormProps = {}) {
-  const router = useRouter();
+  const navigation = useNavigation();
   const getInitialFormData = () => ({
     first_name: partner?.first_name || '',
     last_name: partner?.last_name || '',
@@ -516,7 +516,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         </button>
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => navigation.goBack()}
           disabled={loading}
           className="flex-1 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >

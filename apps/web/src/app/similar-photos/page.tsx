@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
+import { useNavigation } from '@/lib/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
@@ -20,7 +21,7 @@ interface SimilarPartner {
 }
 
 export default function SimilarPhotosPage() {
-  const router = useRouter();
+  const navigation = useNavigation();
   const searchParams = useSearchParams();
   const supabase = createSupabaseClient();
   
@@ -131,10 +132,10 @@ export default function SimilarPhotosPage() {
     if (partnerId) {
       // Navigate to partner page with uploadAnyway flag
       // The PhotoUploadWithFaceMatch component will detect this and trigger upload
-      router.push(`/partners/${partnerId}?uploadAnyway=true`);
+      navigation.push(`/partners/${partnerId}`, { uploadAnyway: 'true' });
     } else {
       // For no partnerId case, go back to where they came from or home
-      router.back();
+      navigation.goBack();
     }
   };
 
@@ -178,7 +179,7 @@ export default function SimilarPhotosPage() {
               </Link>
             ) : (
               <button
-                onClick={() => router.back()}
+                onClick={() => navigation.goBack()}
                 className="mt-4 text-primary-600 hover:text-primary-700"
               >
                 ← Go Back
@@ -287,7 +288,7 @@ export default function SimilarPhotosPage() {
                           if (currentUploadDataKey) {
                             // Store which partner to upload to
                             sessionStorage.setItem(`uploadToPartner-${currentUploadDataKey}`, partner.partner_id);
-                            router.push(`/partners/${partner.partner_id}?uploadPhoto=true&uploadDataKey=${currentUploadDataKey}`);
+                            navigation.push(`/partners/${partner.partner_id}`, { uploadPhoto: 'true', uploadDataKey: currentUploadDataKey });
                           } else {
                             console.error('[SimilarPhotos] No uploadDataKey found');
                             alert('Upload data not found. Please try uploading again.');
@@ -316,7 +317,7 @@ export default function SimilarPhotosPage() {
                 if (uploadDataKey) {
                   sessionStorage.removeItem(uploadDataKey);
                 }
-                router.push('/dashboard');
+                navigation.push('/dashboard');
               }}
               className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 w-full sm:w-auto"
             >
@@ -383,7 +384,7 @@ export default function SimilarPhotosPage() {
                     }
 
                     // Redirect to partner page (not edit mode)
-                    router.push(`/partners/${result.partner.id}`);
+                    navigation.push(`/partners/${result.partner.id}`);
                   } catch (error) {
                     console.error('Error creating partner:', error);
                     alert('Failed to create partner. Please try again.');

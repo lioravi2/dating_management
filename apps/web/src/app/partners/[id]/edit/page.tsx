@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { Partner } from '@/shared';
@@ -12,7 +13,7 @@ import PartnerForm from '@/components/PartnerForm';
 export const dynamic = 'force-dynamic';
 
 export default function EditPartnerPage() {
-  const router = useRouter();
+  const navigation = useNavigation();
   const params = useParams();
   const partnerId = params.id as string;
   const supabase = createSupabaseClient();
@@ -41,7 +42,7 @@ export default function EditPartnerPage() {
         .single();
 
       if (error || !data) {
-        router.push('/partners');
+        navigation.push('/partners');
         return;
       }
 
@@ -50,7 +51,7 @@ export default function EditPartnerPage() {
     };
 
     fetchData();
-  }, [partnerId, supabase, router]);
+  }, [partnerId, supabase, navigation]);
 
 
   if (loading) {

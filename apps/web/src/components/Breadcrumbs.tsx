@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 
 interface BreadcrumbItem {
   label: string;
@@ -13,7 +13,8 @@ interface BreadcrumbsProps {
 }
 
 export default function Breadcrumbs({ customItems }: BreadcrumbsProps = {}) {
-  const pathname = usePathname();
+  const navigation = useNavigation();
+  const pathname = navigation.getCurrentPath();
   
   // Don't show breadcrumbs on home page or auth pages
   if (pathname === '/' || pathname.startsWith('/auth')) {

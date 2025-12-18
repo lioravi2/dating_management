@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { PartnerPhoto } from '@/shared';
 import { PhotoUploadWithFaceMatch } from './PhotoUploadWithFaceMatch';
-import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
+import { environment } from '@/lib/environment';
 import ConfirmDialog from './ConfirmDialog';
 
 interface PartnerPhotosProps {
@@ -12,7 +13,7 @@ interface PartnerPhotosProps {
 }
 
 export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
-  const router = useRouter();
+  const navigation = useNavigation();
   const [photos, setPhotos] = useState<PartnerPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +67,8 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
 
       // Reload photos
       await loadPhotos();
-      router.refresh();
+      // Note: router.refresh() is Next.js specific, using environment.reload() instead
+      environment.reload();
       setDeleteConfirm({ open: false, photoId: null });
     } catch (err) {
       console.error('Error deleting photo:', err);
@@ -108,7 +110,8 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
           partnerId={partnerId}
           onSuccess={() => {
             loadPhotos();
-            router.refresh();
+            // Note: router.refresh() is Next.js specific, using environment.reload() instead
+      environment.reload();
           }}
         />
       </div>

@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { PhotoUploadWithFaceMatch } from '@/components/PhotoUploadWithFaceMatch';
 import { createSupabaseClient } from '@/lib/supabase/client';
 
 export default function UploadPhotoPage() {
-  const router = useRouter();
+  const navigation = useNavigation();
   const supabase = createSupabaseClient();
   const [accountType, setAccountType] = useState<string | null>(null);
 
@@ -34,7 +34,7 @@ export default function UploadPhotoPage() {
   };
 
   const handleCancel = () => {
-    router.push('/dashboard');
+    navigation.push('/dashboard');
   };
 
   return (

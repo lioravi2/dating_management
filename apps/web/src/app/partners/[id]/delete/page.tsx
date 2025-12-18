@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { Partner } from '@/shared';
@@ -13,7 +14,7 @@ import AlertDialog from '@/components/AlertDialog';
 export const dynamic = 'force-dynamic';
 
 export default function DeletePartnerPage() {
-  const router = useRouter();
+  const navigation = useNavigation();
   const params = useParams();
   const partnerId = params.id as string;
   const supabase = createSupabaseClient();
@@ -44,7 +45,7 @@ export default function DeletePartnerPage() {
         .single();
 
       if (error || !data) {
-        router.push('/partners');
+        navigation.push('/partners');
         return;
       }
 
@@ -53,7 +54,7 @@ export default function DeletePartnerPage() {
     };
 
     fetchData();
-  }, [partnerId, supabase, router]);
+  }, [partnerId, supabase, navigation]);
 
   const handleDelete = async () => {
     if (!partner) return;
@@ -70,7 +71,7 @@ export default function DeletePartnerPage() {
       }
 
       // Redirect to partners list after successful deletion
-      router.push('/partners');
+      navigation.push('/partners');
     } catch (error) {
       console.error('Error deleting partner:', error);
       setAlertDialog({

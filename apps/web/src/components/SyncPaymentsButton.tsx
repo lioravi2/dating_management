@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
+import { environment } from '@/lib/environment';
 
 export default function SyncPaymentsButton() {
-  const router = useRouter();
+  const navigation = useNavigation();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -24,7 +25,8 @@ export default function SyncPaymentsButton() {
       }
 
       setMessage({ type: 'success', text: data.message || 'Payments synced successfully!' });
-      router.refresh();
+      // Note: router.refresh() is Next.js specific, using environment.reload() instead
+      environment.reload();
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message || 'Error syncing payments' });
     } finally {
