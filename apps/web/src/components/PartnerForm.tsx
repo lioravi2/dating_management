@@ -229,11 +229,27 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         // Mark as navigating to prevent double submission
         isNavigatingRef.current = true;
         // Keep loading state true - component will unmount on successful navigation
-        // If navigation fails, loading stays true to indicate something went wrong
         // Use navigation.replace to avoid hydration mismatch errors
         // Use setTimeout to ensure navigation happens after state updates complete
         setTimeout(() => {
-          navigation.replace(`/partners/${partner.id}`);
+          try {
+            navigation.replace(`/partners/${partner.id}`);
+            // Reset flag after a delay to handle navigation failures
+            // If navigation succeeds, component will unmount anyway
+            setTimeout(() => {
+              if (isNavigatingRef.current) {
+                // Navigation didn't complete - reset flag and loading state
+                isNavigatingRef.current = false;
+                setLoading(false);
+                setMessage('Navigation failed. Please refresh the page or try again.');
+              }
+            }, 5000); // 5 second timeout for navigation
+          } catch (error) {
+            // Navigation failed - reset flag and loading state
+            isNavigatingRef.current = false;
+            setLoading(false);
+            setMessage('Failed to navigate. Please try again.');
+          }
         }, 0);
         return;
       }
