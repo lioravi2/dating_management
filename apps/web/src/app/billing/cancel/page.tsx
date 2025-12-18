@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
@@ -9,7 +9,7 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 export const dynamic = 'force-dynamic';
 
 export default function CancelSubscriptionPage() {
-  const router = useRouter();
+  const navigation = useNavigation();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [cancellationReason, setCancellationReason] = useState('');
@@ -40,8 +40,7 @@ export default function CancelSubscriptionPage() {
       
       // Redirect to billing page after 1 second
       setTimeout(() => {
-        router.push('/billing');
-        router.refresh();
+        navigation.push('/billing');
       }, 1000);
       // Don't set loading to false here - let it stay true until redirect
     } catch (error: any) {
@@ -102,7 +101,7 @@ export default function CancelSubscriptionPage() {
             <div className="flex gap-4">
               <button
                 type="button"
-                onClick={() => router.push('/billing')}
+                onClick={() => navigation.push('/billing')}
                 disabled={loading}
                 className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
