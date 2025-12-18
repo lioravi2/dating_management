@@ -74,7 +74,13 @@ export default async function PartnerDetailPage({
                 )}
               </div>
               <p className="text-gray-600 mt-2">
-                Added {new Date(partner.created_at).toLocaleDateString()}
+                Added {(() => {
+                  const date = new Date(partner.created_at);
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  return `${month}/${day}/${year}`;
+                })()}
               </p>
             </div>
             <Link
@@ -112,7 +118,18 @@ export default async function PartnerDetailPage({
               <p className="text-gray-900 mt-1">{partner.description}</p>
               {partner.description_time && (
                 <p className="text-xs text-gray-500 mt-1">
-                  Updated {new Date(partner.description_time).toLocaleString()}
+                  Updated {(() => {
+                    const date = new Date(partner.description_time);
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const hours24 = date.getHours();
+                    const hours12 = hours24 % 12 || 12;
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    const seconds = String(date.getSeconds()).padStart(2, '0');
+                    const ampm = hours24 >= 12 ? 'PM' : 'AM';
+                    return `${month}/${day}/${year}, ${String(hours12).padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
+                  })()}
                 </p>
               )}
             </div>
