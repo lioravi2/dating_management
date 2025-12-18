@@ -72,10 +72,12 @@ export default function PartnerActivities({
           
           if (userPartners && userPartners.length > 0) {
             const partnerIds = userPartners.map(p => p.id);
+            // Use a simpler query approach to avoid 406 errors
             const { count } = await supabase
               .from('partner_notes')
-              .select('*', { count: 'exact', head: true })
-              .in('partner_id', partnerIds);
+              .select('id', { count: 'exact' })
+              .in('partner_id', partnerIds)
+              .limit(0); // Don't fetch data, just get count
             
             setTotalActivityCount(count ?? null);
           } else {
@@ -124,10 +126,13 @@ export default function PartnerActivities({
     let count = 0;
     if (userPartners && userPartners.length > 0) {
       const partnerIds = userPartners.map(p => p.id);
-      const { count: notesCount, error: notesError } = await supabase
+      // Use a simpler query approach to avoid 406 errors
+      // Fetch with a limit to get count, or use count query without head option
+      const { data, count: notesCount, error: notesError } = await supabase
         .from('partner_notes')
-        .select('*', { count: 'exact', head: true })
-        .in('partner_id', partnerIds);
+        .select('id', { count: 'exact' })
+        .in('partner_id', partnerIds)
+        .limit(0); // Don't fetch data, just get count
 
       if (notesError) {
         console.error('Error checking activity limit:', notesError);
@@ -199,10 +204,12 @@ export default function PartnerActivities({
       let count = 0;
       if (userPartners && userPartners.length > 0) {
         const partnerIds = userPartners.map(p => p.id);
+        // Use a simpler query approach to avoid 406 errors
         const { count: notesCount, error: notesError } = await supabase
           .from('partner_notes')
-          .select('*', { count: 'exact', head: true })
-          .in('partner_id', partnerIds);
+          .select('id', { count: 'exact' })
+          .in('partner_id', partnerIds)
+          .limit(0); // Don't fetch data, just get count
 
         if (notesError) {
           setMessage({
