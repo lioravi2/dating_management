@@ -41,6 +41,19 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Store timeout for cleanup
   const isMountedRef = useRef(true); // Track component mount state
 
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      // Clear navigation timeout on unmount
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+        navigationTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   // Fetch last activity description if partner has no description
   useEffect(() => {
     const fetchLastActivity = async () => {
@@ -234,21 +247,28 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         // Use navigation.replace to avoid hydration mismatch errors
         // Use setTimeout to ensure navigation happens after state updates complete
         setTimeout(() => {
+          // Check if component is still mounted before proceeding
+          if (!isMountedRef.current) {
+            return;
+          }
+          
           try {
             navigation.replace(`/partners/${partner.id}`);
             // Reset flag after a delay to handle navigation failures
             // If navigation succeeds, component will unmount anyway
-            // Store timeout ID for cleanup
-            navigationTimeoutRef.current = setTimeout(() => {
-              // Only update state if component is still mounted
-              if (isMountedRef.current && isNavigatingRef.current) {
-                // Navigation didn't complete - reset flag and loading state
-                isNavigatingRef.current = false;
-                setLoading(false);
-                setMessage('Navigation failed. Please refresh the page or try again.');
-              }
-              navigationTimeoutRef.current = null;
-            }, 5000); // 5 second timeout for navigation
+            // Store timeout ID for cleanup - check mounted state first
+            if (isMountedRef.current) {
+              navigationTimeoutRef.current = setTimeout(() => {
+                // Only update state if component is still mounted
+                if (isMountedRef.current && isNavigatingRef.current) {
+                  // Navigation didn't complete - reset flag and loading state
+                  isNavigatingRef.current = false;
+                  setLoading(false);
+                  setMessage('Navigation failed. Please refresh the page or try again.');
+                }
+                navigationTimeoutRef.current = null;
+              }, 5000); // 5 second timeout for navigation
+            }
           } catch (error) {
             // Navigation failed - reset flag and loading state only if mounted
             if (isMountedRef.current) {
