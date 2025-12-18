@@ -303,8 +303,8 @@ export function PhotoUploadWithFaceMatch({
     originalFileName?: string
   ): Promise<{ file: File; dimensions: { width: number; height: number } }> => {
     try {
-      // Load image using abstraction
-      const webImage = await imageProcessor.loadImage(imageUrl);
+      // Load image using abstraction with crossOrigin for CORS support
+      const webImage = await imageProcessor.loadImage(imageUrl, 'anonymous');
       
       // Create canvas for the cropped face using abstraction
       const canvas = imageProcessor.createCanvas(boundingBox.width, boundingBox.height);

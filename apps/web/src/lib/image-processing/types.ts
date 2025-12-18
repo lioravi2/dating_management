@@ -52,7 +52,7 @@ export interface ICanvasContext {
 
 export interface IImageProcessor {
   createCanvas(width: number, height: number): ICanvas;
-  loadImage(src: string | File | Blob): Promise<IImage>;
+  loadImage(src: string | File | Blob, crossOrigin?: string): Promise<IImage>;
   createImageData(width: number, height: number): ImageData;
   resizeImage(image: IImage, maxWidth: number, maxHeight: number): Promise<IImage>;
   cropImage(image: IImage, x: number, y: number, width: number, height: number): Promise<Blob>;

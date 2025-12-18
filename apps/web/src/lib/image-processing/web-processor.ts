@@ -182,12 +182,22 @@ export class WebImageProcessor implements IImageProcessor {
     return new WebCanvas(canvas);
   }
 
-  async loadImage(src: string | File | Blob): Promise<IImage> {
+  async loadImage(src: string | File | Blob, crossOrigin?: string): Promise<IImage> {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.onload = () => resolve(new WebImage(img));
-      img.onerror = reject;
+      // Set crossOrigin BEFORE setting src (critical for CORS with Supabase storage)
+      // This must be done before src is set, otherwise CORS may fail
+      if (crossOrigin !== undefined) {
+        img.crossOrigin = crossOrigin;
+      }
       
+      img.onload = () => resolve(new WebImage(img));
+      img.onerror = (error) => {
+        console.error('[ImageProcessor] Failed to load image:', error, src);
+        reject(error);
+      };
+      
+      // Set src after crossOrigin and event handlers are set
       if (src instanceof File || src instanceof Blob) {
         img.src = URL.createObjectURL(src);
       } else {
