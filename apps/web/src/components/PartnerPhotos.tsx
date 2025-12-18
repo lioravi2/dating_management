@@ -1,11 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { PartnerPhoto } from '@/shared';
 import { PhotoUploadWithFaceMatch } from './PhotoUploadWithFaceMatch';
-import { useNavigation } from '@/lib/navigation';
-import { environment } from '@/lib/environment';
 import ConfirmDialog from './ConfirmDialog';
 
 interface PartnerPhotosProps {
@@ -20,13 +18,20 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; photoId: string | null }>({ open: false, photoId: null });
   const [deleting, setDeleting] = useState(false);
   const supabase = createSupabaseClient();
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     loadPhotos();
+    
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [partnerId]);
 
   const loadPhotos = async () => {
     try {
+      if (!isMountedRef.current) return;
       setLoading(true);
       const { data, error: fetchError } = await supabase
         .from('partner_photos')
@@ -38,12 +43,18 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
         throw fetchError;
       }
 
-      setPhotos(data || []);
+      if (isMountedRef.current) {
+        setPhotos(data || []);
+      }
     } catch (err) {
-      console.error('Error loading photos:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load photos');
+      if (isMountedRef.current) {
+        console.error('Error loading photos:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load photos');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -65,18 +76,28 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
         throw new Error(error.error || 'Failed to delete photo');
       }
 
-      // Reload photos
+      // Reload photos - state update will trigger re-render, no need for page reload
+      // Removing environment.reload() to prevent hydration mismatch errors
       await loadPhotos();
-      // Note: router.refresh() is Next.js specific, using environment.reload() instead
-      environment.reload();
-      setDeleteConfirm({ open: false, photoId: null });
+      
+      if (isMountedRef.current) {
+        setDeleteConfirm({ open: false, photoId: null });
+      }
     } catch (err) {
-      console.error('Error deleting photo:', err);
-      setError(err instanceof Error ? err.message : 'Failed to delete photo. Please try again.');
-      setTimeout(() => setError(null), 5000);
-      setDeleteConfirm({ open: false, photoId: null });
+      if (isMountedRef.current) {
+        console.error('Error deleting photo:', err);
+        setError(err instanceof Error ? err.message : 'Failed to delete photo. Please try again.');
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            setError(null);
+          }
+        }, 5000);
+        setDeleteConfirm({ open: false, photoId: null });
+      }
     } finally {
-      setDeleting(false);
+      if (isMountedRef.current) {
+        setDeleting(false);
+      }
     }
   };
 
@@ -109,9 +130,9 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
         <PhotoUploadWithFaceMatch
           partnerId={partnerId}
           onSuccess={() => {
+            // Reload photos - state update will trigger re-render, no need for page reload
+            // Removing environment.reload() to prevent hydration mismatch errors
             loadPhotos();
-            // Note: router.refresh() is Next.js specific, using environment.reload() instead
-      environment.reload();
           }}
         />
       </div>
@@ -143,7 +164,15 @@ export default function PartnerPhotos({ partnerId }: PartnerPhotosProps) {
                 Delete
               </button>
               <div className="mt-2 text-xs text-gray-500">
-                {new Date(photo.uploaded_at).toLocaleDateString()}
+                {(() => {
+                  // Format date consistently to avoid hydration mismatch
+                  // Use a fixed format instead of toLocaleDateString() which can differ between server/client
+                  const date = new Date(photo.uploaded_at);
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  return `${month}/${day}/${year}`;
+                })()}
               </div>
             </div>
           ))}

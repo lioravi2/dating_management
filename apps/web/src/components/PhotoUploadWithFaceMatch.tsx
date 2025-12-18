@@ -648,19 +648,27 @@ export function PhotoUploadWithFaceMatch({
       console.log('[PhotoUpload] Photo uploaded successfully:', photo);
 
       // Show success message
-      setUploadSuccess(true);
+      if (mounted) {
+        setUploadSuccess(true);
+      }
       
       // Reset state after a short delay
       setTimeout(() => {
-        resetState();
-        setUploadSuccess(false);
-        onSuccess?.();
+        if (mounted) {
+          resetState();
+          setUploadSuccess(false);
+          onSuccess?.();
+        }
       }, 2000);
     } catch (error) {
-      console.error('Error uploading photo:', error);
-      setUploadError(error instanceof Error ? error.message : 'Failed to upload photo');
+      if (mounted) {
+        console.error('Error uploading photo:', error);
+        setUploadError(error instanceof Error ? error.message : 'Failed to upload photo');
+      }
     } finally {
-      setUploading(false);
+      if (mounted) {
+        setUploading(false);
+      }
     }
   };
 
@@ -725,8 +733,13 @@ export function PhotoUploadWithFaceMatch({
           actualKey = fallbackKey;
           
           // If we found data with fallback key, update the URL to use it
-          if (storedData) {
-            navigation.replace(`/partners/${partnerId}`, { uploadPhoto: 'true', uploadDataKey: fallbackKey });
+          if (storedData && mounted) {
+            // Use setTimeout to ensure navigation happens after state updates complete
+            setTimeout(() => {
+              if (mounted) {
+                navigation.replace(`/partners/${partnerId}`, { uploadPhoto: 'true', uploadDataKey: fallbackKey });
+              }
+            }, 0);
           }
         }
       }
@@ -803,7 +816,12 @@ export function PhotoUploadWithFaceMatch({
               message: 'Failed to restore upload data. Please try uploading again.',
             });
             // Remove query params from URL
-            navigation.replace(`/partners/${partnerId}`);
+            // Use setTimeout to ensure navigation happens after state updates complete
+            setTimeout(() => {
+              if (mounted) {
+                navigation.replace(`/partners/${partnerId}`);
+              }
+            }, 0);
           }
         })();
       } else {
@@ -815,7 +833,12 @@ export function PhotoUploadWithFaceMatch({
           message: 'The upload data could not be found. Please try uploading the photo again from the similar photos page.',
         });
         // Remove query params from URL
-        navigation.replace(`/partners/${partnerId}`);
+        // Use setTimeout to ensure navigation happens after state updates complete
+        setTimeout(() => {
+          if (mounted) {
+            navigation.replace(`/partners/${partnerId}`);
+          }
+        }, 0);
       }
       };
       
@@ -889,7 +912,12 @@ export function PhotoUploadWithFaceMatch({
               uploadDataKeys.slice(1).forEach(key => sessionStorage.removeItem(key));
               
               // Remove uploadAnyway from URL
-              navigation.replace(`/partners/${partnerId}`);
+              // Use setTimeout to ensure navigation happens after state updates complete
+              setTimeout(() => {
+                if (mounted) {
+                  navigation.replace(`/partners/${partnerId}`);
+                }
+              }, 0);
             } catch (error) {
               console.error('[PhotoUpload] Failed to restore and upload:', error);
               setAlertDialog({
@@ -898,7 +926,12 @@ export function PhotoUploadWithFaceMatch({
                 message: 'Failed to restore upload data. Please try uploading again.',
               });
               // Remove uploadAnyway from URL
-              navigation.replace(`/partners/${partnerId}`);
+              // Use setTimeout to ensure navigation happens after state updates complete
+              setTimeout(() => {
+                if (mounted) {
+                  navigation.replace(`/partners/${partnerId}`);
+                }
+              }, 0);
             }
           })();
         } else {
@@ -906,11 +939,21 @@ export function PhotoUploadWithFaceMatch({
           // Clean up orphaned key before navigating
           sessionStorage.removeItem(latestKey);
           uploadDataKeys.slice(1).forEach(key => sessionStorage.removeItem(key));
-          navigation.replace(`/partners/${partnerId}`);
+          // Use setTimeout to ensure navigation happens after state updates complete
+          setTimeout(() => {
+            if (mounted) {
+              navigation.replace(`/partners/${partnerId}`);
+            }
+          }, 0);
         }
       } else {
         console.warn('[PhotoUpload] uploadAnyway=true but no upload data keys found');
-        navigation.replace(`/partners/${partnerId}`);
+        // Use setTimeout to ensure navigation happens after state updates complete
+        setTimeout(() => {
+          if (mounted) {
+            navigation.replace(`/partners/${partnerId}`);
+          }
+        }, 0);
       }
     }
   }, [mounted, partnerId, navigation]);
