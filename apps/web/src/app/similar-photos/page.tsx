@@ -18,6 +18,7 @@ interface SimilarPartner {
   partner_profile_picture: string | null;
   confidence: number;
   matchCount: number;
+  black_flag?: boolean;
 }
 
 export default function SimilarPhotosPage() {
