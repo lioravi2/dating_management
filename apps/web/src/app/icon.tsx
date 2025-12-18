@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 
 // Icon for the app - theatre masks emoji
+export const runtime = 'edge';
 export const size = { width: 200, height: 200 };
 export const contentType = 'image/png';
 

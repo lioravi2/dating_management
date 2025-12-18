@@ -6,11 +6,18 @@ import Link from 'next/link';
 import { INavigation, NavigationParams, ILinkProps } from './types';
 
 class WebNavigation implements INavigation {
+  private searchParams: URLSearchParams;
+
   constructor(
     private router: ReturnType<typeof useRouter>,
     private pathname: string,
-    private searchParams: URLSearchParams
-  ) {}
+    searchParams: URLSearchParams | ReturnType<typeof useNextSearchParams>
+  ) {
+    // Convert ReadonlyURLSearchParams to URLSearchParams if needed
+    this.searchParams = searchParams instanceof URLSearchParams 
+      ? searchParams 
+      : new URLSearchParams(searchParams.toString());
+  }
 
   push(path: string, params?: NavigationParams): void {
     const url = this.buildUrl(path, params);
@@ -45,7 +52,11 @@ class WebNavigation implements INavigation {
   }
 
   setParams(params: NavigationParams): void {
-    const current = new URLSearchParams(this.searchParams);
+    // Convert ReadonlyURLSearchParams to URLSearchParams by iterating
+    const current = new URLSearchParams();
+    this.searchParams.forEach((value, key) => {
+      current.set(key, value);
+    });
     Object.entries(params).forEach(([key, value]) => {
       if (value === undefined) {
         current.delete(key);
@@ -53,7 +64,9 @@ class WebNavigation implements INavigation {
         current.set(key, String(value));
       }
     });
-    const newPath = `${this.pathname}?${current.toString()}`;
+    // Only append query string if there are actual parameters
+    const queryString = current.toString();
+    const newPath = queryString ? `${this.pathname}?${queryString}` : this.pathname;
     this.router.replace(newPath);
   }
 
@@ -67,7 +80,9 @@ class WebNavigation implements INavigation {
         searchParams.set(key, String(value));
       }
     });
-    return `${path}?${searchParams.toString()}`;
+    // Only append query string if there are actual parameters
+    const queryString = searchParams.toString();
+    return queryString ? `${path}?${queryString}` : path;
   }
 }
 
@@ -76,7 +91,11 @@ const NavigationContext = createContext<INavigation | null>(null);
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useNextSearchParams();
+  const nextSearchParams = useNextSearchParams();
+  
+  // Convert ReadonlyURLSearchParams to URLSearchParams for compatibility
+  // Using toString() is the most reliable way to convert
+  const searchParams = new URLSearchParams(nextSearchParams.toString());
   
   const navigation = new WebNavigation(router, pathname, searchParams);
 
