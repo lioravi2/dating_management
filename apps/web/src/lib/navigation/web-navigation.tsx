@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, usePathname, useSearchParams as useNextSearchParams } from 'next/navigation';
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useMemo } from 'react';
 import Link from 'next/link';
 import { INavigation, NavigationParams, ILinkProps } from './types';
 
@@ -95,12 +95,14 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   
   // Memoize the navigation instance to maintain referential equality across renders
   // Only recreate when pathname or search params actually change
+  // Note: router is not in dependencies because useRouter() returns a new object reference
+  // on every render, but the router methods are stable, so we capture it in the closure
   const navigation = useMemo(() => {
     // Convert ReadonlyURLSearchParams to URLSearchParams for compatibility
     // Using toString() is the most reliable way to convert
     const searchParams = new URLSearchParams(nextSearchParams.toString());
     return new WebNavigation(router, pathname, searchParams);
-  }, [router, pathname, nextSearchParams.toString()]);
+  }, [pathname, nextSearchParams.toString()]);
 
   return (
     <NavigationContext.Provider value={navigation}>
