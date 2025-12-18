@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { useNavigation } from '@/lib/navigation';
+import { NavigationLink, useNavigation } from '@/lib/navigation';
 
 interface BreadcrumbItem {
   label: string;
@@ -65,7 +64,7 @@ export default function Breadcrumbs({ customItems }: BreadcrumbsProps = {}) {
               {index === breadcrumbs.length - 1 ? (
                 <span className="text-gray-900 font-medium">{crumb.label}</span>
               ) : (
-                <Link
+                <NavigationLink
                   href={crumb.href}
                   className="text-gray-600 hover:text-gray-900 transition-colors flex items-center"
                 >
@@ -85,7 +84,7 @@ export default function Breadcrumbs({ customItems }: BreadcrumbsProps = {}) {
                     </svg>
                   )}
                   {crumb.label}
-                </Link>
+                </NavigationLink>
               )}
             </div>
           ))}

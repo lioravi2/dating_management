@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { NavigationLink } from '@/lib/navigation';
 import { Partner } from '@/shared';
 import { getPartnerProfilePictureUrl } from '@/lib/photo-utils';
 import BlackFlagIcon from '@/components/BlackFlagIcon';
@@ -17,7 +17,7 @@ export default function PartnerCard({ partner, lastActivityDescription, showDele
 
   return (
     <div className="relative group">
-      <Link
+      <NavigationLink
         href={`/partners/${partner.id}`}
         className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow flex gap-4"
       >
@@ -66,15 +66,15 @@ export default function PartnerCard({ partner, lastActivityDescription, showDele
             )}
           </div>
         </div>
-      </Link>
+      </NavigationLink>
       {showDelete && (
-        <Link
+        <NavigationLink
           href={`/partners/${partner.id}/delete`}
           onClick={(e) => e.stopPropagation()}
           className="absolute top-6 right-6 text-red-600 hover:text-red-800 text-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
         >
           Delete
-        </Link>
+        </NavigationLink>
       )}
     </div>
   );

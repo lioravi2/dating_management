@@ -119,11 +119,13 @@ export function useNavigation(): INavigation {
   return navigation;
 }
 
-export function NavigationLink({ href, params, children, className, replace }: ILinkProps) {
+export function NavigationLink({ href, params, children, className, replace, onClick }: ILinkProps) {
   const navigation = useNavigation();
   
   const handlePress = (e: React.MouseEvent) => {
     e.preventDefault();
+    // Call custom onClick handler if provided (e.g., for stopPropagation)
+    onClick?.(e);
     if (replace) {
       navigation.replace(href, params);
     } else {

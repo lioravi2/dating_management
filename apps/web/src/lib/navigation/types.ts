@@ -18,5 +18,6 @@ export interface ILinkProps {
   children: React.ReactNode;
   className?: string;
   replace?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
