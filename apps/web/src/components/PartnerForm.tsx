@@ -38,6 +38,8 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   const suggestionRef = useRef<HTMLSpanElement>(null);
   const touchStartX = useRef<number | null>(null);
   const isNavigatingRef = useRef(false); // Prevent double submission during navigation
+  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Store timeout for cleanup
+  const isMountedRef = useRef(true); // Track component mount state
 
   // Fetch last activity description if partner has no description
   useEffect(() => {
@@ -236,19 +238,24 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
             navigation.replace(`/partners/${partner.id}`);
             // Reset flag after a delay to handle navigation failures
             // If navigation succeeds, component will unmount anyway
-            setTimeout(() => {
-              if (isNavigatingRef.current) {
+            // Store timeout ID for cleanup
+            navigationTimeoutRef.current = setTimeout(() => {
+              // Only update state if component is still mounted
+              if (isMountedRef.current && isNavigatingRef.current) {
                 // Navigation didn't complete - reset flag and loading state
                 isNavigatingRef.current = false;
                 setLoading(false);
                 setMessage('Navigation failed. Please refresh the page or try again.');
               }
+              navigationTimeoutRef.current = null;
             }, 5000); // 5 second timeout for navigation
           } catch (error) {
-            // Navigation failed - reset flag and loading state
-            isNavigatingRef.current = false;
-            setLoading(false);
-            setMessage('Failed to navigate. Please try again.');
+            // Navigation failed - reset flag and loading state only if mounted
+            if (isMountedRef.current) {
+              isNavigatingRef.current = false;
+              setLoading(false);
+              setMessage('Failed to navigate. Please try again.');
+            }
           }
         }, 0);
         return;
