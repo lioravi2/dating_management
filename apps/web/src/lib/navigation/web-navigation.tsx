@@ -93,11 +93,14 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const nextSearchParams = useNextSearchParams();
   
-  // Convert ReadonlyURLSearchParams to URLSearchParams for compatibility
-  // Using toString() is the most reliable way to convert
-  const searchParams = new URLSearchParams(nextSearchParams.toString());
-  
-  const navigation = new WebNavigation(router, pathname, searchParams);
+  // Memoize the navigation instance to maintain referential equality across renders
+  // Only recreate when pathname or search params actually change
+  const navigation = useMemo(() => {
+    // Convert ReadonlyURLSearchParams to URLSearchParams for compatibility
+    // Using toString() is the most reliable way to convert
+    const searchParams = new URLSearchParams(nextSearchParams.toString());
+    return new WebNavigation(router, pathname, searchParams);
+  }, [router, pathname, nextSearchParams.toString()]);
 
   return (
     <NavigationContext.Provider value={navigation}>
@@ -132,4 +135,3 @@ export function NavigationLink({ href, params, children, className, replace }: I
     </Link>
   );
 }
-
