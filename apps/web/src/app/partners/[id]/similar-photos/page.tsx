@@ -9,6 +9,7 @@ import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { getPhotoUrl } from '@/lib/photo-utils';
 import { PhotoUploadAnalysis, FaceMatch } from '@/shared';
+import BlackFlagIcon from '@/components/BlackFlagIcon';
 
 export const dynamic = 'force-dynamic';
 
@@ -249,7 +250,7 @@ export default function SimilarPhotosPage() {
                         </Link>
                         {partner.black_flag && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-black text-white flex-shrink-0" title="Black Flag">
-                            ⚫
+                            <BlackFlagIcon className="w-4 h-4" />
                           </span>
                         )}
                       </div>

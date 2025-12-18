@@ -175,7 +175,10 @@ export function FaceSelectionUI({
     };
   }, [imageLoaded, drawCanvas]); // Only depend on imageLoaded and drawCanvas (which already includes blinkOpacity)
 
-  const handleCanvasInteraction = (
+  // Store handleCanvasInteraction in ref so touch handler can access latest version
+  const interactionHandlerRef = useRef<((clientX: number, clientY: number) => void) | null>(null);
+
+  const handleCanvasInteraction = useCallback((
     clientX: number,
     clientY: number
   ) => {
@@ -200,19 +203,40 @@ export function FaceSelectionUI({
         break;
       }
     }
-  };
+  }, [detections]);
+
+  // Update ref when handler changes
+  useEffect(() => {
+    interactionHandlerRef.current = handleCanvasInteraction;
+  }, [handleCanvasInteraction]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     handleCanvasInteraction(e.clientX, e.clientY);
   };
 
-  const handleCanvasTouch = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault(); // Prevent scrolling/zooming
-    if (e.touches.length > 0) {
-      const touch = e.touches[0];
-      handleCanvasInteraction(touch.clientX, touch.clientY);
-    }
-  };
+  // Use ref-based touch handler to avoid passive event listener issue
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Create non-passive touch handler that uses the latest interaction handler
+    const handleTouch = (e: TouchEvent) => {
+      e.preventDefault(); // Prevent scrolling/zooming
+      if (e.touches.length > 0 && interactionHandlerRef.current) {
+        const touch = e.touches[0];
+        interactionHandlerRef.current(touch.clientX, touch.clientY);
+      }
+    };
+    
+    // Attach with passive: false to allow preventDefault
+    canvas.addEventListener('touchstart', handleTouch, { passive: false });
+    canvas.addEventListener('touchmove', handleTouch, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouch);
+      canvas.removeEventListener('touchmove', handleTouch);
+    };
+  }, []); // Empty deps - interactionHandlerRef.current always has latest version
 
   const handleSelect = () => {
     if (selectedIndex !== null && detections[selectedIndex]) {
@@ -232,7 +256,6 @@ export function FaceSelectionUI({
           <canvas
             ref={canvasRef}
             onClick={handleCanvasClick}
-            onTouchStart={handleCanvasTouch}
             className="max-w-full h-auto border border-gray-300 rounded cursor-pointer touch-none"
             style={{ maxHeight: '70vh', touchAction: 'none' }}
           />

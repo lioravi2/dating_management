@@ -6,6 +6,7 @@ import { createSupabaseClient } from '@/lib/supabase/client';
 import { environment } from '@/lib/environment';
 import Link from 'next/link';
 import type { Partner } from '@/shared';
+import BlackFlagIcon from '@/components/BlackFlagIcon';
 
 interface PartnerFormProps {
   partner?: Partner | null;
@@ -59,16 +60,18 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     const fetchLastActivity = async () => {
       if (partner && !partner.description) {
         const supabase = createSupabaseClient();
-        const { data: activities } = await supabase
+        // Use maybeSingle() instead of single() to handle cases where no activities exist
+        // Also select id to avoid 406 errors with single-column selects
+        const { data: activity } = await supabase
           .from('partner_notes')
-          .select('description')
+          .select('id, description')
           .eq('partner_id', partner.id)
           .order('start_time', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
         
-        if (activities?.description) {
-          setLastActivityDescription(activities.description);
+        if (activity?.description) {
+          setLastActivityDescription(activity.description);
         }
       }
     };
@@ -171,7 +174,8 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     formData.facebook_profile !== initialFormData.facebook_profile ||
     formData.x_profile !== initialFormData.x_profile ||
     formData.linkedin_profile !== initialFormData.linkedin_profile ||
-    formData.instagram_profile !== initialFormData.instagram_profile
+    formData.instagram_profile !== initialFormData.instagram_profile ||
+    formData.black_flag !== initialFormData.black_flag
   ) : true; // Always allow submission for new partners
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -253,7 +257,8 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           }
           
           try {
-            navigation.replace(`/partners/${partner.id}`);
+            // Add timestamp to force Next.js to refresh the server component data
+            navigation.replace(`/partners/${partner.id}?t=${Date.now()}`);
             // Reset flag after a delay to handle navigation failures
             // If navigation succeeds, component will unmount anyway
             // Store timeout ID for cleanup - check mounted state first
@@ -356,6 +361,35 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         />
       </div>
 
+      {/* Black Flag - Only show when editing, placed after last name */}
+      {partner && (
+        <div>
+          <div className="flex items-start gap-3">
+            <input
+              id="black_flag"
+              type="checkbox"
+              checked={formData.black_flag}
+              onChange={(e) =>
+                setFormData({ ...formData, black_flag: e.target.checked })
+              }
+              className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+            />
+            <div className="flex-1">
+              <label
+                htmlFor="black_flag"
+                className="block text-sm font-medium text-gray-700 mb-1 cursor-pointer flex items-center gap-2"
+              >
+                <BlackFlagIcon className="w-5 h-5 text-black" />
+                Black Flag
+              </label>
+              <p className="text-xs text-gray-500">
+                Mark this partner with a black flag. When enabled, description becomes mandatory.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <label
           htmlFor="email"
@@ -395,8 +429,9 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       <div>
         <label
           htmlFor="description"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2"
         >
+          {formData.black_flag && <BlackFlagIcon className="w-4 h-4 text-black" />}
           Description{formData.black_flag ? ' *' : ''}
         </label>
         <div className="relative">
@@ -545,34 +580,6 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           </div>
         </div>
       </div>
-
-      {/* Black Flag - Only show when editing */}
-      {partner && (
-        <div className="border-t pt-4">
-          <div className="flex items-start gap-3">
-            <input
-              id="black_flag"
-              type="checkbox"
-              checked={formData.black_flag}
-              onChange={(e) =>
-                setFormData({ ...formData, black_flag: e.target.checked })
-              }
-              className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-            />
-            <div className="flex-1">
-              <label
-                htmlFor="black_flag"
-                className="block text-sm font-medium text-gray-700 mb-1 cursor-pointer"
-              >
-                Black Flag
-              </label>
-              <p className="text-xs text-gray-500">
-                Mark this partner with a black flag. When enabled, description becomes mandatory.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {message && (
         <div

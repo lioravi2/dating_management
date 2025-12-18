@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Partner } from '@/shared';
 import { getPartnerProfilePictureUrl } from '@/lib/photo-utils';
+import BlackFlagIcon from '@/components/BlackFlagIcon';
 
 interface PartnerCardProps {
   partner: Partner;
@@ -41,7 +42,7 @@ export default function PartnerCard({ partner, lastActivityDescription, showDele
             </h2>
             {partner.black_flag && (
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-black text-white" title="Black Flag">
-                ⚫
+                <BlackFlagIcon className="w-4 h-4" />
               </span>
             )}
           </div>

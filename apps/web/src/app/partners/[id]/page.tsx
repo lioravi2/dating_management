@@ -6,6 +6,7 @@ import PartnerActivities from '@/components/PartnerActivities';
 import PartnerPhotos from '@/components/PartnerPhotos';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import BlackFlagIcon from '@/components/BlackFlagIcon';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +69,7 @@ export default async function PartnerDetailPage({
                 </h1>
                 {partner.black_flag && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-black text-white" title="Black Flag">
-                    ⚫
+                    <BlackFlagIcon className="w-4 h-4" />
                   </span>
                 )}
               </div>

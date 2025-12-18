@@ -348,6 +348,34 @@ These rules are CRITICAL for:
 
 Any code that violates these rules MUST be rejected and fixed before merging.
 
+## 📝 SUMMARY AND COMMUNICATION RULES
+
+### Version Publishing Summary Format
+
+**REQUIRED:** When a version is published (code is committed and pushed, or a build is deployed), the first row of the summary in the chat MUST include the build information.
+
+**Format:**
+- Include build status (success/failure)
+- Include build timestamp or commit hash if available
+- Include deployment platform (Vercel, local, etc.) if applicable
+- Place this information as the first line of any summary after publishing
+
+**Example:**
+```
+✅ Build successful - Published to Vercel at 12:45:23 UTC (commit: abc1234)
+[Rest of summary...]
+```
+
+**OR:**
+
+```
+❌ Build failed - Vercel deployment error at 12:45:23 UTC
+[Error details and rest of summary...]
+```
+
+This ensures immediate visibility of build status in conversation summaries.
+
+
 
 
 

@@ -31,7 +31,8 @@ class WebCanvas implements ICanvas {
   }
 
   getContext(type: '2d'): ICanvasContext | null {
-    const ctx = this.canvas.getContext('2d');
+    // Use willReadFrequently option for better performance when frequently reading image data
+    const ctx = this.canvas.getContext('2d', { willReadFrequently: true });
     return ctx ? new WebCanvasContext(ctx) : null;
   }
 
