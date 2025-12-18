@@ -220,9 +220,10 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         setLoading(false);
         return;
       } else {
+        // Reset loading state before navigation to prevent UI freeze if navigation is delayed
+        setLoading(false);
         // Use navigation.replace to avoid hydration mismatch errors
         // Use setTimeout to ensure navigation happens after state updates complete
-        // Don't set loading to false here - component will unmount on navigation
         setTimeout(() => {
           navigation.replace(`/partners/${partner.id}`);
         }, 0);
