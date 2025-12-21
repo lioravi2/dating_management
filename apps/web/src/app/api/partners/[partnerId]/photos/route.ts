@@ -48,9 +48,15 @@ export async function POST(
       const accessToken = authHeader.substring(7);
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-      supabase = createClient(supabaseUrl, supabaseAnonKey);
+      supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      });
       
-      // Get user using the access token
+      // Get user using the access token and verify it's valid
       console.log('[API] Getting user from Bearer token...');
       const { data: { user: tokenUser }, error: userError } = await supabase.auth.getUser(accessToken);
       if (userError || !tokenUser) {
