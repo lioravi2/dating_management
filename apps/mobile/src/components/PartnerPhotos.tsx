@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  FlatList,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase/client';
@@ -286,17 +285,13 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
           <Text style={styles.emptyText}>No photos yet. Upload your first photo above.</Text>
         </View>
       ) : (
-        <FlatList
-          data={photos}
-          numColumns={2}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.gallery}
-          renderItem={({ item }) => {
+        <View style={styles.gallery}>
+          {photos.map((item) => {
             const photoUrl = getPhotoUrl(item.storage_path, supabaseUrl);
             const isDeleting = deleting === item.id;
 
             return (
-              <View style={styles.photoContainer}>
+              <View key={item.id} style={styles.photoContainer}>
                 <Image
                   source={{ uri: photoUrl }}
                   style={styles.photo}
@@ -317,8 +312,8 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
                 <Text style={styles.photoDate}>{formatDate(item.uploaded_at)}</Text>
               </View>
             );
-          }}
-        />
+          })}
+        </View>
       )}
     </View>
   );
@@ -401,11 +396,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   gallery: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingTop: 8,
   },
   photoContainer: {
-    flex: 1,
-    margin: 4,
+    width: '48%', // 2 columns with margin
+    margin: '1%',
     position: 'relative',
   },
   photo: {
