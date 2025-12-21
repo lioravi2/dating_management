@@ -31,6 +31,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   const [initialFormData, setInitialFormData] = useState(getInitialFormData());
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
   const [isLimitReached, setIsLimitReached] = useState(false);
   const [lastActivityDescription, setLastActivityDescription] = useState<string | null>(null);
   const [suggestionText, setSuggestionText] = useState<string>('');
@@ -41,6 +42,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   const isNavigatingRef = useRef(false); // Prevent double submission during navigation
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Store timeout for cleanup
   const isMountedRef = useRef(true); // Track component mount state
+  const fieldRefs = useRef<{ [key: string]: HTMLElement | null }>({});
 
   // Cleanup on unmount
   useEffect(() => {
@@ -137,6 +139,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   // Handle input changes
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setFormData({ ...formData, description: e.target.value });
+    clearFieldError('description');
   };
 
   // Handle touch events for right swipe gesture
@@ -178,6 +181,33 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
     formData.black_flag !== initialFormData.black_flag
   ) : true; // Always allow submission for new partners
 
+  // Validation functions
+  const isValidEmail = (email: string): boolean => {
+    if (!email.trim()) return true; // Empty is valid (optional field)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email.trim());
+  };
+
+  const isValidUrl = (url: string): boolean => {
+    if (!url.trim()) return true; // Empty is valid (optional field)
+    try {
+      new URL(url.trim());
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const clearFieldError = (fieldName: string) => {
+    if (fieldErrors[fieldName]) {
+      setFieldErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+    }
+  };
+
     const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -191,14 +221,69 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       return;
     }
     
+    // Clear previous field errors
+    setFieldErrors({});
+    setMessage('');
+
+    // Validate all fields and collect errors
+    const errors: { [key: string]: string } = {};
+
+    // Validate: first_name is required
+    if (!formData.first_name.trim()) {
+      errors.first_name = 'First name is required.';
+    }
+
     // Validate: description is mandatory when black_flag is enabled
     if (formData.black_flag && !formData.description?.trim()) {
-      setMessage('Description is required when black flag is enabled.');
+      errors.description = 'Description is required when black flag is enabled.';
+    }
+
+    // Validate: email format
+    if (formData.email && !isValidEmail(formData.email)) {
+      errors.email = 'Please enter a valid email address.';
+    }
+
+    // Validate: social media URLs
+    if (formData.facebook_profile && !isValidUrl(formData.facebook_profile)) {
+      errors.facebook_profile = 'Please enter a valid Facebook profile URL (e.g., https://facebook.com/username).';
+    }
+
+    if (formData.x_profile && !isValidUrl(formData.x_profile)) {
+      errors.x_profile = 'Please enter a valid X (Twitter) profile URL (e.g., https://x.com/username).';
+    }
+
+    if (formData.linkedin_profile && !isValidUrl(formData.linkedin_profile)) {
+      errors.linkedin_profile = 'Please enter a valid LinkedIn profile URL (e.g., https://linkedin.com/in/username).';
+    }
+
+    if (formData.instagram_profile && !isValidUrl(formData.instagram_profile)) {
+      errors.instagram_profile = 'Please enter a valid Instagram profile URL (e.g., https://instagram.com/username).';
+    }
+
+    // If there are validation errors, set them and scroll to first error
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      
+      // Scroll to first error field
+      const firstErrorField = Object.keys(errors)[0];
+      const fieldElement = fieldRefs.current[firstErrorField];
+      
+      if (fieldElement) {
+        // Use setTimeout to ensure the error is rendered before scrolling
+        setTimeout(() => {
+          fieldElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Focus the input field if it's an input element
+          const inputElement = fieldElement.querySelector('input, textarea') as HTMLElement;
+          if (inputElement) {
+            inputElement.focus();
+          }
+        }, 100);
+      }
+      
       return;
     }
     
     setLoading(true);
-    setMessage('');
 
     const supabase = createSupabaseClient();
     const {
@@ -324,7 +409,9 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
+      <div
+        ref={(ref) => (fieldRefs.current.first_name = ref)}
+      >
         <label
           htmlFor="first_name"
           className="block text-sm font-medium text-gray-700 mb-1"
@@ -335,12 +422,20 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           id="first_name"
           type="text"
           value={formData.first_name}
-          onChange={(e) =>
-            setFormData({ ...formData, first_name: e.target.value })
-          }
+          onChange={(e) => {
+            setFormData({ ...formData, first_name: e.target.value });
+            clearFieldError('first_name');
+          }}
           required
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+            fieldErrors.first_name
+              ? 'border-red-500 focus:ring-red-500'
+              : 'border-gray-300'
+          }`}
         />
+        {fieldErrors.first_name && (
+          <p className="mt-1 text-sm text-red-600">{fieldErrors.first_name}</p>
+        )}
       </div>
 
       <div>
@@ -390,7 +485,9 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         </div>
       )}
 
-      <div>
+      <div
+        ref={(ref) => (fieldRefs.current.email = ref)}
+      >
         <label
           htmlFor="email"
           className="block text-sm font-medium text-gray-700 mb-1"
@@ -401,11 +498,19 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           id="email"
           type="email"
           value={formData.email}
-          onChange={(e) =>
-            setFormData({ ...formData, email: e.target.value })
-          }
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          onChange={(e) => {
+            setFormData({ ...formData, email: e.target.value });
+            clearFieldError('email');
+          }}
+          className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+            fieldErrors.email
+              ? 'border-red-500 focus:ring-red-500'
+              : 'border-gray-300'
+          }`}
         />
+        {fieldErrors.email && (
+          <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
+        )}
       </div>
 
       <div>
@@ -426,7 +531,9 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         />
       </div>
 
-      <div>
+      <div
+        ref={(ref) => (fieldRefs.current.description = ref)}
+      >
         <label
           htmlFor="description"
           className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2"
@@ -461,7 +568,11 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
             onTouchEnd={handleTouchEnd}
             rows={4}
             required={formData.black_flag}
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent relative z-10 bg-transparent"
+            className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent relative z-10 bg-transparent ${
+              fieldErrors.description
+                ? 'border-red-500 focus:ring-red-500'
+                : 'border-gray-300'
+            }`}
             style={{ 
               caretColor: 'inherit',
             }}
@@ -487,6 +598,9 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
             </button>
           )}
         </div>
+        {fieldErrors.description && (
+          <p className="mt-1 text-sm text-red-600">{fieldErrors.description}</p>
+        )}
         {showSuggestion && suggestionText && (
           <p className="text-xs text-gray-500 mt-1">
             Press <kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">Tab</kbd> or <kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">→</kbd> to accept suggestion
@@ -503,7 +617,9 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         <h3 className="text-lg font-semibold mb-4">Social Media Profiles</h3>
         
         <div className="space-y-4">
-          <div>
+          <div
+            ref={(ref) => (fieldRefs.current.facebook_profile = ref)}
+          >
             <label
               htmlFor="facebook_profile"
               className="block text-sm font-medium text-gray-700 mb-1"
@@ -514,15 +630,25 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
               id="facebook_profile"
               type="url"
               value={formData.facebook_profile}
-              onChange={(e) =>
-                setFormData({ ...formData, facebook_profile: e.target.value })
-              }
+              onChange={(e) => {
+                setFormData({ ...formData, facebook_profile: e.target.value });
+                clearFieldError('facebook_profile');
+              }}
               placeholder="https://facebook.com/..."
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                fieldErrors.facebook_profile
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300'
+              }`}
             />
+            {fieldErrors.facebook_profile && (
+              <p className="mt-1 text-sm text-red-600">{fieldErrors.facebook_profile}</p>
+            )}
           </div>
 
-          <div>
+          <div
+            ref={(ref) => (fieldRefs.current.x_profile = ref)}
+          >
             <label
               htmlFor="x_profile"
               className="block text-sm font-medium text-gray-700 mb-1"
@@ -533,15 +659,25 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
               id="x_profile"
               type="url"
               value={formData.x_profile}
-              onChange={(e) =>
-                setFormData({ ...formData, x_profile: e.target.value })
-              }
+              onChange={(e) => {
+                setFormData({ ...formData, x_profile: e.target.value });
+                clearFieldError('x_profile');
+              }}
               placeholder="https://x.com/..."
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                fieldErrors.x_profile
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300'
+              }`}
             />
+            {fieldErrors.x_profile && (
+              <p className="mt-1 text-sm text-red-600">{fieldErrors.x_profile}</p>
+            )}
           </div>
 
-          <div>
+          <div
+            ref={(ref) => (fieldRefs.current.linkedin_profile = ref)}
+          >
             <label
               htmlFor="linkedin_profile"
               className="block text-sm font-medium text-gray-700 mb-1"
@@ -552,15 +688,25 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
               id="linkedin_profile"
               type="url"
               value={formData.linkedin_profile}
-              onChange={(e) =>
-                setFormData({ ...formData, linkedin_profile: e.target.value })
-              }
+              onChange={(e) => {
+                setFormData({ ...formData, linkedin_profile: e.target.value });
+                clearFieldError('linkedin_profile');
+              }}
               placeholder="https://linkedin.com/in/..."
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                fieldErrors.linkedin_profile
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300'
+              }`}
             />
+            {fieldErrors.linkedin_profile && (
+              <p className="mt-1 text-sm text-red-600">{fieldErrors.linkedin_profile}</p>
+            )}
           </div>
 
-          <div>
+          <div
+            ref={(ref) => (fieldRefs.current.instagram_profile = ref)}
+          >
             <label
               htmlFor="instagram_profile"
               className="block text-sm font-medium text-gray-700 mb-1"
@@ -571,17 +717,26 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
               id="instagram_profile"
               type="url"
               value={formData.instagram_profile}
-              onChange={(e) =>
-                setFormData({ ...formData, instagram_profile: e.target.value })
-              }
+              onChange={(e) => {
+                setFormData({ ...formData, instagram_profile: e.target.value });
+                clearFieldError('instagram_profile');
+              }}
               placeholder="https://instagram.com/..."
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className={`w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                fieldErrors.instagram_profile
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300'
+              }`}
             />
+            {fieldErrors.instagram_profile && (
+              <p className="mt-1 text-sm text-red-600">{fieldErrors.instagram_profile}</p>
+            )}
           </div>
         </div>
       </div>
 
-      {message && (
+      {/* General message box - only for non-field-specific errors (success, auth, network, account limits, etc.) */}
+      {message && !message.includes('required') && !message.includes('valid') ? (
         <div
           className={`mb-4 p-3 rounded ${
             message.includes('Error') || message.includes('error') || message.includes('violates') || message.includes('Not authenticated') || message.includes('limited') || message.includes("can't add")
@@ -601,7 +756,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
             )}
           </div>
         </div>
-      )}
+      ) : null}
 
       <div className="flex space-x-4">
         <button

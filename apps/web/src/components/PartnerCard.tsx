@@ -34,18 +34,20 @@ export default function PartnerCard({ partner, lastActivityDescription, showDele
             </span>
           </div>
         )}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <h2 className="text-xl font-semibold">
+        <div className="flex-1 min-w-0 pr-16">
+          <div className="flex items-start justify-between mb-2">
+            <h2 className="text-xl font-semibold line-clamp-2 flex-1 min-w-0">
               {partner.first_name || partner.last_name || 'Unnamed Partner'}
               {partner.first_name && partner.last_name && ` ${partner.last_name}`}
             </h2>
-            {partner.black_flag && (
+          </div>
+          {partner.black_flag && (
+            <div className="flex justify-center mb-2">
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-black text-white" title="Black Flag">
                 <BlackFlagIcon className="w-4 h-4" />
               </span>
-            )}
-          </div>
+            </div>
+          )}
           {partner.email && (
             <p className="text-sm text-gray-600 mb-1 truncate">{partner.email}</p>
           )}
@@ -71,7 +73,7 @@ export default function PartnerCard({ partner, lastActivityDescription, showDele
         <NavigationLink
           href={`/partners/${partner.id}/delete`}
           onClick={(e) => e.stopPropagation()}
-          className="absolute top-6 right-6 text-red-600 hover:text-red-800 text-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          className="absolute top-6 right-6 text-red-600 hover:text-red-800 text-sm z-10"
         >
           Delete
         </NavigationLink>
