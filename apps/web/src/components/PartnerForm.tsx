@@ -410,7 +410,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div
-        ref={(ref) => (fieldRefs.current.first_name = ref)}
+        ref={(ref) => { fieldRefs.current.first_name = ref; }}
       >
         <label
           htmlFor="first_name"
@@ -486,7 +486,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       )}
 
       <div
-        ref={(ref) => (fieldRefs.current.email = ref)}
+        ref={(ref) => { fieldRefs.current.email = ref; }}
       >
         <label
           htmlFor="email"
@@ -532,7 +532,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       </div>
 
       <div
-        ref={(ref) => (fieldRefs.current.description = ref)}
+        ref={(ref) => { fieldRefs.current.description = ref; }}
       >
         <label
           htmlFor="description"
@@ -618,7 +618,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         
         <div className="space-y-4">
           <div
-            ref={(ref) => (fieldRefs.current.facebook_profile = ref)}
+            ref={(ref) => { fieldRefs.current.facebook_profile = ref; }}
           >
             <label
               htmlFor="facebook_profile"
@@ -647,7 +647,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           </div>
 
           <div
-            ref={(ref) => (fieldRefs.current.x_profile = ref)}
+            ref={(ref) => { fieldRefs.current.x_profile = ref; }}
           >
             <label
               htmlFor="x_profile"
@@ -676,7 +676,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           </div>
 
           <div
-            ref={(ref) => (fieldRefs.current.linkedin_profile = ref)}
+            ref={(ref) => { fieldRefs.current.linkedin_profile = ref; }}
           >
             <label
               htmlFor="linkedin_profile"
@@ -705,7 +705,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
           </div>
 
           <div
-            ref={(ref) => (fieldRefs.current.instagram_profile = ref)}
+            ref={(ref) => { fieldRefs.current.instagram_profile = ref; }}
           >
             <label
               htmlFor="instagram_profile"
