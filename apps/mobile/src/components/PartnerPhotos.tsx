@@ -30,14 +30,14 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
 
   useEffect(() => {
     isMountedRef.current = true;
-    loadPhotos();
+    loadPhotos(partnerId);
     
     return () => {
       isMountedRef.current = false;
     };
   }, [partnerId]);
 
-  const loadPhotos = async () => {
+  const loadPhotos = async (requestedPartnerId: string) => {
     try {
       if (!isMountedRef.current) return;
       setLoading(true);
@@ -46,23 +46,27 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
       const { data, error: fetchError } = await supabase
         .from('partner_photos')
         .select('*')
-        .eq('partner_id', partnerId)
+        .eq('partner_id', requestedPartnerId)
         .order('uploaded_at', { ascending: false });
 
       if (fetchError) {
         throw fetchError;
       }
 
-      if (isMountedRef.current) {
+      // Verify that the partnerId hasn't changed while the request was in flight
+      // Only update state if this is still the current partner
+      if (isMountedRef.current && requestedPartnerId === partnerId) {
         setPhotos(data || []);
       }
     } catch (err) {
-      if (isMountedRef.current) {
+      // Only update error state if this is still the current partner
+      if (isMountedRef.current && requestedPartnerId === partnerId) {
         console.error('Error loading photos:', err);
         setError(err instanceof Error ? err.message : 'Failed to load photos');
       }
     } finally {
-      if (isMountedRef.current) {
+      // Only update loading state if this is still the current partner
+      if (isMountedRef.current && requestedPartnerId === partnerId) {
         setLoading(false);
       }
     }
@@ -88,9 +92,9 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
+        allowsEditing: false, // Disable editing to avoid confusion - user can select photo directly
         quality: 0.8,
+        allowsMultipleSelection: false,
       });
 
       if (result.canceled || !result.assets[0]) {
@@ -122,7 +126,11 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
       }
 
       // Upload to API
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      // Use EXPO_PUBLIC_WEB_APP_URL if available, otherwise fallback to localhost
+      const apiUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      
+      console.log('[PartnerPhotos] Uploading to:', `${apiUrl}/api/partners/${partnerId}/photos`);
+      
       const uploadResponse = await fetch(`${apiUrl}/api/partners/${partnerId}/photos`, {
         method: 'POST',
         body: formData,
@@ -132,13 +140,16 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
         },
       });
 
+      console.log('[PartnerPhotos] Upload response status:', uploadResponse.status);
+
       if (!uploadResponse.ok) {
         const errorData = await uploadResponse.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || errorData.details || 'Failed to upload photo');
+        console.error('[PartnerPhotos] Upload error:', errorData);
+        throw new Error(errorData.error || errorData.details || `Failed to upload photo (${uploadResponse.status})`);
       }
 
       // Reload photos
-      await loadPhotos();
+      await loadPhotos(partnerId);
       onPhotoUploaded?.();
     } catch (err) {
       console.error('Error uploading photo:', err);
@@ -181,7 +192,8 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
         throw new Error('Not authenticated');
       }
 
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      // Use EXPO_PUBLIC_WEB_APP_URL if available, otherwise fallback to localhost
+      const apiUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
       const response = await fetch(`${apiUrl}/api/partners/${partnerId}/photos/${photoId}`, {
         method: 'DELETE',
         headers: {
@@ -195,7 +207,7 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
       }
 
       // Reload photos
-      await loadPhotos();
+      await loadPhotos(partnerId);
       onPhotoUploaded?.();
     } catch (err) {
       console.error('Error deleting photo:', err);
