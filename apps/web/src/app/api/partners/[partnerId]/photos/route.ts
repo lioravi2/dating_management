@@ -77,15 +77,17 @@ export async function POST(
       }
       user = cookieUser;
     }
-    if (userError || !user) {
-      console.error('Auth error:', userError);
+
+    // At this point, user should be set (either from Bearer token or cookies)
+    // If not, it means authentication failed in both branches above
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    const userId = user!.id;
+    const userId = user.id;
 
     // Verify partner belongs to user
     const { data: partner, error: partnerError } = await supabase

@@ -67,9 +67,9 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
         setError(err instanceof Error ? err.message : 'Failed to load photos');
       }
     } finally {
-      // Always clear loading state if component is still mounted
-      // This prevents UI from getting stuck in loading state
-      if (isMountedRef.current) {
+      // Only clear loading state if this request is still for the current partner
+      // This prevents stale requests from clearing loading state while a new request is in progress
+      if (isMountedRef.current && requestedPartnerId === partnerId) {
         setLoading(false);
       }
     }
