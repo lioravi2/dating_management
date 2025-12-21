@@ -150,10 +150,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'subscription',
-      subscription_data: {
-        // Set billing cycle anchor to current timestamp to avoid prorating
-        billing_cycle_anchor: Math.floor(Date.now() / 1000),
-      },
+      // Don't set billing_cycle_anchor - let Stripe set it automatically to the subscription start time
+      // This avoids timing issues where the anchor could be before the checkout session creation time
       success_url: `${request.nextUrl.origin}/profile?success=true`,
       cancel_url: `${request.nextUrl.origin}/upgrade?canceled=true`,
       metadata: {
