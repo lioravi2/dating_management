@@ -39,7 +39,9 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
 
   const loadPhotos = async (requestedPartnerId: string) => {
     try {
-      if (!isMountedRef.current) return;
+      // Check mount and partner ID before setting loading state
+      if (!isMountedRef.current || requestedPartnerId !== partnerId) return;
+      
       setLoading(true);
       setError(null);
 
@@ -65,8 +67,9 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
         setError(err instanceof Error ? err.message : 'Failed to load photos');
       }
     } finally {
-      // Only update loading state if this is still the current partner
-      if (isMountedRef.current && requestedPartnerId === partnerId) {
+      // Always clear loading state if component is still mounted
+      // This prevents UI from getting stuck in loading state
+      if (isMountedRef.current) {
         setLoading(false);
       }
     }

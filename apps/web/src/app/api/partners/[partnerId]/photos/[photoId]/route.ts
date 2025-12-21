@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 
 /**
  * Delete a partner photo
@@ -10,16 +11,43 @@ export async function DELETE(
 ) {
   try {
     const { partnerId, photoId } = params;
-    const supabase = createSupabaseRouteHandlerClient();
     
-    // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      console.error('Auth error:', userError);
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Check for Authorization header (for mobile app) or use cookie-based auth (for web)
+    const authHeader = request.headers.get('authorization');
+    let supabase;
+    let user;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Mobile app sends Bearer token
+      const accessToken = authHeader.substring(7);
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+      supabase = createClient(supabaseUrl, supabaseAnonKey);
+      
+      // Get user using the access token
+      const { data: { user: tokenUser }, error: userError } = await supabase.auth.getUser(accessToken);
+      if (userError || !tokenUser) {
+        console.error('Auth error:', userError);
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      user = tokenUser;
+    } else {
+      // Web app uses cookies
+      supabase = createSupabaseRouteHandlerClient();
+      
+      // Get current user
+      const { data: { user: cookieUser }, error: userError } = await supabase.auth.getUser();
+      if (userError || !cookieUser) {
+        console.error('Auth error:', userError);
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      user = cookieUser;
     }
 
     // First verify partner belongs to user and get profile picture

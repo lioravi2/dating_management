@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -37,11 +38,45 @@ export async function POST(
       );
     }
 
-    const supabase = createSupabaseRouteHandlerClient();
+    // Check for Authorization header (for mobile app) or use cookie-based auth (for web)
+    const authHeader = request.headers.get('authorization');
+    let supabase;
+    let user;
     
-    // Get current user (more reliable than getSession for API routes)
-    console.log('[API] Getting user...');
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Mobile app sends Bearer token
+      const accessToken = authHeader.substring(7);
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+      supabase = createClient(supabaseUrl, supabaseAnonKey);
+      
+      // Get user using the access token
+      console.log('[API] Getting user from Bearer token...');
+      const { data: { user: tokenUser }, error: userError } = await supabase.auth.getUser(accessToken);
+      if (userError || !tokenUser) {
+        console.error('Auth error:', userError);
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      user = tokenUser;
+    } else {
+      // Web app uses cookies
+      supabase = createSupabaseRouteHandlerClient();
+      
+      // Get current user (more reliable than getSession for API routes)
+      console.log('[API] Getting user from cookies...');
+      const { data: { user: cookieUser }, error: userError } = await supabase.auth.getUser();
+      if (userError || !cookieUser) {
+        console.error('Auth error:', userError);
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      user = cookieUser;
+    }
     if (userError || !user) {
       console.error('Auth error:', userError);
       return NextResponse.json(
@@ -50,7 +85,7 @@ export async function POST(
       );
     }
 
-    const userId = user.id;
+    const userId = user!.id;
 
     // Verify partner belongs to user
     const { data: partner, error: partnerError } = await supabase
