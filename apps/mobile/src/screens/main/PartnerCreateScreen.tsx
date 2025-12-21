@@ -118,13 +118,21 @@ export default function PartnerCreateScreen() {
       
       // Scroll to first error field
       const firstErrorField = Object.keys(errors)[0];
-      const fieldY = fieldPositions.current[firstErrorField];
+      const fieldRef = fieldRefs.current[firstErrorField];
       
-      if (fieldY !== undefined && scrollViewRef.current) {
+      if (fieldRef && scrollViewRef.current) {
         // Use setTimeout to ensure the error is rendered before scrolling
         setTimeout(() => {
-          scrollViewRef.current?.scrollTo({ y: Math.max(0, fieldY - 20), animated: true });
-        }, 100);
+          // Measure the field position
+          fieldRef.measure((x, y, width, height, pageX, pageY) => {
+            // Get the ScrollView's position on the page
+            scrollViewRef.current?.measure((sx, sy, swidth, sheight, spageX, spageY) => {
+              // Calculate the relative Y position within the ScrollView
+              const relativeY = pageY - spageY;
+              scrollViewRef.current?.scrollTo({ y: Math.max(0, relativeY - 20), animated: true });
+            });
+          });
+        }, 150);
       }
       
       return;
@@ -223,7 +231,8 @@ export default function PartnerCreateScreen() {
         </View>
 
         {/* General message box - only for non-field-specific errors (success, auth, network, account limits, etc.) */}
-        {message && !message.includes('required') && !message.includes('valid') ? (
+        {/* Only show if there are no field errors (field errors are shown inline) */}
+        {message && Object.keys(fieldErrors).length === 0 ? (
           <View
             style={[
               styles.messageBox,

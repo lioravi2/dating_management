@@ -736,7 +736,8 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
       </div>
 
       {/* General message box - only for non-field-specific errors (success, auth, network, account limits, etc.) */}
-      {message && !message.includes('required') && !message.includes('valid') ? (
+      {/* Only show if there are no field errors (field errors are shown inline) */}
+      {message && Object.keys(fieldErrors).length === 0 ? (
         <div
           className={`mb-4 p-3 rounded ${
             message.includes('Error') || message.includes('error') || message.includes('violates') || message.includes('Not authenticated') || message.includes('limited') || message.includes("can't add")

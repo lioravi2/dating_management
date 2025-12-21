@@ -18,6 +18,7 @@ import { supabase } from '../../lib/supabase/client';
 import { Partner } from '@dating-app/shared';
 import { getPartnerProfilePictureUrl } from '../../lib/photo-utils';
 import BlackFlagIcon from '../../components/BlackFlagIcon';
+import PartnerPhotos from '../../components/PartnerPhotos';
 
 type PartnerDetailScreenRouteProp = RouteProp<PartnersStackParamList, 'PartnerDetail'>;
 type PartnerDetailScreenNavigationProp = NativeStackNavigationProp<PartnersStackParamList, 'PartnerDetail'>;
@@ -272,13 +273,14 @@ export default function PartnerDetailScreen() {
           )}
         </View>
 
-        {/* Photos Section - Placeholder */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Photos</Text>
-          <Text style={styles.placeholderText}>
-            Photo management will be available in a future update.
-          </Text>
-        </View>
+        {/* Photos Section */}
+        <PartnerPhotos
+          partnerId={partnerId}
+          onPhotoUploaded={() => {
+            // Reload partner data to refresh profile picture if needed
+            loadPartner(true);
+          }}
+        />
 
         {/* Activities Section - Placeholder */}
         <View style={styles.sectionCard}>
