@@ -19,6 +19,7 @@ export default function SignUpPage() {
   const supabase = useMemo(() => createSupabaseClient(), []);
   const navigation = useNavigation();
   const hasCheckedSession = useRef(false);
+  const isSubmitting = useRef(false); // Prevent double submissions
 
   // Check if user is already logged in
   useEffect(() => {
@@ -37,54 +38,61 @@ export default function SignUpPage() {
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent double submissions
+    if (isSubmitting.current || loading) {
+      return;
+    }
+    
+    isSubmitting.current = true;
     setLoading(true);
     setMessage('');
 
-    // Check if user already exists first
     try {
-      const checkResponse = await fetch('/api/auth/check-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+      // Skip check-user API to avoid unnecessary calls and potential rate limit issues
+      // Supabase will handle user validation directly
+      
+      const redirectUrl = `${environment.getOrigin()}/auth/callback`;
+      console.log('[SIGNUP] Requesting magic link', { email, redirectUrl });
+      
+      // Try to sign up - Supabase will handle user creation
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: redirectUrl,
+        },
       });
 
-      const checkData = await checkResponse.json();
-      
-      // If user already exists, show message
-      if (checkData.exists === true) {
-        setMessage('A user with this email already exists. Would you like to sign in instead?');
-        setLoading(false);
-        return;
-      }
-    } catch (checkError) {
-      // If check fails, continue with normal flow
-      console.error('Error checking user:', checkError);
-    }
-
-    // Try to sign up - Supabase will handle user creation
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${environment.getOrigin()}/auth/callback`,
-      },
-    });
-
-    if (error) {
-      // Check if error indicates user already exists
-      if (
-        error.message.toLowerCase().includes('user already exists') ||
-        error.message.toLowerCase().includes('already registered') ||
-        error.message.toLowerCase().includes('email already registered') ||
-        error.message.toLowerCase().includes('already exists')
-      ) {
-        setMessage('A user with this email already exists. Would you like to sign in instead?');
+      if (error) {
+        console.error('[SIGNUP] Magic link error:', error);
+        // Check for rate limit errors
+        if (
+          error.message.toLowerCase().includes('rate limit') ||
+          error.message.toLowerCase().includes('too many requests') ||
+          error.status === 429
+        ) {
+          setMessage('Too many requests. Please wait about an hour before requesting another magic link.');
+        } else if (
+          error.message.toLowerCase().includes('user already exists') ||
+          error.message.toLowerCase().includes('already registered') ||
+          error.message.toLowerCase().includes('email already registered') ||
+          error.message.toLowerCase().includes('already exists')
+        ) {
+          setMessage('A user with this email already exists. Would you like to sign in instead?');
+        } else {
+          setMessage(error.message);
+        }
       } else {
-        setMessage(error.message);
+        console.log('[SIGNUP] Magic link sent successfully', { email });
+        setMessage('Check your email for the magic link!');
       }
-    } else {
-      setMessage('Check your email for the magic link!');
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      setMessage(error?.message || 'An error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+      isSubmitting.current = false;
     }
-    setLoading(false);
   };
 
   const handleGoogleSignIn = async () => {

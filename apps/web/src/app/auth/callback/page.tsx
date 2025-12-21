@@ -21,75 +21,28 @@ export default function AuthCallbackPage() {
       hasProcessed.current = true;
       const supabase = createSupabaseClient();
 
-      // Check for hash fragment (access_token, etc.)
+      // Check for hash fragment (access_token, etc.) - Magic links use this
       const hashParams = environment.getHashParams();
       const accessToken = hashParams.access_token;
       const refreshToken = hashParams.refresh_token;
       const error = hashParams.error;
       const errorDescription = hashParams.error_description;
 
-      // Check for query parameters (code from PKCE flow)
+      // Check for query parameters (code from PKCE flow - OAuth uses this)
       const code = searchParams.get('code');
       const errorCode = searchParams.get('error_code');
       const errorDesc = searchParams.get('error_description');
+      const token = searchParams.get('token'); // Magic link token in query params
+      const type = searchParams.get('type'); // Magic link type
 
-      // Handle errors
+      // Handle errors first
       if (error || errorCode || errorDesc || errorDescription) {
         const errorMsg = errorDescription || errorDesc || error || 'Authentication failed';
         navigation.push('/auth/signin', { error: errorMsg });
         return;
       }
 
-      // If we have a code, exchange it for a session (PKCE flow)
-      if (code) {
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-        
-        if (exchangeError) {
-          console.error('Error exchanging code for session:', exchangeError);
-          environment.redirect(`/auth/signin?error=${encodeURIComponent(exchangeError.message)}`);
-          return;
-        }
-
-        if (!data.session) {
-          console.error('No session created after code exchange');
-          environment.redirect('/auth/signin?error=Failed to create session');
-          return;
-        }
-
-        // Verify session is set by checking it again
-        const { data: { session: verifiedSession } } = await supabase.auth.getSession();
-        if (!verifiedSession) {
-          console.error('Session not found after exchange');
-          environment.redirect('/auth/signin?error=Session verification failed');
-          return;
-        }
-
-        // Update user profile and verify session is accessible from server
-        // This ensures cookies are properly set before redirecting
-        try {
-          const profileResponse = await fetch('/api/auth/update-profile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          });
-          
-          if (!profileResponse.ok) {
-            console.error('Profile update failed, but continuing with login');
-          }
-        } catch (error) {
-          console.error('Error updating profile:', error);
-          // Don't fail login if profile update fails
-        }
-
-        // Wait a moment for cookies to sync, then redirect
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Clear hash and redirect to dashboard with full page reload
-        environment.clearHash();
-        environment.redirect('/dashboard');
-        return;
-      }
-
-      // If we have access_token in hash, set the session directly (implicit flow)
+      // Priority 1: If we have tokens in hash (magic link implicit flow), use them directly
       if (accessToken && refreshToken) {
         const { error: sessionError } = await supabase.auth.setSession({
           access_token: accessToken,
@@ -98,45 +51,129 @@ export default function AuthCallbackPage() {
 
         if (sessionError) {
           console.error('Error setting session:', sessionError);
-          environment.redirect(`/auth/signin?error=${encodeURIComponent(sessionError.message)}`);
+          navigation.push('/auth/signin', { error: sessionError.message });
           return;
         }
 
-        // Verify session is set by checking it again
+        // Verify session is set
         const { data: { session: verifiedSession } } = await supabase.auth.getSession();
         if (!verifiedSession) {
           console.error('Session not found after setSession');
-          environment.redirect('/auth/signin?error=Session verification failed');
+          navigation.push('/auth/signin', { error: 'Session verification failed' });
           return;
         }
 
-        // Update user profile and verify session is accessible from server
-        // This ensures cookies are properly set before redirecting
+        // Update profile
         try {
           const profileResponse = await fetch('/api/auth/update-profile', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
           });
-          
           if (!profileResponse.ok) {
             console.error('Profile update failed, but continuing with login');
           }
         } catch (error) {
           console.error('Error updating profile:', error);
-          // Don't fail login if profile update fails
         }
 
-        // Wait a moment for cookies to sync, then redirect
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Wait for session to sync to cookies, then navigate
+        await new Promise(resolve => setTimeout(resolve, 500));
+        // Use Next.js navigation instead of full page reload to preserve session
+        navigation.push('/dashboard');
+        return;
+      }
+
+      // Priority 2: If we have a magic link token in query params, verify it
+      if (token && type) {
+        const email = searchParams.get('email');
+        if (email) {
+          const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
+            type: type as 'magiclink' | 'email',
+            token: token,
+            email: email,
+          });
+
+          if (!otpError && otpData?.session) {
+            // Verify session is set
+            const { data: { session: verifiedSession } } = await supabase.auth.getSession();
+            if (verifiedSession) {
+              // Update profile
+              try {
+                const profileResponse = await fetch('/api/auth/update-profile', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                });
+                if (!profileResponse.ok) {
+                  console.error('Profile update failed, but continuing with login');
+                }
+              } catch (error) {
+                console.error('Error updating profile:', error);
+              }
+              // Wait for session to sync to cookies, then navigate
+              await new Promise(resolve => setTimeout(resolve, 500));
+              // Use Next.js navigation instead of full page reload to preserve session
+              navigation.push('/dashboard');
+              return;
+            }
+          } else if (otpError) {
+            console.error('Error verifying OTP:', otpError);
+            navigation.push('/auth/signin', { error: otpError.message });
+            return;
+          }
+        }
+      }
+
+      // Priority 3: If we have a code, exchange it for a session (PKCE flow - OAuth)
+      if (code) {
+        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
         
-        // Clear hash and redirect to dashboard with full page reload
-        environment.clearHash();
-        environment.redirect('/dashboard');
+        if (exchangeError) {
+          console.error('Error exchanging code for session:', exchangeError);
+          // If it's a code verifier error, provide helpful message
+          if (exchangeError.message.includes('code verifier') || exchangeError.message.includes('non-empty')) {
+            navigation.push('/auth/signin', { error: 'Authentication session expired. Please try signing in again.' });
+          } else {
+            navigation.push('/auth/signin', { error: exchangeError.message });
+          }
+          return;
+        }
+
+        if (!data.session) {
+          console.error('No session created after code exchange');
+          navigation.push('/auth/signin', { error: 'Failed to create session' });
+          return;
+        }
+
+        // Verify session is set
+        const { data: { session: verifiedSession } } = await supabase.auth.getSession();
+        if (!verifiedSession) {
+          console.error('Session not found after exchange');
+          navigation.push('/auth/signin', { error: 'Session verification failed' });
+          return;
+        }
+
+        // Update profile
+        try {
+          const profileResponse = await fetch('/api/auth/update-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          if (!profileResponse.ok) {
+            console.error('Profile update failed, but continuing with login');
+          }
+        } catch (error) {
+          console.error('Error updating profile:', error);
+        }
+
+        // Wait for session to sync to cookies, then navigate
+        await new Promise(resolve => setTimeout(resolve, 500));
+        // Use Next.js navigation instead of full page reload to preserve session
+        navigation.push('/dashboard');
         return;
       }
 
       // No valid auth data found
-      environment.redirect('/auth/signin?error=No authorization code provided');
+      navigation.push('/auth/signin', { error: 'No authorization code provided' });
     };
 
     handleCallback();

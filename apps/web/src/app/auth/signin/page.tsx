@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-import { useNavigation } from '@/lib/navigation';
+import { useRouter } from 'next/navigation';
 import { environment } from '@/lib/environment';
+import DevSignInButton from '@/components/DevSignInButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +18,9 @@ export default function SignInPage() {
   const [message, setMessage] = useState('');
   // Use useMemo to create supabase client only once
   const supabase = useMemo(() => createSupabaseClient(), []);
-  const navigation = useNavigation();
+  const router = useRouter();
   const hasCheckedSession = useRef(false);
+  const isSubmitting = useRef(false); // Prevent double submissions
 
   // Check if user is already logged in
   useEffect(() => {
@@ -29,7 +31,7 @@ export default function SignInPage() {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigation.push('/dashboard');
+        router.push('/dashboard');
         return;
       }
 
@@ -41,61 +43,68 @@ export default function SignInPage() {
       }
     };
     checkUser();
-  }, [supabase, navigation]);
+  }, [supabase, router]);
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent double submissions
+    if (isSubmitting.current || loading) {
+      return;
+    }
+    
+    isSubmitting.current = true;
     setLoading(true);
     setMessage('');
 
-    // Check if user exists first by calling our API
     try {
-      const checkResponse = await fetch('/api/auth/check-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+      // Skip check-user API to avoid unnecessary calls and potential rate limit issues
+      // Supabase will handle user validation directly
+      
+      const redirectUrl = `${environment.getOrigin()}/auth/callback`;
+      console.log('[SIGNIN] Requesting magic link', { email, redirectUrl });
+      
+      // Try to sign in - Supabase will handle if user exists or not
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: redirectUrl,
+          shouldCreateUser: false, // Don't auto-create user on sign-in
+        },
       });
 
-      const checkData = await checkResponse.json();
-      
-      // If user doesn't exist, show message (will be rendered with clickable link)
-      if (checkData.exists === false) {
-        setMessage('A user with this email wasn\'t found. Would you like to sign up instead?');
-        setLoading(false);
-        return;
-      }
-    } catch (checkError) {
-      // If check fails, continue with normal flow
-      console.error('Error checking user:', checkError);
-    }
-
-    // Try to sign in - Supabase will handle if user exists or not
-    const { data, error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${environment.getOrigin()}/auth/callback`,
-        shouldCreateUser: false, // Don't auto-create user on sign-in
-      },
-    });
-
-    if (error) {
-      // Check if error indicates user doesn't exist or signups not allowed
-      if (
-        error.message.toLowerCase().includes('user not found') ||
-        error.message.toLowerCase().includes('does not exist') ||
-        error.message.toLowerCase().includes('no user found') ||
-        error.message.toLowerCase().includes('signups not allowed') ||
-        error.message.toLowerCase().includes('signup not allowed') ||
-        error.status === 400
-      ) {
-        setMessage('A user with this email wasn\'t found. Would you like to sign up instead?');
+      if (error) {
+        console.error('[SIGNIN] Magic link error:', error);
+        // Check for rate limit errors
+        if (
+          error.message.toLowerCase().includes('rate limit') ||
+          error.message.toLowerCase().includes('too many requests') ||
+          error.status === 429
+        ) {
+          setMessage('Too many requests. Please wait about an hour before requesting another magic link, or use the dev sign-in button for testing.');
+        } else if (
+          error.message.toLowerCase().includes('user not found') ||
+          error.message.toLowerCase().includes('does not exist') ||
+          error.message.toLowerCase().includes('no user found') ||
+          error.message.toLowerCase().includes('signups not allowed') ||
+          error.message.toLowerCase().includes('signup not allowed') ||
+          error.status === 400
+        ) {
+          setMessage('A user with this email wasn\'t found. Would you like to sign up instead?');
+        } else {
+          setMessage(error.message);
+        }
       } else {
-        setMessage(error.message);
+        console.log('[SIGNIN] Magic link sent successfully', { email });
+        setMessage('Check your email for the magic link!');
       }
-    } else {
-      setMessage('Check your email for the magic link!');
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      setMessage(error?.message || 'An error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+      isSubmitting.current = false;
     }
-    setLoading(false);
   };
 
   const handleGoogleSignIn = async () => {
@@ -231,6 +240,8 @@ export default function SignInPage() {
               {loading ? 'Sending...' : 'Send Magic Link'}
             </button>
           </form>
+
+          <DevSignInButton disabled={loading} />
         </div>
 
         <p className="mt-6 text-center text-sm text-gray-600">
