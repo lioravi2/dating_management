@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
-import Link from 'next/link';
+import { NavigationLink } from '@/lib/navigation';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import PartnerForm from '@/components/PartnerForm';
@@ -12,7 +12,7 @@ import { FREE_TIER_PARTNER_LIMIT } from '@/lib/pricing';
 export const dynamic = 'force-dynamic';
 
 export default function NewPartnerPage() {
-  const router = useRouter();
+  const navigation = useNavigation();
   const supabase = createSupabaseClient();
   const [accountType, setAccountType] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,19 +94,19 @@ export default function NewPartnerPage() {
                     : `Your free subscription is limited to ${FREE_TIER_PARTNER_LIMIT} partners. You currently have ${partnerCount} partners.`
                   : `Your free subscription is limited to ${FREE_TIER_PARTNER_LIMIT} partners.`}
               </p>
-              <Link
+              <NavigationLink
                 href="/upgrade"
                 className="inline-block bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors"
               >
                 Upgrade to Pro
-              </Link>
+              </NavigationLink>
             </div>
-            <Link
+            <NavigationLink
               href="/partners"
               className="text-primary-600 hover:text-primary-700"
             >
               ← Back to Partners
-            </Link>
+            </NavigationLink>
           </div>
         </main>
       </div>
