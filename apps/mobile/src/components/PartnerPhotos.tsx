@@ -9,9 +9,15 @@ import {
   Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from '../lib/supabase/client';
-import { PartnerPhoto } from '@dating-app/shared';
+import { PartnerPhoto, PhotoUploadAnalysis, FaceMatch } from '@dating-app/shared';
 import { getPhotoUrl } from '../lib/photo-utils';
+import PhotoUploadProgressModal, { UploadStep } from './PhotoUploadProgressModal';
+import FaceSelectionModal from './FaceSelectionModal';
+import NoFaceDetectedModal from './NoFaceDetectedModal';
+import SamePersonWarningModal from './SamePersonWarningModal';
+import DifferentPartnerWarningModal from './DifferentPartnerWarningModal';
 
 interface PartnerPhotosProps {
   partnerId: string;
@@ -26,6 +32,29 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
   const [error, setError] = useState<string | null>(null);
   const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
   const isMountedRef = useRef(true);
+
+  // Progress and modal states
+  const [uploadProgress, setUploadProgress] = useState<UploadStep>('preparing');
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [showFaceSelectionModal, setShowFaceSelectionModal] = useState(false);
+  const [showNoFaceModal, setShowNoFaceModal] = useState(false);
+  const [showSamePersonModal, setShowSamePersonModal] = useState(false);
+  const [showDifferentPartnerModal, setShowDifferentPartnerModal] = useState(false);
+  
+  // Face detection data
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [faceDetections, setFaceDetections] = useState<any[]>([]);
+  const [selectedFaceDescriptor, setSelectedFaceDescriptor] = useState<number[] | null>(null);
+  const [analysisData, setAnalysisData] = useState<PhotoUploadAnalysis | null>(null);
+  
+  // Upload data (stored for "upload anyway" scenarios)
+  const uploadDataRef = useRef<{
+    optimizedUri: string;
+    width: number;
+    height: number;
+    mimeType: string;
+    fileName: string;
+  } | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -87,6 +116,100 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
     return true;
   };
 
+  const optimizeImage = async (uri: string, width?: number, height?: number): Promise<{
+    uri: string;
+    width: number;
+    height: number;
+    mimeType: string;
+  }> => {
+    // Resize image to max 1200px on longest side for faster uploads
+    // This maintains quality while significantly reducing file size
+    const MAX_DIMENSION = 1200;
+    
+    let actions: ImageManipulator.Action[] = [];
+    
+    if (width && height) {
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        const scale = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+        const newWidth = Math.round(width * scale);
+        const newHeight = Math.round(height * scale);
+        actions.push({ resize: { width: newWidth, height: newHeight } });
+      }
+    } else {
+      // If dimensions not provided, resize to max dimension
+      actions.push({ resize: { width: MAX_DIMENSION } });
+    }
+
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      actions,
+      { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+    );
+
+    return {
+      uri: result.uri,
+      width: result.width,
+      height: result.height,
+      mimeType: 'image/jpeg',
+    };
+  };
+
+  const performUpload = async (faceDescriptor: number[] | null = null) => {
+    if (!uploadDataRef.current) {
+      throw new Error('Upload data not available');
+    }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('Not authenticated');
+    }
+
+    const apiUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+    const uploadData = uploadDataRef.current;
+
+    setUploadProgress('uploading');
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: uploadData.optimizedUri,
+      type: uploadData.mimeType,
+      name: uploadData.fileName,
+    } as any);
+    formData.append('width', uploadData.width.toString());
+    formData.append('height', uploadData.height.toString());
+    if (faceDescriptor) {
+      formData.append('faceDescriptor', JSON.stringify(faceDescriptor));
+    }
+
+    const uploadResponse = await fetch(`${apiUrl}/api/partners/${partnerId}/photos`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (!uploadResponse.ok) {
+      const errorData = await uploadResponse.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || errorData.details || `Failed to upload photo (${uploadResponse.status})`);
+    }
+
+    setUploadProgress('complete');
+    setTimeout(() => {
+      setShowProgressModal(false);
+      setUploadProgress('preparing');
+      setUploading(false);
+      uploadDataRef.current = null;
+      setSelectedImageUri(null);
+      setFaceDetections([]);
+      setSelectedFaceDescriptor(null);
+      setAnalysisData(null);
+    }, 1000);
+
+    await loadPhotos(partnerId);
+    onPhotoUploaded?.();
+  };
+
   const handleUploadPhoto = async () => {
     const hasPermission = await requestImagePickerPermission();
     if (!hasPermission) return;
@@ -94,8 +217,8 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false, // Disable editing to avoid confusion - user can select photo directly
-        quality: 0.8,
+        allowsEditing: false,
+        quality: 1.0, // Use full quality, we'll optimize ourselves
         allowsMultipleSelection: false,
       });
 
@@ -104,33 +227,46 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
       }
 
       const asset = result.assets[0];
-      setUploading(true);
       setError(null);
+      setUploading(true);
+      setShowProgressModal(true);
+      setUploadProgress('preparing');
 
-      // Get session token for authentication
+      // Optimize image first
+      const optimized = await optimizeImage(
+        asset.uri,
+        asset.width,
+        asset.height
+      );
+
+      // Store upload data for later use
+      uploadDataRef.current = {
+        optimizedUri: optimized.uri,
+        width: optimized.width,
+        height: optimized.height,
+        mimeType: optimized.mimeType,
+        fileName: asset.fileName || 'photo.jpg',
+      };
+
+      setSelectedImageUri(optimized.uri);
+
+      // Get session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Not authenticated');
       }
 
-      // Use EXPO_PUBLIC_WEB_APP_URL if available, otherwise fallback to localhost
       const apiUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
-      // TODO: Face Detection
-      // Attempt server-side face detection (currently returns 501 Not Implemented)
-      // When implemented, this will:
-      // 1. Detect faces in the image
-      // 2. Extract face descriptors
-      // 3. Call analyze endpoint to check for matches
-      // 4. Show warnings if same person or different partner detected
-      // 5. Upload with face descriptor for future matching
-      let faceDescriptor: number[] | null = null;
+      // Step 1: Face Detection
+      setUploadProgress('detecting_faces');
+      let detections: any[] = [];
       try {
         const detectFormData = new FormData();
         detectFormData.append('file', {
-          uri: asset.uri,
-          type: asset.mimeType || 'image/jpeg',
-          name: asset.fileName || 'photo.jpg',
+          uri: optimized.uri,
+          type: optimized.mimeType,
+          name: uploadDataRef.current.fileName,
         } as any);
 
         const detectResponse = await fetch(`${apiUrl}/api/face-detection/detect`, {
@@ -144,103 +280,123 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
         if (detectResponse.ok) {
           const detectData = await detectResponse.json();
           if (detectData.detections && detectData.detections.length > 0) {
-            // Handle multiple faces - for now use first face
-            // TODO: Implement face selection UI for multiple faces (similar to web app)
-            if (detectData.detections.length > 1) {
-              console.log('[PartnerPhotos] Multiple faces detected, using first face');
-            }
-            
-            faceDescriptor = detectData.detections[0].descriptor;
-            console.log('[PartnerPhotos] Face detected, descriptor length:', faceDescriptor.length);
-            
-            // Call analyze endpoint to check for matches (same as web app)
-            try {
-              const analyzeResponse = await fetch(`${apiUrl}/api/partners/${partnerId}/photos/analyze`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({ faceDescriptor }),
-              });
+            detections = detectData.detections;
+            setFaceDetections(detections);
 
-              if (analyzeResponse.ok) {
-                const analysis = await analyzeResponse.json();
-                console.log('[PartnerPhotos] Analysis result:', analysis.decision.type);
-                
-                // TODO: Show decision dialogs based on analysis.decision.type
-                // - 'warn_same_person': Show warning that face doesn't match partner
-                // - 'warn_other_partners': Show warning with list of matching partners
-                // - 'proceed': Continue with upload
-                // For now, proceed with upload regardless
-              } else {
-                console.log('[PartnerPhotos] Analysis failed, proceeding with upload');
-              }
-            } catch (analyzeError) {
-              console.log('[PartnerPhotos] Analysis error, proceeding with upload:', analyzeError);
+            // Handle multiple faces - show selection modal
+            if (detections.length > 1) {
+              setShowProgressModal(false);
+              setShowFaceSelectionModal(true);
+              return; // Wait for user to select face
             }
+
+            // Single face - proceed with analysis
+            const faceDescriptor = detections[0].descriptor;
+            await handleFaceAnalysis(faceDescriptor);
           } else {
-            console.log('[PartnerPhotos] No faces detected in image');
-            // TODO: Show "no face detected" dialog (similar to web app)
+            // No face detected - show modal
+            setShowProgressModal(false);
+            setShowNoFaceModal(true);
+            return;
           }
         } else {
-          // Face detection not available (501) or failed - proceed without it
-          console.log('[PartnerPhotos] Face detection not available, proceeding without face descriptor');
+          // Face detection failed - proceed without it
+          console.log('[PartnerPhotos] Face detection failed, proceeding without face descriptor');
+          setShowProgressModal(false);
+          await performUpload(null);
         }
       } catch (detectError) {
-        // Face detection failed - proceed without it
-        console.log('[PartnerPhotos] Face detection error, proceeding without face descriptor:', detectError);
+        console.error('[PartnerPhotos] Face detection error:', detectError);
+        setShowProgressModal(false);
+        await performUpload(null);
       }
-
-      // Create FormData for photo upload
-      const formData = new FormData();
-      formData.append('file', {
-        uri: asset.uri,
-        type: asset.mimeType || 'image/jpeg',
-        name: asset.fileName || 'photo.jpg',
-      } as any);
-      if (asset.width) {
-        formData.append('width', asset.width.toString());
-      }
-      if (asset.height) {
-        formData.append('height', asset.height.toString());
-      }
-      if (faceDescriptor) {
-        formData.append('faceDescriptor', JSON.stringify(faceDescriptor));
-      }
-      
-      console.log('[PartnerPhotos] Uploading to:', `${apiUrl}/api/partners/${partnerId}/photos`);
-      
-      const uploadResponse = await fetch(`${apiUrl}/api/partners/${partnerId}/photos`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          // Don't set Content-Type, let fetch set it with boundary for FormData
-        },
-      });
-
-      console.log('[PartnerPhotos] Upload response status:', uploadResponse.status);
-
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('[PartnerPhotos] Upload error:', errorData);
-        throw new Error(errorData.error || errorData.details || `Failed to upload photo (${uploadResponse.status})`);
-      }
-
-      // Reload photos
-      await loadPhotos(partnerId);
-      onPhotoUploaded?.();
     } catch (err) {
       console.error('Error uploading photo:', err);
       if (isMountedRef.current) {
         setError(err instanceof Error ? err.message : 'Failed to upload photo');
+        setShowProgressModal(false);
+        setUploadProgress('preparing');
+        setUploading(false);
         Alert.alert('Upload Error', err instanceof Error ? err.message : 'Failed to upload photo');
       }
-    } finally {
-      if (isMountedRef.current) {
-        setUploading(false);
+    }
+  };
+
+  const handleFaceAnalysis = async (faceDescriptor: number[]) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const apiUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+
+    setUploadProgress('analyzing_matches');
+
+    try {
+      const analyzeResponse = await fetch(`${apiUrl}/api/partners/${partnerId}/photos/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ faceDescriptor }),
+      });
+
+      if (analyzeResponse.ok) {
+        const analysis: PhotoUploadAnalysis = await analyzeResponse.json();
+        setAnalysisData(analysis);
+        setSelectedFaceDescriptor(faceDescriptor);
+
+        // Handle decision
+        if (analysis.decision.type === 'proceed') {
+          // Proceed with upload
+          await performUpload(faceDescriptor);
+        } else if (analysis.decision.type === 'warn_same_person') {
+          // Show same person warning
+          setShowProgressModal(false);
+          setShowSamePersonModal(true);
+        } else if (analysis.decision.type === 'warn_other_partners') {
+          // Show different partner warning
+          setShowProgressModal(false);
+          setShowDifferentPartnerModal(true);
+        }
+      } else {
+        // Analysis failed - proceed with upload
+        await performUpload(faceDescriptor);
       }
+    } catch (analyzeError) {
+      console.error('[PartnerPhotos] Analysis error:', analyzeError);
+      // Proceed with upload on error
+      await performUpload(faceDescriptor);
+    }
+  };
+
+  const handleFaceSelected = async (detection: any) => {
+    setShowFaceSelectionModal(false);
+    setSelectedFaceDescriptor(detection.descriptor);
+    await handleFaceAnalysis(detection.descriptor);
+  };
+
+  const handleNoFaceProceed = async () => {
+    setShowNoFaceModal(false);
+    setShowProgressModal(true);
+    setUploadProgress('uploading');
+    await performUpload(null);
+  };
+
+  const handleSamePersonConfirm = async () => {
+    setShowSamePersonModal(false);
+    setShowProgressModal(true);
+    setUploadProgress('uploading');
+    if (selectedFaceDescriptor) {
+      await performUpload(selectedFaceDescriptor);
+    }
+  };
+
+  const handleDifferentPartnerUploadAnyway = async () => {
+    setShowDifferentPartnerModal(false);
+    setShowProgressModal(true);
+    setUploadProgress('uploading');
+    if (selectedFaceDescriptor) {
+      await performUpload(selectedFaceDescriptor);
     }
   };
 
@@ -392,6 +548,92 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
             );
           })}
         </View>
+      )}
+
+      {/* Progress Modal */}
+      <PhotoUploadProgressModal
+        visible={showProgressModal}
+        currentStep={uploadProgress}
+        error={error}
+        onDismiss={() => {
+          setShowProgressModal(false);
+          setUploadProgress('preparing');
+          setUploading(false);
+          setError(null);
+          uploadDataRef.current = null;
+          setSelectedImageUri(null);
+          setFaceDetections([]);
+          setSelectedFaceDescriptor(null);
+          setAnalysisData(null);
+        }}
+      />
+
+      {/* Face Selection Modal */}
+      {selectedImageUri && (
+        <FaceSelectionModal
+          visible={showFaceSelectionModal}
+          imageUri={selectedImageUri}
+          detections={faceDetections}
+          onSelect={handleFaceSelected}
+          onCancel={() => {
+            setShowFaceSelectionModal(false);
+            setShowProgressModal(false);
+            setUploadProgress('preparing');
+            setUploading(false);
+            uploadDataRef.current = null;
+            setSelectedImageUri(null);
+            setFaceDetections([]);
+          }}
+        />
+      )}
+
+      {/* No Face Detected Modal */}
+      <NoFaceDetectedModal
+        visible={showNoFaceModal}
+        onProceed={handleNoFaceProceed}
+        onCancel={() => {
+          setShowNoFaceModal(false);
+          setShowProgressModal(false);
+          setUploadProgress('preparing');
+          setUploading(false);
+          uploadDataRef.current = null;
+          setSelectedImageUri(null);
+        }}
+      />
+
+      {/* Same Person Warning Modal */}
+      <SamePersonWarningModal
+        visible={showSamePersonModal}
+        onConfirm={handleSamePersonConfirm}
+        onCancel={() => {
+          setShowSamePersonModal(false);
+          setShowProgressModal(false);
+          setUploadProgress('preparing');
+          setUploading(false);
+          uploadDataRef.current = null;
+          setSelectedImageUri(null);
+          setSelectedFaceDescriptor(null);
+          setAnalysisData(null);
+        }}
+      />
+
+      {/* Different Partner Warning Modal */}
+      {analysisData && analysisData.decision.type === 'warn_other_partners' && (
+        <DifferentPartnerWarningModal
+          visible={showDifferentPartnerModal}
+          matches={analysisData.otherPartnerMatches}
+          onUploadAnyway={handleDifferentPartnerUploadAnyway}
+          onCancel={() => {
+            setShowDifferentPartnerModal(false);
+            setShowProgressModal(false);
+            setUploadProgress('preparing');
+            setUploading(false);
+            uploadDataRef.current = null;
+            setSelectedImageUri(null);
+            setSelectedFaceDescriptor(null);
+            setAnalysisData(null);
+          }}
+        />
       )}
     </View>
   );
