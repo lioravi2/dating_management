@@ -491,9 +491,6 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
         const isNetworkError = detectError?.message?.includes('Network request failed') || 
                               detectError?.message?.includes('Failed to fetch') ||
                               detectError?.name === 'TypeError';
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:handleUploadPhoto:networkErrorCheck',message:'Network error check',data:{isNetworkError:isNetworkError,isTimeout:isTimeout},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-        // #endregion
         
         if (isTimeout || isNetworkError) {
           // Show error to user and allow them to proceed without face detection
@@ -1049,4 +1046,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
