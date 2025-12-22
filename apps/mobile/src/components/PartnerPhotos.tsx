@@ -372,6 +372,9 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
   const handleFaceSelected = async (detection: any) => {
     setShowFaceSelectionModal(false);
     setSelectedFaceDescriptor(detection.descriptor);
+    // Reopen progress modal before analysis to maintain user feedback
+    setShowProgressModal(true);
+    setUploadProgress('analyzing_matches');
     await handleFaceAnalysis(detection.descriptor);
   };
 
