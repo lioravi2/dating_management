@@ -33,10 +33,12 @@ async function loadModels() {
     // This is required for face-api.js to recognize canvas elements in server environment
     // Without this, face-api.js will fail to process the canvas and crash at runtime
     // According to face-api.js docs, monkeyPatch requires Canvas, Image, and ImageData
+    // Note: We cast to 'any' because Node.js canvas types don't match browser types,
+    // but face-api.js uses duck typing and will work correctly at runtime
     faceapi.env.monkeyPatch({ 
-      Canvas: CanvasClass, 
-      Image: CanvasImage,
-      ImageData: CanvasImageData
+      Canvas: CanvasClass as any, 
+      Image: CanvasImage as any,
+      ImageData: CanvasImageData as any
     });
     console.log('[Face Detection] Monkey patched face-api.js for Node.js canvas (Canvas, Image, ImageData)');
     
