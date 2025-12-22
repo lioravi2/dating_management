@@ -11,7 +11,8 @@
     "test:verbose": "jest --verbose",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "cleanup:test-users": "tsx scripts/cleanup-test-users.ts"
+    "cleanup:test-users": "tsx scripts/cleanup-test-users.ts",
+    "test-face-detection": "tsx scripts/test-face-detection.ts"
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.7",
