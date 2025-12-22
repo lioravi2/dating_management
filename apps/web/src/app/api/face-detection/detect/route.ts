@@ -3,7 +3,7 @@ import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import * as tf from '@tensorflow/tfjs';
 import * as faceapi from 'face-api.js';
-import { createCanvas, loadImage } from 'canvas';
+import { createCanvas, loadImage, Image as CanvasImage, Canvas as CanvasClass } from 'canvas';
 import path from 'path';
 
 // Initialize TensorFlow.js with CPU backend (no native compilation needed)
@@ -28,6 +28,15 @@ async function loadModels() {
   
   try {
     await initializeTensorFlow();
+    
+    // CRITICAL: Monkey patch face-api.js to work with Node.js canvas
+    // This is required for face-api.js to recognize canvas elements in server environment
+    // Without this, face-api.js will fail to process the canvas and crash at runtime
+    faceapi.env.monkeyPatch({ 
+      Canvas: CanvasClass, 
+      Image: CanvasImage 
+    });
+    console.log('[Face Detection] Monkey patched face-api.js for Node.js canvas');
     
     // Load face-api.js models from file system
     // These are the same models used in the web app
