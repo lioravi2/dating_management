@@ -20,6 +20,7 @@ interface PhotoUploadProgressModalProps {
   currentStep: UploadStep;
   error?: string | null;
   onDismiss?: () => void;
+  onCancel?: () => void;
 }
 
 const stepLabels: Record<UploadStep, string> = {
@@ -35,6 +36,7 @@ export default function PhotoUploadProgressModal({
   currentStep,
   error,
   onDismiss,
+  onCancel,
 }: PhotoUploadProgressModalProps) {
   const steps: UploadStep[] = ['preparing', 'detecting_faces', 'analyzing_matches', 'uploading', 'complete'];
   const currentStepIndex = steps.indexOf(currentStep);
@@ -98,6 +100,16 @@ export default function PhotoUploadProgressModal({
                   );
                 })}
               </View>
+
+              {/* Cancel button - show when not complete and not in error state */}
+              {onCancel && currentStep !== 'complete' && (
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={onCancel}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
         </View>
@@ -197,6 +209,20 @@ const styles = StyleSheet.create({
   },
   dismissButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  cancelButtonText: {
+    color: '#374151',
     fontSize: 16,
     fontWeight: '600',
   },

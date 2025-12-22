@@ -56,6 +56,9 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
     fileName: string;
   } | null>(null);
 
+  // Abort controller for cancelling uploads
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
     isMountedRef.current = true;
     loadPhotos(partnerId);
@@ -145,6 +148,9 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
       actions,
       { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
     );
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:optimizeImage:result',message:'Image optimization result',data:{outputWidth:result.width,outputHeight:result.height,uri:result.uri?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
 
     return {
       uri: result.uri,
@@ -155,8 +161,16 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
   };
 
   const performUpload = async (faceDescriptor: number[] | null = null) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:performUpload:entry',message:'Starting photo upload',data:{hasFaceDescriptor:!!faceDescriptor,hasUploadData:!!uploadDataRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
     if (!uploadDataRef.current) {
       throw new Error('Upload data not available');
+    }
+
+    // Check if cancelled before upload
+    if (abortControllerRef.current?.signal.aborted) {
+      return;
     }
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -166,6 +180,10 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
 
     const apiUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
     const uploadData = uploadDataRef.current;
+    const uploadStartTime = Date.now();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:performUpload:uploadStart',message:'Starting file upload',data:{endpoint:`${apiUrl}/api/partners/${partnerId}/photos`,width:uploadData.width,height:uploadData.height},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
 
     setUploadProgress('uploading');
 
@@ -187,14 +205,35 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
       headers: {
         Authorization: `Bearer ${session.access_token}`,
       },
+      signal: abortControllerRef.current?.signal,
     });
+    const uploadDuration = Date.now() - uploadStartTime;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:performUpload:uploadResponse',message:'Upload response received',data:{duration:uploadDuration,status:uploadResponse.status,ok:uploadResponse.ok,aborted:abortControllerRef.current?.signal.aborted},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
+
+    // Check if cancelled during fetch
+    if (abortControllerRef.current?.signal.aborted) {
+      return;
+    }
 
     if (!uploadResponse.ok) {
       const errorData = await uploadResponse.json().catch(() => ({ error: 'Unknown error' }));
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:performUpload:uploadError',message:'Upload failed',data:{status:uploadResponse.status,error:errorData.error || errorData.details},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
       throw new Error(errorData.error || errorData.details || `Failed to upload photo (${uploadResponse.status})`);
     }
 
+    // Check if cancelled after upload completes
+    if (abortControllerRef.current?.signal.aborted) {
+      return;
+    }
+
     setUploadProgress('complete');
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:performUpload:uploadSuccess',message:'Upload completed successfully',data:{totalDuration:Date.now() - uploadStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
     setTimeout(() => {
       setShowProgressModal(false);
       setUploadProgress('preparing');
@@ -210,13 +249,39 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
     onPhotoUploaded?.();
   };
 
+  const cancelUpload = () => {
+    // Abort any ongoing fetch requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Clean up all state
+    setShowProgressModal(false);
+    setShowFaceSelectionModal(false);
+    setShowNoFaceModal(false);
+    setShowSamePersonModal(false);
+    setShowDifferentPartnerModal(false);
+    setUploadProgress('preparing');
+    setUploading(false);
+    setError(null);
+    uploadDataRef.current = null;
+    setSelectedImageUri(null);
+    setFaceDetections([]);
+    setSelectedFaceDescriptor(null);
+    setAnalysisData(null);
+  };
+
   const handleUploadPhoto = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:handleUploadPhoto:entry',message:'Upload started',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
     const hasPermission = await requestImagePickerPermission();
     if (!hasPermission) return;
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images',
         allowsEditing: false,
         quality: 1.0, // Use full quality, we'll optimize ourselves
         allowsMultipleSelection: false,
@@ -227,10 +292,20 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
       }
 
       const asset = result.assets[0];
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:handleUploadPhoto:asset',message:'Image selected',data:{width:asset.width,height:asset.height,fileSize:asset.fileSize,uri:asset.uri?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
       setError(null);
       setUploading(true);
       setShowProgressModal(true);
       setUploadProgress('preparing');
+
+      // Create abort controller for this upload
+      abortControllerRef.current = new AbortController();
+      const optimizeStartTime = Date.now();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:handleUploadPhoto:optimizeStart',message:'Starting image optimization',data:{originalWidth:asset.width,originalHeight:asset.height},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
 
       // Optimize image first
       const optimized = await optimizeImage(
@@ -238,6 +313,15 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
         asset.width,
         asset.height
       );
+      const optimizeDuration = Date.now() - optimizeStartTime;
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:handleUploadPhoto:optimizeEnd',message:'Image optimization complete',data:{duration:optimizeDuration,optimizedWidth:optimized.width,optimizedHeight:optimized.height,mimeType:optimized.mimeType},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
+
+      // Check if cancelled during optimization
+      if (abortControllerRef.current?.signal.aborted) {
+        return;
+      }
 
       // Store upload data for later use
       uploadDataRef.current = {
@@ -256,11 +340,23 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
         throw new Error('Not authenticated');
       }
 
+      // Check if cancelled before face detection
+      if (abortControllerRef.current?.signal.aborted) {
+        return;
+      }
+
       const apiUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:handleUploadPhoto:apiUrl',message:'API URL configured',data:{apiUrl:apiUrl,hasToken:!!session.access_token},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+      // #endregion
 
       // Step 1: Face Detection
       setUploadProgress('detecting_faces');
       let detections: any[] = [];
+      const faceDetectStartTime = Date.now();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:handleUploadPhoto:faceDetectStart',message:'Starting face detection',data:{endpoint:`${apiUrl}/api/face-detection/detect`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
       try {
         const detectFormData = new FormData();
         detectFormData.append('file', {
@@ -269,17 +365,55 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
           name: uploadDataRef.current.fileName,
         } as any);
 
-        const detectResponse = await fetch(`${apiUrl}/api/face-detection/detect`, {
-          method: 'POST',
-          body: detectFormData,
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
+        // Add client-side timeout (25 seconds) to prevent indefinite waiting
+        // Server timeout is typically 30 seconds, so we timeout slightly earlier
+        const timeoutController = new AbortController();
+        const timeoutId = setTimeout(() => {
+          timeoutController.abort();
+        }, 25000); // 25 second client timeout
+
+        // Use the abort controller signal if available, otherwise use timeout signal
+        const fetchSignal = abortControllerRef.current?.signal || timeoutController.signal;
+
+        let detectResponse: Response;
+        try {
+          detectResponse = await fetch(`${apiUrl}/api/face-detection/detect`, {
+            method: 'POST',
+            body: detectFormData,
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            signal: fetchSignal,
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          // If it's a timeout error from our client-side timeout, throw a specific error
+          if (fetchError?.name === 'AbortError' && timeoutController.signal.aborted) {
+            throw new Error('CLIENT_TIMEOUT');
+          }
+          throw fetchError;
+        }
+        const faceDetectDuration = Date.now() - faceDetectStartTime;
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:handleUploadPhoto:faceDetectResponse',message:'Face detection response received',data:{duration:faceDetectDuration,status:detectResponse.status,ok:detectResponse.ok,aborted:abortControllerRef.current?.signal.aborted},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+        // #endregion
+
+        // Check if cancelled during fetch
+        if (abortControllerRef.current?.signal.aborted) {
+          return;
+        }
 
         if (detectResponse.ok) {
           const detectData = await detectResponse.json();
-          if (detectData.detections && detectData.detections.length > 0) {
+          
+          // Check if cancelled during JSON parsing
+          if (abortControllerRef.current?.signal.aborted) {
+            return;
+          }
+
+          // Handle response - check for detections array (could be empty array, null, or undefined)
+          if (Array.isArray(detectData.detections) && detectData.detections.length > 0) {
             detections = detectData.detections;
             setFaceDetections(detections);
 
@@ -300,17 +434,109 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
             return;
           }
         } else {
-          // Face detection failed - proceed without it
-          console.log('[PartnerPhotos] Face detection failed, proceeding without face descriptor');
+          // Face detection failed - check if it's a timeout
+          const errorText = await detectResponse.text();
+          console.log('[PartnerPhotos] Face detection failed:', detectResponse.status, errorText);
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:handleUploadPhoto:faceDetectError',message:'Face detection failed',data:{status:detectResponse.status,errorText:errorText.substring(0,200),isTimeout:detectResponse.status === 504 || errorText.includes('TIMEOUT') || errorText.includes('FUNCTION_INVOCATION_TIMEOUT')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+          // #endregion
+          
+          const isTimeout = detectResponse.status === 504 || errorText.includes('TIMEOUT') || errorText.includes('FUNCTION_INVOCATION_TIMEOUT');
+          
+          if (isTimeout) {
+            // Show timeout error to user and allow them to proceed
+            Alert.alert(
+              'Face Detection Timeout',
+              'Face detection is taking longer than expected. Would you like to upload the photo anyway?',
+              [
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                  onPress: () => {
+                    cancelUpload();
+                  },
+                },
+                {
+                  text: 'Upload Anyway',
+                  onPress: async () => {
+                    setShowProgressModal(false);
+                    await performUpload(null);
+                  },
+                },
+              ]
+            );
+            return;
+          }
+          
+          // For other errors, proceed with upload silently
           setShowProgressModal(false);
           await performUpload(null);
         }
-      } catch (detectError) {
+      } catch (detectError: any) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:handleUploadPhoto:faceDetectException',message:'Face detection exception',data:{errorName:detectError?.name,errorMessage:detectError?.message?.substring(0,200),isAbort:detectError?.name === 'AbortError',signalAborted:abortControllerRef.current?.signal.aborted},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
+        // Check if error is due to user cancellation
+        if (abortControllerRef.current?.signal.aborted && detectError?.name === 'AbortError') {
+          console.log('[PartnerPhotos] Face detection cancelled by user');
+          return;
+        }
+        
+        // Check if it's a timeout (client-side or server-side)
+        const isTimeout = detectError?.message === 'CLIENT_TIMEOUT' || 
+                         detectError?.message?.includes('TIMEOUT') ||
+                         detectError?.message?.includes('timeout');
+        
+        // Check if it's a network error
+        const isNetworkError = detectError?.message?.includes('Network request failed') || 
+                              detectError?.message?.includes('Failed to fetch') ||
+                              detectError?.name === 'TypeError';
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PartnerPhotos.tsx:handleUploadPhoto:networkErrorCheck',message:'Network error check',data:{isNetworkError:isNetworkError,isTimeout:isTimeout},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
+        
+        if (isTimeout || isNetworkError) {
+          // Show error to user and allow them to proceed without face detection
+          Alert.alert(
+            isTimeout ? 'Face Detection Timeout' : 'Network Error',
+            isTimeout 
+              ? 'Face detection is taking longer than expected. Would you like to upload the photo anyway?'
+              : 'Unable to connect to face detection service. Would you like to upload the photo anyway?',
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel',
+                onPress: () => {
+                  cancelUpload();
+                },
+              },
+              {
+                text: 'Upload Anyway',
+                onPress: async () => {
+                  setShowProgressModal(false);
+                  await performUpload(null);
+                },
+              },
+            ]
+          );
+          return;
+        }
+        
         console.error('[PartnerPhotos] Face detection error:', detectError);
-        setShowProgressModal(false);
-        await performUpload(null);
+        
+        // For other errors, proceed with upload silently
+        // Only proceed with upload if we're still in an active upload state
+        if (isMountedRef.current && uploading && !abortControllerRef.current?.signal.aborted) {
+          setShowProgressModal(false);
+          await performUpload(null);
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
+      // Check if error is due to abort
+      if (err?.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
+        console.log('[PartnerPhotos] Upload cancelled');
+        return;
+      }
       console.error('Error uploading photo:', err);
       if (isMountedRef.current) {
         setError(err instanceof Error ? err.message : 'Failed to upload photo');
@@ -324,7 +550,24 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
 
   const handleFaceAnalysis = async (faceDescriptor: number[]) => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!session) {
+      // Clean up state if session is missing
+      setShowProgressModal(false);
+      setUploadProgress('preparing');
+      setUploading(false);
+      setError('Not authenticated. Please sign in again.');
+      Alert.alert('Authentication Error', 'Please sign in again to upload photos.');
+      return;
+    }
+
+    // Check if cancelled before analysis
+    if (abortControllerRef.current?.signal.aborted) {
+      // Clean up modal state if cancelled
+      setShowProgressModal(false);
+      setUploadProgress('preparing');
+      setUploading(false);
+      return;
+    }
 
     const apiUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -338,10 +581,30 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ faceDescriptor }),
+        signal: abortControllerRef.current?.signal,
       });
+
+      // Check if cancelled during fetch
+      if (abortControllerRef.current?.signal.aborted) {
+        // Clean up modal state if cancelled
+        setShowProgressModal(false);
+        setUploadProgress('preparing');
+        setUploading(false);
+        return;
+      }
 
       if (analyzeResponse.ok) {
         const analysis: PhotoUploadAnalysis = await analyzeResponse.json();
+        
+        // Check if cancelled during JSON parsing
+        if (abortControllerRef.current?.signal.aborted) {
+          // Clean up modal state if cancelled
+          setShowProgressModal(false);
+          setUploadProgress('preparing');
+          setUploading(false);
+          return;
+        }
+
         setAnalysisData(analysis);
         setSelectedFaceDescriptor(faceDescriptor);
 
@@ -360,18 +623,44 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
         }
       } else {
         // Analysis failed - proceed with upload
+        if (!abortControllerRef.current?.signal.aborted) {
+          await performUpload(faceDescriptor);
+        }
+      }
+    } catch (analyzeError: any) {
+      // Check if error is due to abort
+      if (analyzeError?.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
+        console.log('[PartnerPhotos] Analysis cancelled');
+        // Clean up modal state if cancelled
+        setShowProgressModal(false);
+        setUploadProgress('preparing');
+        setUploading(false);
+        return;
+      }
+      console.error('[PartnerPhotos] Analysis error:', analyzeError);
+      // Proceed with upload on error (only if not cancelled)
+      if (!abortControllerRef.current?.signal.aborted) {
         await performUpload(faceDescriptor);
       }
-    } catch (analyzeError) {
-      console.error('[PartnerPhotos] Analysis error:', analyzeError);
-      // Proceed with upload on error
-      await performUpload(faceDescriptor);
     }
   };
 
   const handleFaceSelected = async (detection: any) => {
     setShowFaceSelectionModal(false);
     setSelectedFaceDescriptor(detection.descriptor);
+    
+    // Check session before opening progress modal
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      // Clean up state if session is missing
+      setShowProgressModal(false);
+      setUploadProgress('preparing');
+      setUploading(false);
+      setError('Not authenticated. Please sign in again.');
+      Alert.alert('Authentication Error', 'Please sign in again to upload photos.');
+      return;
+    }
+    
     // Reopen progress modal before analysis to maintain user feedback
     setShowProgressModal(true);
     setUploadProgress('analyzing_matches');
@@ -560,15 +849,9 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
         error={error}
         onDismiss={() => {
           setShowProgressModal(false);
-          setUploadProgress('preparing');
-          setUploading(false);
           setError(null);
-          uploadDataRef.current = null;
-          setSelectedImageUri(null);
-          setFaceDetections([]);
-          setSelectedFaceDescriptor(null);
-          setAnalysisData(null);
         }}
+        onCancel={cancelUpload}
       />
 
       {/* Face Selection Modal */}
