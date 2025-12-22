@@ -22,3 +22,4 @@ CREATE INDEX IF NOT EXISTS idx_partners_profile_picture
 
 
 
+

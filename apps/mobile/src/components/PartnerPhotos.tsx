@@ -107,7 +107,92 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
       setUploading(true);
       setError(null);
 
-      // Create FormData for React Native
+      // Get session token for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      // Use EXPO_PUBLIC_WEB_APP_URL if available, otherwise fallback to localhost
+      const apiUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+
+      // TODO: Face Detection
+      // Attempt server-side face detection (currently returns 501 Not Implemented)
+      // When implemented, this will:
+      // 1. Detect faces in the image
+      // 2. Extract face descriptors
+      // 3. Call analyze endpoint to check for matches
+      // 4. Show warnings if same person or different partner detected
+      // 5. Upload with face descriptor for future matching
+      let faceDescriptor: number[] | null = null;
+      try {
+        const detectFormData = new FormData();
+        detectFormData.append('file', {
+          uri: asset.uri,
+          type: asset.mimeType || 'image/jpeg',
+          name: asset.fileName || 'photo.jpg',
+        } as any);
+
+        const detectResponse = await fetch(`${apiUrl}/api/face-detection/detect`, {
+          method: 'POST',
+          body: detectFormData,
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (detectResponse.ok) {
+          const detectData = await detectResponse.json();
+          if (detectData.detections && detectData.detections.length > 0) {
+            // Handle multiple faces - for now use first face
+            // TODO: Implement face selection UI for multiple faces (similar to web app)
+            if (detectData.detections.length > 1) {
+              console.log('[PartnerPhotos] Multiple faces detected, using first face');
+            }
+            
+            faceDescriptor = detectData.detections[0].descriptor;
+            console.log('[PartnerPhotos] Face detected, descriptor length:', faceDescriptor.length);
+            
+            // Call analyze endpoint to check for matches (same as web app)
+            try {
+              const analyzeResponse = await fetch(`${apiUrl}/api/partners/${partnerId}/photos/analyze`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ faceDescriptor }),
+              });
+
+              if (analyzeResponse.ok) {
+                const analysis = await analyzeResponse.json();
+                console.log('[PartnerPhotos] Analysis result:', analysis.decision.type);
+                
+                // TODO: Show decision dialogs based on analysis.decision.type
+                // - 'warn_same_person': Show warning that face doesn't match partner
+                // - 'warn_other_partners': Show warning with list of matching partners
+                // - 'proceed': Continue with upload
+                // For now, proceed with upload regardless
+              } else {
+                console.log('[PartnerPhotos] Analysis failed, proceeding with upload');
+              }
+            } catch (analyzeError) {
+              console.log('[PartnerPhotos] Analysis error, proceeding with upload:', analyzeError);
+            }
+          } else {
+            console.log('[PartnerPhotos] No faces detected in image');
+            // TODO: Show "no face detected" dialog (similar to web app)
+          }
+        } else {
+          // Face detection not available (501) or failed - proceed without it
+          console.log('[PartnerPhotos] Face detection not available, proceeding without face descriptor');
+        }
+      } catch (detectError) {
+        // Face detection failed - proceed without it
+        console.log('[PartnerPhotos] Face detection error, proceeding without face descriptor:', detectError);
+      }
+
+      // Create FormData for photo upload
       const formData = new FormData();
       formData.append('file', {
         uri: asset.uri,
@@ -120,16 +205,9 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
       if (asset.height) {
         formData.append('height', asset.height.toString());
       }
-
-      // Get session token for authentication
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Not authenticated');
+      if (faceDescriptor) {
+        formData.append('faceDescriptor', JSON.stringify(faceDescriptor));
       }
-
-      // Upload to API
-      // Use EXPO_PUBLIC_WEB_APP_URL if available, otherwise fallback to localhost
-      const apiUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
       
       console.log('[PartnerPhotos] Uploading to:', `${apiUrl}/api/partners/${partnerId}/photos`);
       
