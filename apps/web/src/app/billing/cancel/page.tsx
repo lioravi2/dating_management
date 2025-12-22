@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useNavigation } from '@/lib/navigation';
+import { environment } from '@/lib/environment';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
@@ -38,9 +39,11 @@ export default function CancelSubscriptionPage() {
       setMessage({ type: 'success', text: data.message || 'Subscription will be canceled at the end of the billing period.' });
       // Keep loading state true to show loader during redirect
       
-      // Redirect to billing page after 1 second
+      // Redirect to billing page after 1 second with a full page reload
+      // This ensures the server component fetches fresh subscription data
+      // and the "Resume Subscription" button appears immediately
       setTimeout(() => {
-        navigation.push('/billing');
+        environment.redirect('/billing');
       }, 1000);
       // Don't set loading to false here - let it stay true until redirect
     } catch (error: any) {
