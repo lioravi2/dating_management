@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { findFaceMatches } from '@/lib/face-matching';
 import { analyzePhotoUploadForPartner } from '@/lib/photo-upload-decision';
 import { FaceMatch } from '@/shared';
@@ -32,13 +33,49 @@ export async function POST(
     }
 
     console.log('[API] Face descriptor received, length:', faceDescriptor.length);
-    const supabase = createSupabaseRouteHandlerClient();
     
-    // Get current user (more reliable than getSession for API routes)
-    console.log('[API] Getting user...');
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      console.error('Auth error:', userError);
+    // Check for Authorization header (for mobile app) or use cookie-based auth (for web)
+    const authHeader = request.headers.get('authorization');
+    let supabase;
+    let user;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Mobile app sends Bearer token
+      const accessToken = authHeader.substring(7);
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+      supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      });
+      
+      const { data: { user: tokenUser }, error: userError } = await supabase.auth.getUser(accessToken);
+      if (userError || !tokenUser) {
+        console.error('Auth error:', userError);
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      user = tokenUser;
+    } else {
+      // Web app uses cookies
+      supabase = createSupabaseRouteHandlerClient();
+      const { data: { user: cookieUser }, error: userError } = await supabase.auth.getUser();
+      if (userError || !cookieUser) {
+        console.error('Auth error:', userError);
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      user = cookieUser;
+    }
+    
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }

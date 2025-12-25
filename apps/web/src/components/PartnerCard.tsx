@@ -4,6 +4,7 @@ import { NavigationLink } from '@/lib/navigation';
 import { Partner } from '@/shared';
 import { getPartnerProfilePictureUrl } from '@/lib/photo-utils';
 import BlackFlagIcon from '@/components/BlackFlagIcon';
+import { renderTextWithLinks } from '@/lib/text-utils';
 
 interface PartnerCardProps {
   partner: Partner;
@@ -58,7 +59,7 @@ export default function PartnerCard({ partner, lastActivityDescription, showDele
           )}
           {(partner.description || lastActivityDescription) && (
             <p className="text-sm text-gray-700 mt-3 line-clamp-2">
-              {partner.description || lastActivityDescription}
+              {renderTextWithLinks(partner.description || lastActivityDescription || '', true)}
             </p>
           )}
           <div className="text-xs text-gray-500 mt-4 space-y-1">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image, RefreshControl, Linking } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -104,6 +104,35 @@ export default function DashboardScreen() {
     loadData(true);
   }, []);
 
+  const renderDescriptionWithLinks = (text: string) => {
+    // URL regex pattern
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    
+    return (
+      <Text style={styles.partnerDescription} numberOfLines={2}>
+        {parts.map((part, index) => {
+          if (urlRegex.test(part)) {
+            return (
+              <Text
+                key={index}
+                style={styles.linkText}
+                onPress={() => {
+                  Linking.openURL(part).catch((err) => {
+                    console.error('Error opening URL:', err);
+                  });
+                }}
+              >
+                {part}
+              </Text>
+            );
+          }
+          return <Text key={index}>{part}</Text>;
+        })}
+      </Text>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -143,7 +172,7 @@ export default function DashboardScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Partners</Text>
             <TouchableOpacity
-              onPress={() => navigation.navigate('Partners')}
+              onPress={() => navigation.navigate('Partners', { screen: 'PartnersList' })}
               style={styles.viewAllButton}
             >
               <Text style={styles.viewAllButtonText}>View all partners →</Text>
@@ -213,11 +242,7 @@ export default function DashboardScreen() {
                       {partner.email}
                     </Text>
                   )}
-                  {description && (
-                    <Text style={styles.partnerDescription} numberOfLines={2}>
-                      {description}
-                    </Text>
-                  )}
+                  {description && renderDescriptionWithLinks(description)}
                   <View style={styles.partnerDates}>
                     <Text style={styles.partnerDateText}>
                       Added {createdDate}
@@ -243,7 +268,20 @@ export default function DashboardScreen() {
             <Text style={styles.actionTitle}>Add Partner</Text>
             <Text style={styles.actionSubtitle}>Add a new partner</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionCard, styles.actionCardPurple]}>
+          <TouchableOpacity 
+            style={[styles.actionCard, styles.actionCardPurple]}
+            onPress={() => {
+              // Navigate to Partners tab first, then to PhotoUpload screen
+              // Use setTimeout to ensure navigation stack is ready
+              setTimeout(() => {
+                navigation.navigate('Partners', {
+                  screen: 'PhotoUpload',
+                  params: {},
+                });
+              }, 100);
+            }}
+            activeOpacity={0.7}
+          >
             <Text style={styles.actionTitle}>Upload Photo</Text>
             <Text style={styles.actionSubtitle}>Find or create a partner</Text>
           </TouchableOpacity>
@@ -391,6 +429,10 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginTop: 12,
     lineHeight: 20,
+  },
+  linkText: {
+    color: '#2563eb',
+    textDecorationLine: 'underline',
   },
   partnerDates: {
     marginTop: 12,

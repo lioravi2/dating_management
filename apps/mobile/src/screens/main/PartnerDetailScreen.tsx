@@ -119,6 +119,35 @@ export default function PartnerDetailScreen() {
     });
   };
 
+  const renderDescriptionWithLinks = (text: string) => {
+    // URL regex pattern
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    
+    return (
+      <Text style={styles.descriptionText}>
+        {parts.map((part, index) => {
+          if (urlRegex.test(part)) {
+            return (
+              <Text
+                key={index}
+                style={styles.linkText}
+                onPress={() => {
+                  Linking.openURL(part).catch((err) => {
+                    console.error('Error opening URL:', err);
+                  });
+                }}
+              >
+                {part}
+              </Text>
+            );
+          }
+          return <Text key={index}>{part}</Text>;
+        })}
+      </Text>
+    );
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -222,7 +251,7 @@ export default function PartnerDetailScreen() {
           {partner.description && (
             <View style={styles.descriptionSection}>
               <Text style={styles.infoLabel}>Description</Text>
-              <Text style={styles.descriptionText}>{partner.description}</Text>
+              {renderDescriptionWithLinks(partner.description)}
               {partner.description_time && (
                 <Text style={styles.descriptionTime}>
                   Updated {formatDateTime(partner.description_time)}
@@ -444,6 +473,10 @@ const styles = StyleSheet.create({
     color: '#111827',
     lineHeight: 24,
     marginTop: 8,
+  },
+  linkText: {
+    color: '#2563eb',
+    textDecorationLine: 'underline',
   },
   descriptionTime: {
     fontSize: 12,

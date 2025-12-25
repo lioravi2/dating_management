@@ -7,6 +7,7 @@ import PartnerPhotos from '@/components/PartnerPhotos';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import BlackFlagIcon from '@/components/BlackFlagIcon';
+import DescriptionWithLinks from '@/components/DescriptionWithLinks';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,7 +116,9 @@ export default async function PartnerDetailPage({
               <label className="text-sm font-medium text-gray-700">
                 Description
               </label>
-              <p className="text-gray-900 mt-1">{partner.description}</p>
+              <p className="text-gray-900 mt-1">
+                <DescriptionWithLinks text={partner.description} />
+              </p>
               {partner.description_time && (
                 <p className="text-xs text-gray-500 mt-1">
                   Updated {(() => {

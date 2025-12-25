@@ -70,8 +70,9 @@ export default function DeletePartnerPage() {
         throw new Error(errorData.error || 'Failed to delete partner');
       }
 
-      // Redirect to partners list after successful deletion
-      navigation.push('/partners');
+      // Redirect to partners list after successful deletion with page refresh
+      const { environment } = require('@/lib/environment');
+      environment.redirect('/partners');
     } catch (error) {
       console.error('Error deleting partner:', error);
       setAlertDialog({

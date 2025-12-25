@@ -214,6 +214,8 @@ export class WebImageProcessor implements IImageProcessor {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
+    // Note: willReadFrequently is set in getContext() method to optimize
+    // for frequent getImageData calls (used by face-api.js)
     return new WebCanvas(canvas);
   }
 

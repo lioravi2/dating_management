@@ -16,19 +16,32 @@ export default function RootNavigator() {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        // If there's an error (e.g., invalid refresh token), clear session
+        console.log('Session error (will redirect to sign in):', error.message);
+        setSession(null);
+      } else {
+        setSession(session);
+      }
       setLoading(false);
     }).catch((error) => {
       console.error('Error getting session:', error);
+      // On error, assume not authenticated
+      setSession(null);
       setLoading(false);
     });
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // Handle SIGNED_OUT event or null session (includes invalid refresh token)
+      if (event === 'SIGNED_OUT' || !session) {
+        setSession(null);
+      } else {
+        setSession(session);
+      }
     });
 
     return () => subscription.unsubscribe();

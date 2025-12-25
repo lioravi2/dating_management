@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { supabase } from '../../lib/supabase/client';
 import { Partner } from '@dating-app/shared';
@@ -26,6 +27,7 @@ export default function PartnersListScreen() {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [lastActivities, setLastActivities] = useState<{ [key: string]: string | null }>({});
+  const [deletingPartnerId, setDeletingPartnerId] = useState<string | null>(null);
 
   const loadPartners = async () => {
     try {
@@ -82,10 +84,6 @@ export default function PartnersListScreen() {
       loadPartners();
     }, [])
   );
-
-  useEffect(() => {
-    loadPartners();
-  }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -168,13 +166,81 @@ export default function PartnersListScreen() {
           </View>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.deleteButton}
+          style={[styles.deleteButton, deletingPartnerId === partner.id && styles.deleteButtonDisabled]}
           onPress={() => {
-            // Placeholder - delete functionality will be added later
-            console.log('Delete partner:', partner.id);
+            if (deletingPartnerId === partner.id) return; // Prevent clicks while deleting
+            
+            Alert.alert(
+              'Delete Partner',
+              `Are you sure you want to delete ${partnerName}? This will permanently delete all photos, activities, and the partner record. This action cannot be undone.`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setDeletingPartnerId(partner.id);
+                    try {
+                      const { data: { session } } = await supabase.auth.getSession();
+                      if (!session) {
+                        Alert.alert('Error', 'Not authenticated');
+                        setDeletingPartnerId(null);
+                        return;
+                      }
+
+                      const apiUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+                      
+                      const response = await fetch(`${apiUrl}/api/partners/${partner.id}`, {
+                        method: 'DELETE',
+                        headers: {
+                          'Authorization': `Bearer ${session.access_token}`,
+                        },
+                      });
+
+                      if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                        throw new Error(errorData.error || 'Failed to delete partner');
+                      }
+
+                      // Verify deletion by checking if partner still exists
+                      const { data: { session: verifySession } } = await supabase.auth.getSession();
+                      if (verifySession) {
+                        const { data: verifyData } = await supabase
+                          .from('partners')
+                          .select('id')
+                          .eq('id', partner.id)
+                          .eq('user_id', verifySession.user.id)
+                          .single();
+                        
+                        if (verifyData) {
+                          // Partner still exists, deletion may have failed
+                          throw new Error('Partner deletion verification failed');
+                        }
+                      }
+
+                      // Reload partners list after successful deletion and verification
+                      await loadPartners();
+                    } catch (error) {
+                      console.error('Error deleting partner:', error);
+                      Alert.alert(
+                        'Delete Error',
+                        error instanceof Error ? error.message : 'Failed to delete partner'
+                      );
+                    } finally {
+                      setDeletingPartnerId(null);
+                    }
+                  },
+                },
+              ]
+            );
           }}
+          disabled={deletingPartnerId === partner.id}
         >
-          <Text style={styles.deleteButtonText}>Delete</Text>
+          {deletingPartnerId === partner.id ? (
+            <ActivityIndicator size="small" color="#dc2626" />
+          ) : (
+            <Text style={styles.deleteButtonText}>Delete</Text>
+          )}
         </TouchableOpacity>
       </View>
     );
@@ -314,6 +380,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     zIndex: 10,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButtonDisabled: {
+    opacity: 0.6,
   },
   deleteButtonText: {
     color: '#dc2626',

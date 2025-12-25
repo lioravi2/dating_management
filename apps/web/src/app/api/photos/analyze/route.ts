@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { findFaceMatches } from '@/lib/face-matching';
 import { analyzePhotoUploadWithoutPartner } from '@/lib/photo-upload-decision';
 import { FaceMatch } from '@/shared';
@@ -23,12 +24,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createSupabaseRouteHandlerClient();
+    // Check for Authorization header (for mobile app) or use cookie-based auth (for web)
+    const authHeader = request.headers.get('authorization');
+    let supabase;
+    let user;
     
-    // Get current user (more reliable than getSession for API routes)
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      console.error('Auth error:', userError);
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Mobile app sends Bearer token
+      const accessToken = authHeader.substring(7);
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+      supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      });
+      
+      const { data: { user: tokenUser }, error: userError } = await supabase.auth.getUser(accessToken);
+      if (userError || !tokenUser) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      user = tokenUser;
+    } else {
+      // Web app uses cookies
+      supabase = createSupabaseRouteHandlerClient();
+      const { data: { user: cookieUser }, error: userError } = await supabase.auth.getUser();
+      if (userError || !cookieUser) {
+        console.error('Auth error:', userError);
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      user = cookieUser;
+    }
+
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -40,7 +76,7 @@ export async function POST(request: NextRequest) {
     // Get all partner IDs for this user
     const { data: userPartners, error: partnersError } = await supabase
       .from('partners')
-      .select('id, first_name, last_name, profile_picture_storage_path')
+      .select('id, first_name, last_name, profile_picture_storage_path, black_flag')
       .eq('user_id', userId);
 
     if (partnersError) {
@@ -81,7 +117,7 @@ export async function POST(request: NextRequest) {
       allPhotos || []
     );
 
-    // Enrich matches with partner names and profile pictures
+    // Enrich matches with partner names, profile pictures, and black flag
     const enrichedMatches: FaceMatch[] = allMatches.map((match) => {
       const photo = (allPhotos || []).find(p => p.id === match.photo_id);
       if (photo) {
@@ -92,6 +128,7 @@ export async function POST(request: NextRequest) {
             ? `${partner.first_name || ''} ${partner.last_name || ''}`.trim() || null
             : null,
           partner_profile_picture: partner?.profile_picture_storage_path || null,
+          black_flag: partner?.black_flag || false,
         };
       }
       return match;

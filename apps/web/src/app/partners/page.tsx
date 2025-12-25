@@ -28,7 +28,7 @@ export default async function PartnersPage() {
     .from('partners')
     .select('*')
     .eq('user_id', session.user.id)
-    .order('created_at', { ascending: false });
+    .order('updated_at', { ascending: false });
 
   if (partnersError) {
     console.error('Error fetching partners:', partnersError);

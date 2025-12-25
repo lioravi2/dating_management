@@ -1,5 +1,10 @@
 {
   "framework": "nextjs",
-  "installCommand": "cd ../../packages/shared && npm install && cd ../../apps/web && npm install"
+  "installCommand": "cd ../../packages/shared && npm install && cd ../../apps/web && npm install",
+  "functions": {
+    "src/app/api/face-detection/detect/route.ts": {
+      "maxDuration": 60
+    }
+  }
 }
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,22 +6,90 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
+  Image,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { FaceMatch } from '@dating-app/shared';
+import { getPartnerProfilePictureUrl } from '../lib/photo-utils';
+import BlackFlagIcon from './BlackFlagIcon';
+import { MainTabParamList } from '../navigation/types';
+import { PartnersStackParamList } from '../navigation/types';
+
+type NavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList>,
+  NativeStackNavigationProp<PartnersStackParamList>
+>;
 
 interface DifferentPartnerWarningModalProps {
   visible: boolean;
   matches: FaceMatch[];
   onUploadAnyway: () => void;
+  onUploadToPartner: (partnerId: string) => void;
   onCancel: () => void;
+  onViewPartner?: (partnerId: string) => void;
 }
 
 export default function DifferentPartnerWarningModal({
   visible,
   matches,
   onUploadAnyway,
+  onUploadToPartner,
   onCancel,
+  onViewPartner,
 }: DifferentPartnerWarningModalProps) {
+  const navigation = useNavigation<NavigationProp>();
+  const [viewingPartnerId, setViewingPartnerId] = useState<string | null>(null);
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+
+  // Group matches by partner_id to avoid duplicates (like web app)
+  const groupedMatches = new Map<string, FaceMatch[]>();
+  matches.forEach((match) => {
+    const partnerId = match.partner_id;
+    if (!groupedMatches.has(partnerId)) {
+      groupedMatches.set(partnerId, []);
+    }
+    groupedMatches.get(partnerId)!.push(match);
+  });
+
+  // Get best match (highest similarity) for each partner
+  const uniquePartners = Array.from(groupedMatches.entries()).map(([partnerId, partnerMatches]) => {
+    const bestMatch = partnerMatches.reduce((best, current) => 
+      (current.similarity || current.confidence || 0) > (best.similarity || best.confidence || 0) ? current : best
+    );
+    return {
+      partner_id: partnerId,
+      partner_name: bestMatch.partner_name,
+      partner_profile_picture: (bestMatch as any).partner_profile_picture || null,
+      similarity: bestMatch.similarity || bestMatch.confidence || 0,
+      matchCount: partnerMatches.length,
+      black_flag: (bestMatch as any).black_flag || false,
+    };
+  });
+
+  // Note: Modal visibility is controlled by parent component
+  // React Native Modal components persist across navigation automatically
+
+  const handleViewPartner = (partnerId: string) => {
+    setViewingPartnerId(partnerId);
+    // Notify parent that we're viewing a partner (so it can track state)
+    if (onViewPartner) {
+      onViewPartner(partnerId);
+    }
+    // Navigate to Partners tab, then to PartnerDetail
+    navigation.navigate('Partners', {
+      screen: 'PartnerDetail',
+      params: { partnerId },
+    });
+  };
+
+  const handleUploadToPartner = (partnerId: string) => {
+    setViewingPartnerId(null);
+    onUploadToPartner(partnerId);
+  };
+
   return (
     <Modal
       visible={visible}
@@ -30,22 +98,63 @@ export default function DifferentPartnerWarningModal({
     >
       <View style={styles.overlay}>
         <View style={styles.modal}>
-          <Text style={styles.title}>Face Matches Another Partner</Text>
+          <Text style={styles.title}>This photo resembles other partners</Text>
           <Text style={styles.message}>
-            This photo matches photos from {matches.length} other partner{matches.length > 1 ? 's' : ''}. Are you sure you want to upload it to this partner?
+            This photo matches photos from other partners:
           </Text>
 
           <ScrollView style={styles.matchesContainer}>
-            {matches.map((match, index) => (
-              <View key={match.photo_id} style={styles.matchItem}>
-                <Text style={styles.matchName}>
-                  {match.partner_name || 'Unknown Partner'}
-                </Text>
-                <Text style={styles.matchSimilarity}>
-                  {Math.round(match.similarity * 100)}% match
-                </Text>
-              </View>
-            ))}
+            {uniquePartners.map((partner) => {
+              const profilePictureUrl = partner.partner_profile_picture
+                ? getPartnerProfilePictureUrl({ profile_picture_storage_path: partner.partner_profile_picture }, supabaseUrl)
+                : null;
+              const initials = (partner.partner_name?.[0] || '?').toUpperCase();
+
+              return (
+                <View key={partner.partner_id} style={styles.partnerCard}>
+                  {profilePictureUrl ? (
+                    <Image
+                      source={{ uri: profilePictureUrl }}
+                      style={styles.partnerAvatar}
+                    />
+                  ) : (
+                    <View style={styles.partnerAvatarPlaceholder}>
+                      <Text style={styles.partnerAvatarText}>{initials}</Text>
+                    </View>
+                  )}
+                  <View style={styles.partnerInfo}>
+                    <View style={styles.partnerNameRow}>
+                      <Text style={styles.partnerName} numberOfLines={1}>
+                        {partner.partner_name || 'Unknown Partner'}
+                      </Text>
+                      {partner.black_flag && (
+                        <View style={styles.blackFlagBadge}>
+                          <BlackFlagIcon width={12} height={12} color="#fff" />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.matchSimilarity}>
+                      {Math.round(partner.similarity * 100)}% match
+                      {partner.matchCount > 1 && `, ${partner.matchCount} photos`}
+                    </Text>
+                  </View>
+                  <View style={styles.partnerActions}>
+                    <TouchableOpacity
+                      style={styles.viewButton}
+                      onPress={() => handleViewPartner(partner.partner_id)}
+                    >
+                      <Text style={styles.viewButtonText}>View</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.uploadHereButton}
+                      onPress={() => handleUploadToPartner(partner.partner_id)}
+                    >
+                      <Text style={styles.uploadHereButtonText}>Upload Here</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
           </ScrollView>
 
           <View style={styles.buttonRow}>
@@ -96,27 +205,95 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   matchesContainer: {
-    maxHeight: 200,
+    maxHeight: 300,
     marginBottom: 24,
   },
-  matchItem: {
+  partnerCard: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    padding: 12,
     backgroundColor: '#f9fafb',
     borderRadius: 8,
-    marginBottom: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  matchName: {
-    fontSize: 14,
+  partnerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#e5e7eb',
+  },
+  partnerAvatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#e5e7eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  partnerAvatarText: {
+    fontSize: 18,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  partnerInfo: {
+    flex: 1,
+    marginLeft: 12,
+    minWidth: 0,
+  },
+  partnerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  partnerName: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#111827',
+    flex: 1,
+  },
+  blackFlagBadge: {
+    backgroundColor: '#000',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
   },
   matchSimilarity: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#6b7280',
+  },
+  partnerActions: {
+    flexDirection: 'column',
+    gap: 8,
+    marginLeft: 12,
+  },
+  viewButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#6b7280',
+    minWidth: 80,
+  },
+  viewButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  uploadHereButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#10b981',
+    minWidth: 80,
+  },
+  uploadHereButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   buttonRow: {
     flexDirection: 'row',

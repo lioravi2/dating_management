@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import { FREE_TIER_PARTNER_LIMIT } from '@/lib/pricing';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -10,18 +11,57 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createSupabaseRouteHandlerClient();
-    const supabaseAdmin = createSupabaseAdminClient();
+    // Check for Authorization header (for mobile app) or use cookie-based auth (for web)
+    const authHeader = request.headers.get('authorization');
+    let supabase;
+    let supabaseAdmin;
+    let user;
     
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Mobile app sends Bearer token
+      const accessToken = authHeader.substring(7);
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+      supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      });
+      
+      const { data: { user: tokenUser }, error: userError } = await supabase.auth.getUser(accessToken);
+      if (userError || !tokenUser) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      user = tokenUser;
+      // For mobile, use admin client for partner creation (RLS might block)
+      supabaseAdmin = createSupabaseAdminClient();
+    } else {
+      // Web app uses cookies
+      supabase = createSupabaseRouteHandlerClient();
+      supabaseAdmin = createSupabaseAdminClient();
+      const { data: { user: cookieUser }, error: userError } = await supabase.auth.getUser();
+      if (userError || !cookieUser) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      user = cookieUser;
     }
 
-    const userId = session.user.id;
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const userId = user.id;
     const formData = await request.formData();
     
     // Get partner data (optional fields)
@@ -45,13 +85,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user account type
-    const { data: user, error: userError } = await supabaseAdmin
+    const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
       .select('account_type')
       .eq('id', userId)
       .single();
 
-    if (userError || !user) {
+    if (userError || !userData) {
       return NextResponse.json(
         { error: 'Failed to fetch user information' },
         { status: 500 }
@@ -59,7 +99,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check partner limit for free users
-    if (user.account_type === 'free') {
+    if (userData.account_type === 'free') {
       const { count, error: countError } = await supabaseAdmin
         .from('partners')
         .select('*', { count: 'exact', head: true })

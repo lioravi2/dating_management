@@ -22,13 +22,25 @@ const nextConfig = {
         zlib: false,
         url: false,
         util: false,
+        buffer: false,
+        process: false,
       };
-      // Ignore encoding module when required by node-fetch (used by face-api.js)
+      // Ignore Node.js-only modules that face-api.js/node-fetch try to use in browser
+      // This prevents webpack from trying to bundle Node.js-only modules for the browser
       config.plugins = config.plugins || [];
+      
+      // Ignore encoding module completely (required by node-fetch, but not needed in browser)
+      // face-api.js will use browser's native fetch API instead of node-fetch
+      // Using checkResource to catch all cases where encoding is requested
       config.plugins.push(
         new webpack.IgnorePlugin({
-          resourceRegExp: /^encoding$/,
-          contextRegExp: /node-fetch/,
+          checkResource(resource, context) {
+            // Ignore encoding module when requested from node-fetch or anywhere else
+            if (resource === 'encoding') {
+              return true;
+            }
+            return false;
+          },
         })
       );
     }

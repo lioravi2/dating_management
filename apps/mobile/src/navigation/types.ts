@@ -15,11 +15,27 @@ export type MainTabParamList = {
   Profile: undefined;
 };
 
+import { PhotoUploadAnalysis } from '@dating-app/shared';
+
 export type PartnersStackParamList = {
   PartnersList: undefined;
-  PartnerDetail: { partnerId: string };
+  PartnerDetail: { partnerId: string; uploadPhoto?: boolean; uploadData?: any; faceDescriptor?: number[]; imageUri?: string };
   PartnerEdit: { partnerId: string };
-  PartnerCreate: undefined;
+  PartnerCreate: { uploadPhoto?: boolean; uploadData?: any; faceDescriptor?: number[]; imageUri?: string };
+  SimilarPartners: {
+    currentPartnerId: string; // Empty string when uploading from dashboard
+    analysisData: PhotoUploadAnalysis;
+    uploadData: {
+      optimizedUri: string;
+      width: number;
+      height: number;
+      mimeType: string;
+      fileName: string;
+    };
+    faceDescriptor: number[] | null;
+    imageUri: string; // Original image URI for preview
+  };
+  PhotoUpload: { partnerId?: string };
 };
 
 export type UploadStackParamList = {

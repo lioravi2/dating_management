@@ -285,7 +285,7 @@ export default function SimilarPhotosPage() {
                         View
                       </Link>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           // Store upload data and navigate to partner page with upload flag
                           const currentUploadDataKey = uploadDataKey || (() => {
                             // Try to find uploadDataKey in sessionStorage if not in URL
@@ -298,7 +298,66 @@ export default function SimilarPhotosPage() {
                           if (currentUploadDataKey) {
                             // Store which partner to upload to
                             sessionStorage.setItem(`uploadToPartner-${currentUploadDataKey}`, partner.partner_id);
-                            navigation.push(`/partners/${partner.partner_id}`, { uploadPhoto: 'true', uploadDataKey: currentUploadDataKey });
+                            // Store flag to redirect to dashboard after upload (from similar-photos page)
+                            sessionStorage.setItem(`redirectToDashboard-${currentUploadDataKey}`, 'true');
+                            
+                            // Upload directly via API instead of navigating to partner page
+                            try {
+                              const uploadDataStr = sessionStorage.getItem(currentUploadDataKey);
+                              if (!uploadDataStr) {
+                                alert('Upload data not found. Please try uploading again.');
+                                return;
+                              }
+
+                              const uploadData = JSON.parse(uploadDataStr);
+                              const { fileBase64, faceDescriptor, width, height } = uploadData;
+
+                              // Convert base64 back to File
+                              const base64Data = fileBase64.split(',')[1] || fileBase64;
+                              const byteCharacters = atob(base64Data);
+                              const byteNumbers = new Array(byteCharacters.length);
+                              for (let i = 0; i < byteCharacters.length; i++) {
+                                byteNumbers[i] = byteCharacters.charCodeAt(i);
+                              }
+                              const byteArray = new Uint8Array(byteNumbers);
+                              const blob = new Blob([byteArray], { type: 'image/jpeg' });
+                              const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+
+                              // Create FormData
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              if (faceDescriptor) {
+                                formData.append('faceDescriptor', JSON.stringify(faceDescriptor));
+                              }
+                              if (width) formData.append('width', width.toString());
+                              if (height) formData.append('height', height.toString());
+
+                              // Upload photo to partner
+                              const response = await fetch(`/api/partners/${partner.partner_id}/photos`, {
+                                method: 'POST',
+                                body: formData,
+                              });
+
+                              if (!response.ok) {
+                                const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+                                throw new Error(error.error || error.details || 'Failed to upload photo');
+                              }
+
+                              // Clean up sessionStorage
+                              sessionStorage.removeItem(currentUploadDataKey);
+                              sessionStorage.removeItem(`uploadToPartner-${currentUploadDataKey}`);
+                              sessionStorage.removeItem(`redirectToDashboard-${currentUploadDataKey}`);
+                              if (imageKey) {
+                                sessionStorage.removeItem(imageKey);
+                              }
+
+                              // Redirect to dashboard with refresh
+                              const { environment } = require('@/lib/environment');
+                              environment.redirect('/dashboard');
+                            } catch (error) {
+                              console.error('[SimilarPhotos] Error uploading photo:', error);
+                              alert(error instanceof Error ? error.message : 'Failed to upload photo');
+                            }
                           } else {
                             console.error('[SimilarPhotos] No uploadDataKey found');
                             alert('Upload data not found. Please try uploading again.');
@@ -393,8 +452,9 @@ export default function SimilarPhotosPage() {
                       sessionStorage.removeItem(imageKey);
                     }
 
-                    // Redirect to partner page (not edit mode)
-                    navigation.push(`/partners/${result.partner.id}`);
+                    // Redirect to dashboard with refresh (new partner will show first due to latest update date)
+                    const { environment } = require('@/lib/environment');
+                    environment.redirect('/dashboard');
                   } catch (error) {
                     console.error('Error creating partner:', error);
                     alert('Failed to create partner. Please try again.');

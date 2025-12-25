@@ -500,37 +500,70 @@ export function PhotoUploadWithFaceMatch({
 
         const result = await response.json();
         if (result.decision === 'create_new') {
-          // If no partnerId, navigate to no-matches page instead of showing modal
+          // If no partnerId, automatically create partner and upload photo
           if (!partnerId) {
-            // Store image and upload data for later use
-            const fileToConvert = fileRef.current || selectedFile;
-            if (fileToConvert) {
-              try {
-                const base64Url = await fileUtils.fileToBase64(fileToConvert);
-                const imageKey = `upload-photo-image-${Date.now()}`;
-                sessionStorage.setItem(imageKey, base64Url);
-                
-                // Store upload data for creating partner and uploading photo
-                const uploadDataKey = `upload-photo-data-${Date.now()}`;
-                const uploadData = {
-                  fileBase64: base64Url,
-                  faceDescriptor: detection.descriptor,
-                  width: imageDimensions?.width || 0,
-                  height: imageDimensions?.height || 0,
-                };
-                sessionStorage.setItem(uploadDataKey, JSON.stringify(uploadData));
-                
-                navigation.push('/upload-photo/no-matches', { imageKey, uploadDataKey });
-              } catch (error) {
-                console.error('[PhotoUpload] Failed to convert image to base64:', error);
-                navigation.push('/upload-photo/no-matches');
+            const fileToUpload = fileRef.current || selectedFile;
+            const dims = dimensionsRef.current || imageDimensions;
+            
+            if (!fileToUpload || !dims) {
+              setAlertDialog({
+                open: true,
+                title: 'Upload Error',
+                message: 'Missing file or dimensions. Please try again.',
+              });
+              setAnalyzing(false);
+              return;
+            }
+            
+            // Automatically create partner and upload photo
+            setAnalyzing(false);
+            setUploading(true);
+            
+            try {
+              const formData = new FormData();
+              formData.append('file', fileToUpload);
+              formData.append('width', dims.width.toString());
+              formData.append('height', dims.height.toString());
+              if (detection.descriptor) {
+                formData.append('faceDescriptor', JSON.stringify(detection.descriptor));
               }
-            } else {
-              navigation.push('/upload-photo/no-matches');
+              
+              const response = await fetch('/api/partners/create-with-photo', {
+                method: 'POST',
+                body: formData,
+              });
+              
+              if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+                throw new Error(error.error || error.details || 'Failed to create partner and upload photo');
+              }
+              
+              const result = await response.json();
+              console.log('[PhotoUpload] Partner created and photo uploaded:', result);
+              
+              // Show success and redirect to dashboard with refresh
+              setUploadSuccess(true);
+              setTimeout(() => {
+                resetState();
+                setUploadSuccess(false);
+                // Don't call onSuccess when redirecting - go directly to dashboard
+                const { environment } = require('@/lib/environment');
+                environment.redirect('/dashboard');
+              }, 1500);
+            } catch (error) {
+              console.error('Error creating partner:', error);
+              setUploadError(error instanceof Error ? error.message : 'Failed to create partner');
+              setAlertDialog({
+                open: true,
+                title: 'Upload Error',
+                message: error instanceof Error ? error.message : 'Failed to create partner and upload photo',
+              });
+              setUploading(false);
             }
           } else {
             // If partnerId exists, show modal (existing behavior)
             setShowCreateNewPartnerModal(true);
+            setAnalyzing(false);
           }
         } else if (result.decision === 'warn_matches') {
           // Set analysis for displaying matches
@@ -652,12 +685,27 @@ export function PhotoUploadWithFaceMatch({
         setUploadSuccess(true);
       }
       
+      // Check if we should redirect to dashboard (from similar-photos page)
+      const redirectToDashboard = sessionStorage.getItem(`redirectToDashboard-${partnerId}`);
+      
       // Reset state after a short delay
       setTimeout(() => {
         if (mounted) {
           resetState();
           setUploadSuccess(false);
-          onSuccess?.();
+          
+          // Clean up redirect flag
+          if (redirectToDashboard) {
+            sessionStorage.removeItem(`redirectToDashboard-${partnerId}`);
+          }
+          
+          // Redirect to dashboard if flag is set, otherwise call onSuccess
+          if (redirectToDashboard) {
+            const { environment } = require('@/lib/environment');
+            environment.redirect('/dashboard');
+          } else {
+            onSuccess?.();
+          }
         }
       }, 2000);
     } catch (error) {
@@ -806,8 +854,22 @@ export function PhotoUploadWithFaceMatch({
               });
             }, 1000);
             
-            // Remove query params from URL and navigate to partner page
-            navigation.replace(`/partners/${partnerId}`);
+            // Check if we should redirect to dashboard (from similar-photos page)
+            const redirectToDashboard = sessionStorage.getItem(`redirectToDashboard-${actualKey}`);
+            
+            // Clean up redirect flag
+            if (redirectToDashboard) {
+              sessionStorage.removeItem(`redirectToDashboard-${actualKey}`);
+            }
+            
+            // Redirect to dashboard if flag is set, otherwise navigate to partner page
+            if (redirectToDashboard) {
+              const { environment } = require('@/lib/environment');
+              environment.redirect('/dashboard');
+            } else {
+              // Remove query params from URL and navigate to partner page
+              navigation.replace(`/partners/${partnerId}`);
+            }
           } catch (error) {
             console.error('[PhotoUpload] Failed to restore and upload:', error);
             setAlertDialog({
@@ -1116,25 +1178,75 @@ export function PhotoUploadWithFaceMatch({
             </p>
             <div className="flex gap-4 justify-end">
               <button
-                onClick={() => {
-                  setShowNoFaceModal(false);
-                  resetState();
-                }}
-                disabled={uploading}
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Try Again
-              </button>
-              <button
                 onClick={async () => {
                   if (uploading) return; // Prevent double-clicks
-                  // Upload without face descriptor when no face is detected
-                  await uploadPhoto(
-                    null, // No face descriptor
-                    fileRef.current || selectedFile || undefined,
-                    dimensionsRef.current || imageDimensions || undefined
-                  );
+                  
+                  const fileToUpload = fileRef.current || selectedFile;
+                  const dims = dimensionsRef.current || imageDimensions;
+                  
+                  if (!fileToUpload || !dims) {
+                    setAlertDialog({
+                      open: true,
+                      title: 'Upload Error',
+                      message: 'Missing file or dimensions. Please try again.',
+                    });
+                    return;
+                  }
+                  
+                  setUploading(true);
                   setShowNoFaceModal(false);
+                  
+                  try {
+                    if (partnerId) {
+                      // Upload to existing partner
+                      await uploadPhoto(
+                        null, // No face descriptor
+                        fileToUpload,
+                        dims
+                      );
+                    } else {
+                      // Create new partner without name and upload photo
+                      const formData = new FormData();
+                      formData.append('file', fileToUpload);
+                      formData.append('width', dims.width.toString());
+                      formData.append('height', dims.height.toString());
+                      // No faceDescriptor since no face was detected
+                      // No first_name, last_name - creating partner without name
+                      
+                      const response = await fetch('/api/partners/create-with-photo', {
+                        method: 'POST',
+                        body: formData,
+                      });
+                      
+                      if (!response.ok) {
+                        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+                        throw new Error(error.error || error.details || 'Failed to create partner and upload photo');
+                      }
+                      
+                      const result = await response.json();
+                      console.log('[PhotoUpload] Partner created and photo uploaded:', result);
+                      
+                      // Show success and redirect to dashboard with refresh
+                      setUploadSuccess(true);
+                      setTimeout(() => {
+                        resetState();
+                        setUploadSuccess(false);
+                        // Don't call onSuccess when redirecting - go directly to dashboard
+                        const { environment } = require('@/lib/environment');
+                        environment.redirect('/dashboard');
+                      }, 1500);
+                    }
+                  } catch (error) {
+                    console.error('Error uploading photo:', error);
+                    setUploadError(error instanceof Error ? error.message : 'Failed to upload photo');
+                    setAlertDialog({
+                      open: true,
+                      title: 'Upload Error',
+                      message: error instanceof Error ? error.message : 'Failed to upload photo',
+                    });
+                  } finally {
+                    setUploading(false);
+                  }
                 }}
                 disabled={uploading}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
@@ -1147,18 +1259,21 @@ export function PhotoUploadWithFaceMatch({
                 )}
                 {uploading ? 'Uploading...' : 'Upload Anyway'}
               </button>
-              {onCancel && (
-                <button
-                  onClick={() => {
-                    setShowNoFaceModal(false);
+              <button
+                onClick={() => {
+                  setShowNoFaceModal(false);
+                  resetState();
+                  if (onCancel) {
                     onCancel();
-                  }}
-                  disabled={uploading}
-                  className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Cancel
-                </button>
-              )}
+                  } else {
+                    navigation.push('/dashboard');
+                  }
+                }}
+                disabled={uploading}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -1194,7 +1309,7 @@ export function PhotoUploadWithFaceMatch({
                 disabled={uploading}
                 className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Cancel
+                No, Cancel
               </button>
               <button
                 onClick={handleProceedAnyway}
@@ -1207,7 +1322,7 @@ export function PhotoUploadWithFaceMatch({
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 )}
-                {uploading ? 'Uploading...' : 'Upload Anyway'}
+                {uploading ? 'Uploading...' : 'Yes, Upload the Photo'}
               </button>
             </div>
           </div>
