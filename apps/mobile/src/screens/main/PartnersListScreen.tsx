@@ -205,17 +205,27 @@ export default function PartnersListScreen() {
                       // Verify deletion by checking if partner still exists
                       const { data: { session: verifySession } } = await supabase.auth.getSession();
                       if (verifySession) {
-                        const { data: verifyData } = await supabase
+                        const { data: verifyData, error: verifyError } = await supabase
                           .from('partners')
                           .select('id')
                           .eq('id', partner.id)
                           .eq('user_id', verifySession.user.id)
-                          .single();
+                          .maybeSingle(); // Use maybeSingle() instead of single() to avoid throwing on no rows
                         
+                        // maybeSingle() returns null data when no rows found (expected after successful deletion)
+                        // If verifyData exists, partner still exists (deletion failed)
                         if (verifyData) {
                           // Partner still exists, deletion may have failed
                           throw new Error('Partner deletion verification failed');
                         }
+                        // If verifyError exists and it's not a "no rows" error, log it but don't fail
+                        // (PGRST116 = no rows returned, which is expected after successful deletion)
+                        if (verifyError && verifyError.code !== 'PGRST116') {
+                          // Unexpected error during verification, but deletion API call succeeded
+                          console.warn('Verification query error (non-critical):', verifyError);
+                          // Continue anyway as deletion API call succeeded
+                        }
+                        // If verifyData is null (and no error or PGRST116 error), deletion succeeded
                       }
 
                       // Reload partners list after successful deletion and verification

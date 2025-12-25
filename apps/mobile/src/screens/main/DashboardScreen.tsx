@@ -105,14 +105,16 @@ export default function DashboardScreen() {
   }, []);
 
   const renderDescriptionWithLinks = (text: string) => {
-    // URL regex pattern
+    // URL regex pattern (non-global for testing individual parts)
+    const urlPattern = /^https?:\/\/[^\s]+$/;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = text.split(urlRegex);
     
     return (
       <Text style={styles.partnerDescription} numberOfLines={2}>
         {parts.map((part, index) => {
-          if (urlRegex.test(part)) {
+          // Use non-global pattern to test individual parts (avoids lastIndex state issues)
+          if (urlPattern.test(part)) {
             return (
               <Text
                 key={index}

@@ -854,11 +854,15 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
       formData.append('height', uploadData.height.toString());
       formData.append('faceDescriptor', JSON.stringify(selectedFaceDescriptor));
 
-      const uploadResponse = await fetch(`${apiUrl}/api/partners/${targetPartnerId}/photos`, {
+      // Use resilientFetch instead of basic fetch for retry logic, timeout handling, and session refresh
+      const uploadResponse = await resilientFetch(`${apiUrl}/api/partners/${targetPartnerId}/photos`, {
         method: 'POST',
         body: formData,
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
+        timeout: 60000, // 60 second timeout for upload
+        retryOptions: {
+          maxRetries: 2,
+          initialDelay: 2000,
+          maxDelay: 10000,
         },
       });
 
