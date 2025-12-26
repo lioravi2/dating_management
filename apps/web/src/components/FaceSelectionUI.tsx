@@ -49,6 +49,13 @@ export function FaceSelectionUI({
     const webImage = new WebImage(img);
     ctx.drawImage(webImage, 0, 0);
 
+    // Calculate resolution-independent line width based on canvas dimensions
+    // Use 1/100th of image width as base, with min/max bounds for visibility
+    const baseLineWidth = Math.max(2, Math.min(8, webCanvas.width / 100));
+    const selectedLineWidth = baseLineWidth * 1.2; // Slightly thicker for selected
+    const outerStrokeWidth = baseLineWidth * 0.6; // Outer stroke for unselected
+    const outerStrokeOffset = outerStrokeWidth;
+
     // Draw bounding boxes for all faces
     detections.forEach((detection, index) => {
       if (!detection.boundingBox) return;
@@ -57,16 +64,16 @@ export function FaceSelectionUI({
       const isSelected = selectedIndex === index;
       const opacity = isSelected ? 1 : blinkOpacity;
 
-      // Draw bounding box with thicker lines for better visibility (especially on mobile)
+      // Draw bounding box with resolution-independent line width
       ctx.strokeStyle = isSelected ? '#10b981' : `rgba(239, 68, 68, ${opacity})`;
-      ctx.lineWidth = isSelected ? 6 : 5; // Increased from 4/2 to 6/5 for better visibility
+      ctx.lineWidth = isSelected ? selectedLineWidth : baseLineWidth;
       ctx.strokeRect(x, y, width, height);
 
       // Draw a second outer stroke for even better visibility on mobile (only for unselected)
       if (!isSelected) {
         ctx.strokeStyle = `rgba(239, 68, 68, ${opacity * 0.6})`;
-        ctx.lineWidth = 3;
-        ctx.strokeRect(x - 3, y - 3, width + 6, height + 6);
+        ctx.lineWidth = outerStrokeWidth;
+        ctx.strokeRect(x - outerStrokeOffset, y - outerStrokeOffset, width + outerStrokeOffset * 2, height + outerStrokeOffset * 2);
       }
 
       // Draw label with background for better readability

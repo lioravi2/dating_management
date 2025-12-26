@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import Header from '@/components/Header';
 import PartnerCard from '@/components/PartnerCard';
-import { Partner } from '@/shared';
+import { Partner, PARTNER_SORT_ORDER } from '@/shared';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -85,7 +85,7 @@ export default async function DashboardPage() {
       .from('partners')
       .select('*')
       .eq('user_id', session.user.id)
-      .order('updated_at', { ascending: false })
+      .order(PARTNER_SORT_ORDER.field, { ascending: PARTNER_SORT_ORDER.ascending })
       .limit(3);
 
     if (partnersError) {

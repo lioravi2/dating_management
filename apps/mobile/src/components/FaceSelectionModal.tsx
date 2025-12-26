@@ -121,13 +121,7 @@ export default function FaceSelectionModal({
 
     const { locationX, locationY } = event.nativeEvent;
     
-    // The server resizes images to max 600px before detection
-    // We need to scale bounding boxes from detection size to display size
-    const MAX_DETECTION_DIMENSION = 600;
-    const detectionWidth = Math.min(imageDimensions.width, MAX_DETECTION_DIMENSION);
-    const detectionHeight = Math.min(imageDimensions.height, MAX_DETECTION_DIMENSION);
-    
-    // Calculate scale factors from detection image to displayed image
+    // API returns coordinates in original image space, so we scale directly from original to display
     // The displayed image uses resizeMode="contain", so it maintains aspect ratio
     const imageAspectRatio = imageDimensions.width / imageDimensions.height;
     const displayAspectRatio = displayLayout.width / displayLayout.height;
@@ -149,9 +143,9 @@ export default function FaceSelectionModal({
       offsetX = (displayLayout.width - displayImageWidth) / 2;
     }
     
-    // Scale from detection coordinates to display coordinates
-    const scaleX = displayImageWidth / detectionWidth;
-    const scaleY = displayImageHeight / detectionHeight;
+    // Scale from original image coordinates to display coordinates
+    const scaleX = displayImageWidth / imageDimensions.width;
+    const scaleY = displayImageHeight / imageDimensions.height;
     
     // Adjust click coordinates relative to the displayed image (account for padding from resizeMode="contain")
     const clickedX = (locationX - offsetX) / scaleX;
@@ -189,13 +183,8 @@ export default function FaceSelectionModal({
     }
   };
 
-  // The server resizes images to max 600px before detection
-  const MAX_DETECTION_DIMENSION = 600;
-  
   // Use fallback dimensions if not yet loaded
   const effectiveDimensions = imageDimensions || { width: 800, height: 600 };
-  const detectionWidth = Math.min(effectiveDimensions.width, MAX_DETECTION_DIMENSION);
-  const detectionHeight = Math.min(effectiveDimensions.height, MAX_DETECTION_DIMENSION);
 
   const imageAspectRatio = effectiveDimensions.width / effectiveDimensions.height;
   const displayWidth = screenWidth - 48;
@@ -250,42 +239,6 @@ export default function FaceSelectionModal({
                   pointerEvents: 'box-none', // Allow touches to pass through to boxes
                 }}
               >
-                {/* Test box to verify rendering works - should appear in top-left corner */}
-                {detections && detections.length > 0 && (
-                  <>
-                    <View
-                      style={{
-                        position: 'absolute',
-                        left: 10,
-                        top: 10,
-                        width: 50,
-                        height: 50,
-                        backgroundColor: 'red',
-                        borderWidth: 3,
-                        borderColor: 'yellow',
-                        zIndex: 100,
-                        elevation: 100,
-                      }}
-                    />
-                    {/* Test box at calculated position for first detection */}
-                    {containerLayout && detections[0] && (
-                      <View
-                        style={{
-                          position: 'absolute',
-                          left: containerLayout.width / 2 - 25,
-                          top: containerLayout.height / 2 - 25,
-                          width: 50,
-                          height: 50,
-                          backgroundColor: 'blue',
-                          borderWidth: 3,
-                          borderColor: 'cyan',
-                          zIndex: 100,
-                          elevation: 100,
-                        }}
-                      />
-                    )}
-                  </>
-                )}
                 {/* Draw bounding boxes - show even before layout is measured using fallback values */}
               {detections && detections.length > 0 && detections.map((detection, index) => {
                 // Log once per render cycle
@@ -315,14 +268,8 @@ export default function FaceSelectionModal({
                 
                 if (displayLayout && containerLayout && imageDimensions) {
                   // Use accurate calculations with layout measurements
-                  // The detection was done on a resized image (max 600px), so we need to scale from detection size to display size
-                  const MAX_DETECTION_DIMENSION = 600;
-                  
-                  // Calculate the detection image dimensions (server resizes to max 600px)
-                  const detectionWidth = Math.min(imageDimensions.width, MAX_DETECTION_DIMENSION);
-                  const detectionHeight = Math.min(imageDimensions.height, MAX_DETECTION_DIMENSION);
-                  
-                  const detectionAspectRatio = imageDimensions.width / imageDimensions.height;
+                  // API now returns coordinates in original image space, so we scale directly from original to display
+                  const imageAspectRatio = imageDimensions.width / imageDimensions.height;
                   
                   // Use container dimensions (the actual visible area), not image layout dimensions
                   const containerAspectRatio = containerLayout.width / containerLayout.height;
@@ -332,21 +279,21 @@ export default function FaceSelectionModal({
                   let offsetX = 0;
                   let offsetY = 0;
                   
-                  if (detectionAspectRatio > containerAspectRatio) {
+                  if (imageAspectRatio > containerAspectRatio) {
                     // Image is wider - fit to container width
                     displayImageWidth = containerLayout.width;
-                    displayImageHeight = containerLayout.width / detectionAspectRatio;
+                    displayImageHeight = containerLayout.width / imageAspectRatio;
                     offsetY = (containerLayout.height - displayImageHeight) / 2;
                   } else {
                     // Image is taller - fit to container height
                     displayImageHeight = containerLayout.height;
-                    displayImageWidth = containerLayout.height * detectionAspectRatio;
+                    displayImageWidth = containerLayout.height * imageAspectRatio;
                     offsetX = (containerLayout.width - displayImageWidth) / 2;
                   }
                   
-                  // Scale from detection coordinates (600px max) to display coordinates
-                  const scaleX = displayImageWidth / detectionWidth;
-                  const scaleY = displayImageHeight / detectionHeight;
+                  // Scale from original image coordinates to display coordinates
+                  const scaleX = displayImageWidth / imageDimensions.width;
+                  const scaleY = displayImageHeight / imageDimensions.height;
                   
                   // Position boxes relative to the container (which is at 0,0 relative to itself)
                   // With resizeMode="contain", the actual image is centered within the container
@@ -367,8 +314,6 @@ export default function FaceSelectionModal({
                     displayLayout,
                     containerLayout,
                     imageDimensions,
-                    detectionWidth,
-                    detectionHeight,
                     displayImageWidth,
                     displayImageHeight,
                     scaleX,
@@ -390,13 +335,11 @@ export default function FaceSelectionModal({
                   console.log(`[FaceSelectionModal] Box ${index} - using fallback calculation`);
                   // Fallback: assume image fills container (no padding)
                   // This is approximate but ensures boxes are visible
-                  const MAX_DETECTION_DIMENSION = 600;
+                  // API returns coordinates in original image space, so scale directly to display
                   const effectiveDimensions = imageDimensions || { width: 800, height: 600 };
-                  const detectionWidth = Math.min(effectiveDimensions.width, MAX_DETECTION_DIMENSION);
-                  const detectionHeight = Math.min(effectiveDimensions.height, MAX_DETECTION_DIMENSION);
                   
-                  const fallbackScaleX = displayWidth / detectionWidth;
-                  const fallbackScaleY = displayHeight / detectionHeight;
+                  const fallbackScaleX = displayWidth / effectiveDimensions.width;
+                  const fallbackScaleY = displayHeight / effectiveDimensions.height;
                   boxLeft = detection.boundingBox.x * fallbackScaleX;
                   boxTop = detection.boundingBox.y * fallbackScaleY;
                   boxWidth = detection.boundingBox.width * fallbackScaleX;
@@ -439,58 +382,41 @@ export default function FaceSelectionModal({
                   <View key={`box-${index}`} collapsable={false}>
                     {!isSelected && (
                       <>
-                        {/* Static box for debugging - always visible, no animation */}
-                        <View
-                          style={{
-                            position: 'absolute',
-                            left: boxLeft,
-                            top: boxTop,
-                            width: Math.max(boxWidth, 20),
-                            height: Math.max(boxHeight, 20),
-                            borderColor: '#ff0000',
-                            borderWidth: 8,
-                            backgroundColor: 'rgba(255, 0, 0, 0.5)',
-                            borderRadius: 4,
-                            zIndex: 100,
-                            elevation: 100,
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                          }}
-                          pointerEvents="none"
-                        >
-                          <Text style={{ 
-                            color: 'white', 
-                            fontSize: 20, 
-                            fontWeight: 'bold', 
-                            backgroundColor: 'red', 
-                            padding: 8,
-                            borderRadius: 4,
-                          }}>
-                            {index + 1}
-                          </Text>
-                        </View>
-                        {/* Animated box (original) */}
+                        {/* Animated box with blinking effect */}
                         <Animated.View
                           style={[
                             styles.boundingBox,
                             {
                               left: boxLeft,
                               top: boxTop,
-                              width: Math.max(boxWidth, 20), // Ensure minimum width
-                              height: Math.max(boxHeight, 20), // Ensure minimum height
+                              width: boxWidth,
+                              height: boxHeight,
                               borderColor: '#ef4444',
-                              borderWidth: 5, // Increased for visibility
+                              borderWidth: 3, // Match green box width
                               opacity: blinkAnim,
                               elevation: 20, // Android - higher than image
                               shadowColor: '#ef4444', // iOS shadow
                               shadowOffset: { width: 0, height: 0 },
                               shadowOpacity: 1.0,
                               shadowRadius: 6,
-                              backgroundColor: 'rgba(239, 68, 68, 0.5)', // More visible red background
+                              backgroundColor: 'transparent', // No background fill
                             },
                           ]}
                           pointerEvents="none"
                         />
+                        {/* Label outside box */}
+                        <View
+                          style={{
+                            position: 'absolute',
+                            left: boxLeft,
+                            top: boxTop - 24,
+                            zIndex: 100,
+                            elevation: 100,
+                          }}
+                          pointerEvents="none"
+                        >
+                          <Text style={styles.unselectedLabelText}>{index + 1}</Text>
+                        </View>
                         <TouchableOpacity
                           activeOpacity={0.8}
                           onPress={() => {
@@ -510,27 +436,40 @@ export default function FaceSelectionModal({
                       </>
                     )}
                     {isSelected && (
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => setSelectedIndex(index)}
-                        style={[
-                          styles.boundingBox,
-                          {
+                      <>
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={() => setSelectedIndex(index)}
+                          style={[
+                            styles.boundingBox,
+                            {
+                              left: boxLeft,
+                              top: boxTop,
+                              width: boxWidth,
+                              height: boxHeight,
+                              borderColor: '#10b981',
+                              borderWidth: 3,
+                              elevation: 20,
+                              zIndex: 21,
+                            },
+                          ]}
+                        />
+                        {/* Label outside box to prevent overlap */}
+                        <View
+                          style={{
+                            position: 'absolute',
                             left: boxLeft,
-                            top: boxTop,
-                            width: boxWidth,
-                            height: boxHeight,
-                            borderColor: '#10b981',
-                            borderWidth: 3,
-                            elevation: 20,
-                            zIndex: 21,
-                          },
-                        ]}
-                      >
-                        <View style={styles.selectedLabel}>
-                          <Text style={styles.selectedLabelText}>Face {index + 1}</Text>
+                            top: boxTop - 24,
+                            zIndex: 100,
+                            elevation: 100,
+                          }}
+                          pointerEvents="none"
+                        >
+                          <View style={styles.selectedLabel}>
+                            <Text style={styles.selectedLabelText}>{index + 1}</Text>
+                          </View>
                         </View>
-                      </TouchableOpacity>
+                      </>
                     )}
                   </View>
                 );
@@ -541,7 +480,7 @@ export default function FaceSelectionModal({
 
           {selectedIndex !== null && (
             <Text style={styles.selectedText}>
-              Selected: Face {selectedIndex + 1}
+              Selected: {selectedIndex + 1}
             </Text>
           )}
 
@@ -642,6 +581,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  unselectedLabelText: {
+    color: '#ef4444',
+    fontSize: 12,
+    fontWeight: 'bold',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   selectedText: {
     fontSize: 14,

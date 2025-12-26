@@ -5,7 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { supabase } from '../../lib/supabase/client';
-import { Partner } from '@dating-app/shared';
+import { Partner, PARTNER_SORT_ORDER } from '@dating-app/shared';
 import { getPartnerProfilePictureUrl } from '../../lib/photo-utils';
 import BlackFlagIcon from '../../components/BlackFlagIcon';
 import { MainTabParamList } from '../../navigation/types';
@@ -54,7 +54,7 @@ export default function DashboardScreen() {
           .from('partners')
           .select('*')
           .eq('user_id', session.user.id)
-          .order('updated_at', { ascending: false })
+          .order(PARTNER_SORT_ORDER.field, { ascending: PARTNER_SORT_ORDER.ascending })
           .limit(3);
 
         if (!partnersError && partners) {
@@ -211,7 +211,7 @@ export default function DashboardScreen() {
                   // Navigate to Partners tab, then to PartnerDetail
                   navigation.navigate('Partners', {
                     screen: 'PartnerDetail',
-                    params: { partnerId: partner.id },
+                    params: { partnerId: partner.id, source: 'Dashboard' },
                   });
                 }}
                 activeOpacity={0.7}
@@ -278,7 +278,7 @@ export default function DashboardScreen() {
               setTimeout(() => {
                 navigation.navigate('Partners', {
                   screen: 'PhotoUpload',
-                  params: {},
+                  params: { source: 'Dashboard' },
                 });
               }, 100);
             }}

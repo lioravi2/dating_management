@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/lib/navigation';
 import { environment } from '@/lib/environment';
 import DevSignInButton from '@/components/DevSignInButton';
 
@@ -18,7 +18,7 @@ export default function SignInPage() {
   const [message, setMessage] = useState('');
   // Use useMemo to create supabase client only once
   const supabase = useMemo(() => createSupabaseClient(), []);
-  const router = useRouter();
+  const navigation = useNavigation();
   const hasCheckedSession = useRef(false);
   const isSubmitting = useRef(false); // Prevent double submissions
 
@@ -31,7 +31,7 @@ export default function SignInPage() {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        router.push('/dashboard');
+        navigation.push('/dashboard');
         return;
       }
 
@@ -43,7 +43,7 @@ export default function SignInPage() {
       }
     };
     checkUser();
-  }, [supabase, router]);
+  }, [supabase, navigation]);
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,8 +58,29 @@ export default function SignInPage() {
     setMessage('');
 
     try {
-      // Skip check-user API to avoid unnecessary calls and potential rate limit issues
-      // Supabase will handle user validation directly
+      // Check if user exists BEFORE sending magic link
+      try {
+        const checkResponse = await fetch('/api/auth/check-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+
+        if (checkResponse.ok) {
+          const checkData = await checkResponse.json();
+          
+          // If user doesn't exist, show message and don't send magic link
+          if (checkData.exists === false) {
+            setMessage('A user with this email wasn\'t found. Would you like to sign up instead?');
+            setLoading(false);
+            isSubmitting.current = false;
+            return;
+          }
+        }
+      } catch (checkError) {
+        // If check fails, continue with normal flow
+        console.error('Error checking user:', checkError);
+      }
       
       const redirectUrl = `${environment.getOrigin()}/auth/callback`;
       console.log('[SIGNIN] Requesting magic link', { email, redirectUrl });

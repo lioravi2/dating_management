@@ -42,7 +42,7 @@ export default function SamePersonWarningModal({
               style={styles.confirmButton}
               onPress={onConfirm}
             >
-              <Text style={styles.confirmButtonText}>Yes, Upload</Text>
+              <Text style={styles.confirmButtonText}>Yes, Upload Photo</Text>
             </TouchableOpacity>
           </View>
         </View>

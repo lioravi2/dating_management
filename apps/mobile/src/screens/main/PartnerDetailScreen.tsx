@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { PartnersStackParamList } from '../../navigation/types';
+import { MainTabParamList } from '../../navigation/types';
 import { supabase } from '../../lib/supabase/client';
 import { Partner } from '@dating-app/shared';
 import { getPartnerProfilePictureUrl } from '../../lib/photo-utils';
@@ -21,12 +24,15 @@ import BlackFlagIcon from '../../components/BlackFlagIcon';
 import PartnerPhotos from '../../components/PartnerPhotos';
 
 type PartnerDetailScreenRouteProp = RouteProp<PartnersStackParamList, 'PartnerDetail'>;
-type PartnerDetailScreenNavigationProp = NativeStackNavigationProp<PartnersStackParamList, 'PartnerDetail'>;
+type PartnerDetailScreenNavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<PartnersStackParamList, 'PartnerDetail'>,
+  BottomTabNavigationProp<MainTabParamList>
+>;
 
 export default function PartnerDetailScreen() {
   const navigation = useNavigation<PartnerDetailScreenNavigationProp>();
   const route = useRoute<PartnerDetailScreenRouteProp>();
-  const { partnerId } = route.params;
+  const { partnerId, source } = route.params;
 
   const [partner, setPartner] = useState<Partner | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,6 +49,31 @@ export default function PartnerDetailScreen() {
   useEffect(() => {
     loadPartner();
   }, [partnerId]);
+
+  // Configure back button behavior based on source
+  useLayoutEffect(() => {
+    if (source === 'Dashboard') {
+      navigation.setOptions({
+        headerBackTitle: 'Dashboard',
+        headerBackTitleVisible: false,
+      });
+      
+      // Override back button behavior
+      const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+        // Only handle back button if it's the default back action
+        if (e.data.action.type === 'GO_BACK') {
+          e.preventDefault();
+          // Navigate to Dashboard tab instead
+          const tabNavigator = navigation.getParent();
+          if (tabNavigator) {
+            tabNavigator.navigate('Dashboard');
+          }
+        }
+      });
+      
+      return unsubscribe;
+    }
+  }, [navigation, source]);
 
   const loadPartner = async (isRefresh = false) => {
     try {

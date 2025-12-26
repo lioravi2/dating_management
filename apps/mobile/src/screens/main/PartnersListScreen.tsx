@@ -9,9 +9,10 @@ import {
   Image,
   RefreshControl,
   Alert,
+  Linking,
 } from 'react-native';
 import { supabase } from '../../lib/supabase/client';
-import { Partner } from '@dating-app/shared';
+import { Partner, PARTNER_SORT_ORDER } from '@dating-app/shared';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PartnersStackParamList } from '../../navigation/types';
@@ -42,7 +43,7 @@ export default function PartnersListScreen() {
         .from('partners')
         .select('*')
         .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false });
+        .order(PARTNER_SORT_ORDER.field, { ascending: PARTNER_SORT_ORDER.ascending });
 
       if (partnersError) {
         throw partnersError;
@@ -88,6 +89,37 @@ export default function PartnersListScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     loadPartners();
+  };
+
+  const renderDescriptionWithLinks = (text: string) => {
+    // URL regex pattern (non-global for testing individual parts)
+    const urlPattern = /^https?:\/\/[^\s]+$/;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    
+    return (
+      <Text style={styles.description} numberOfLines={2}>
+        {parts.map((part, index) => {
+          // Use non-global pattern to test individual parts (avoids lastIndex state issues)
+          if (urlPattern.test(part)) {
+            return (
+              <Text
+                key={index}
+                style={styles.linkText}
+                onPress={() => {
+                  Linking.openURL(part).catch((err) => {
+                    console.error('Error opening URL:', err);
+                  });
+                }}
+              >
+                {part}
+              </Text>
+            );
+          }
+          return <Text key={index}>{part}</Text>;
+        })}
+      </Text>
+    );
   };
 
   const renderPartnerCard = ({ item: partner }: { item: Partner }) => {
@@ -152,11 +184,7 @@ export default function PartnersListScreen() {
             {partner.phone_number && (
               <Text style={styles.cardText}>{partner.phone_number}</Text>
             )}
-            {description && (
-              <Text style={styles.description} numberOfLines={2}>
-                {description}
-              </Text>
-            )}
+            {description && renderDescriptionWithLinks(description)}
             <View style={styles.dateContainer}>
               <Text style={styles.dateText}>Added {createdDate}</Text>
               {updatedDate && (
@@ -460,6 +488,10 @@ const styles = StyleSheet.create({
     color: '#374151', // gray-700
     marginTop: 12,
     lineHeight: 20,
+  },
+  linkText: {
+    color: '#2563eb',
+    textDecorationLine: 'underline',
   },
   dateContainer: {
     marginTop: 12,

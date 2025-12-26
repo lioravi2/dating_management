@@ -692,33 +692,33 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
     originalDimensions: { width: number; height: number }
   ): Promise<{ uri: string; width: number; height: number }> => {
     try {
-      // The bounding box coordinates are relative to the detection image (max 600px)
-      // We need to scale them to the original optimized image dimensions
-      const MAX_DETECTION_DIMENSION = 600;
-      const detectionWidth = Math.min(originalDimensions.width, MAX_DETECTION_DIMENSION);
-      const detectionHeight = Math.min(originalDimensions.height, MAX_DETECTION_DIMENSION);
+      // API now returns coordinates in original image space, so use them directly
+      // But we need to validate and clamp to ensure they're within image bounds
+      const cropX = Math.max(0, Math.min(Math.round(boundingBox.x), originalDimensions.width - 1));
+      const cropY = Math.max(0, Math.min(Math.round(boundingBox.y), originalDimensions.height - 1));
       
-      // Scale bounding box from detection size to original image size
-      const scaleX = originalDimensions.width / detectionWidth;
-      const scaleY = originalDimensions.height / detectionHeight;
+      // Calculate maximum allowed width and height
+      const maxWidth = originalDimensions.width - cropX;
+      const maxHeight = originalDimensions.height - cropY;
       
-      const cropX = Math.max(0, Math.round(boundingBox.x * scaleX));
-      const cropY = Math.max(0, Math.round(boundingBox.y * scaleY));
-      const cropWidth = Math.min(
-        Math.round(boundingBox.width * scaleX),
-        originalDimensions.width - cropX
-      );
-      const cropHeight = Math.min(
-        Math.round(boundingBox.height * scaleY),
-        originalDimensions.height - cropY
-      );
+      // Clamp width and height to ensure they don't exceed image bounds
+      const cropWidth = Math.max(1, Math.min(Math.round(boundingBox.width), maxWidth));
+      const cropHeight = Math.max(1, Math.min(Math.round(boundingBox.height), maxHeight));
 
       console.log('[PartnerPhotos] Cropping image to face:', {
         original: originalDimensions,
-        detection: { width: detectionWidth, height: detectionHeight },
         boundingBox,
         crop: { x: cropX, y: cropY, width: cropWidth, height: cropHeight },
       });
+
+      // Validate crop parameters
+      if (cropX < 0 || cropY < 0 || cropWidth <= 0 || cropHeight <= 0) {
+        throw new Error(`Invalid crop parameters: x=${cropX}, y=${cropY}, width=${cropWidth}, height=${cropHeight}`);
+      }
+      
+      if (cropX + cropWidth > originalDimensions.width || cropY + cropHeight > originalDimensions.height) {
+        throw new Error(`Crop rectangle extends beyond image bounds: crop(${cropX}, ${cropY}, ${cropWidth}, ${cropHeight}) vs image(${originalDimensions.width}, ${originalDimensions.height})`);
+      }
 
       const result = await ImageManipulator.manipulateAsync(
         imageUri,
@@ -1066,8 +1066,9 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
                   </View>
                 ) : (
                   <TouchableOpacity
-                    style={styles.deleteButton}
+                    style={[styles.deleteButton, deleting !== null && styles.deleteButtonDisabled]}
                     onPress={() => handleDeleteClick(item.id)}
+                    disabled={deleting !== null}
                   >
                     <Text style={styles.deleteButtonText}>Delete</Text>
                   </TouchableOpacity>
@@ -1122,6 +1123,7 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
           uploadDataRef.current = null;
           setSelectedImageUri(null);
         }}
+        partnerId={partnerId}
       />
 
       {/* Same Person Warning Modal */}
@@ -1244,6 +1246,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
+  },
+  deleteButtonDisabled: {
+    opacity: 0.5,
   },
   deleteButtonText: {
     color: '#fff',

@@ -49,8 +49,29 @@ export default function SignUpPage() {
     setMessage('');
 
     try {
-      // Skip check-user API to avoid unnecessary calls and potential rate limit issues
-      // Supabase will handle user validation directly
+      // Check if user already exists BEFORE sending magic link
+      try {
+        const checkResponse = await fetch('/api/auth/check-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+
+        if (checkResponse.ok) {
+          const checkData = await checkResponse.json();
+          
+          // If user already exists, show message and don't send magic link
+          if (checkData.exists === true) {
+            setMessage('A user with this email already exists. Would you like to sign in instead?');
+            setLoading(false);
+            isSubmitting.current = false;
+            return;
+          }
+        }
+      } catch (checkError) {
+        // If check fails, continue with normal flow
+        console.error('Error checking user:', checkError);
+      }
       
       const redirectUrl = `${environment.getOrigin()}/auth/callback`;
       console.log('[SIGNUP] Requesting magic link', { email, redirectUrl });

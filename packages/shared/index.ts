@@ -154,3 +154,9 @@ export const FREE_TIER_ACTIVITY_LIMIT = 20;
 export const FREE_TIER_NOTE_LIMIT = FREE_TIER_ACTIVITY_LIMIT; // Backward compatibility
 export const FREE_TIER_PHOTO_LIMIT = 20;
 
+// Partner Sorting
+export const PARTNER_SORT_ORDER = {
+  field: 'updated_at' as const,
+  ascending: false,
+};
+

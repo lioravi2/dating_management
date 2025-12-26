@@ -19,7 +19,7 @@ import { PhotoUploadAnalysis } from '@dating-app/shared';
 
 export type PartnersStackParamList = {
   PartnersList: undefined;
-  PartnerDetail: { partnerId: string; uploadPhoto?: boolean; uploadData?: any; faceDescriptor?: number[]; imageUri?: string };
+  PartnerDetail: { partnerId: string; uploadPhoto?: boolean; uploadData?: any; faceDescriptor?: number[]; imageUri?: string; source?: 'Dashboard' | 'PartnersList' };
   PartnerEdit: { partnerId: string };
   PartnerCreate: { uploadPhoto?: boolean; uploadData?: any; faceDescriptor?: number[]; imageUri?: string };
   SimilarPartners: {
@@ -35,7 +35,7 @@ export type PartnersStackParamList = {
     faceDescriptor: number[] | null;
     imageUri: string; // Original image URI for preview
   };
-  PhotoUpload: { partnerId?: string };
+  PhotoUpload: { partnerId?: string; source?: 'Dashboard' | 'PartnersList' };
 };
 
 export type UploadStackParamList = {

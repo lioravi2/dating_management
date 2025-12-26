@@ -146,6 +146,10 @@ export async function POST(request: NextRequest) {
     const img = await loadImage(buffer);
     console.log(`[Face Detection] Image loaded: ${img.width}x${img.height}`);
     
+    // Store original dimensions before any resizing
+    const originalWidth = img.width;
+    const originalHeight = img.height;
+    
     // Create canvas and draw image
     const canvas = createCanvas(img.width, img.height);
     const ctx = canvas.getContext('2d');
@@ -198,16 +202,25 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Scale bounding boxes back to original size if we resized
+    // This ensures coordinates are in original image space (matching web app behavior)
+    const inputWidth = inputCanvas.width;
+    const inputHeight = inputCanvas.height;
+    const scaleX = originalWidth / inputWidth;
+    const scaleY = originalHeight / inputHeight;
+    
+    console.log(`[Face Detection] Scaling coordinates: input=${inputWidth}x${inputHeight}, original=${originalWidth}x${originalHeight}, scale=${scaleX.toFixed(3)}x${scaleY.toFixed(3)}`);
+
     // Convert detections to response format (same structure as web app)
     const results = filteredDetections.map((detection) => {
       const box = detection.detection.box;
       return {
         descriptor: Array.from(detection.descriptor),
         boundingBox: {
-          x: box.x,
-          y: box.y,
-          width: box.width,
-          height: box.height,
+          x: box.x * scaleX,
+          y: box.y * scaleY,
+          width: box.width * scaleX,
+          height: box.height * scaleY,
         },
         confidence: detection.detection.score,
       };

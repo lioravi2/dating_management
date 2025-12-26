@@ -1,7 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { MainTabParamList } from '../../navigation/types';
 import { supabase } from '../../lib/supabase/client';
 import { usePhotoUpload } from '../../hooks/usePhotoUpload';
 import { PartnersStackParamList } from '../../navigation/types';
@@ -14,11 +17,15 @@ import { getPartnerProfilePictureUrl } from '../../lib/photo-utils';
 import { Partner, PhotoUploadAnalysis, FaceMatch } from '@dating-app/shared';
 
 type PhotoUploadScreenRouteProp = RouteProp<PartnersStackParamList, 'PhotoUpload'>;
-type PhotoUploadScreenNavigationProp = NativeStackNavigationProp<PartnersStackParamList, 'PhotoUpload'>;
+type PhotoUploadScreenNavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<PartnersStackParamList, 'PhotoUpload'>,
+  BottomTabNavigationProp<MainTabParamList>
+>;
 
 export default function PhotoUploadScreen() {
   const navigation = useNavigation<PhotoUploadScreenNavigationProp>();
   const route = useRoute<PhotoUploadScreenRouteProp>();
+  const { source } = route.params || {};
   
   const [matches, setMatches] = useState<FaceMatch[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,11 +72,15 @@ export default function PhotoUploadScreen() {
       return;
     }
     
+    // Set loading state immediately before API call
+    setLoading(true);
+    
     // Create partner without name and upload photo in background
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         Alert.alert('Error', 'Not authenticated');
+        setLoading(false);
         return;
       }
 
@@ -105,6 +116,9 @@ export default function PhotoUploadScreen() {
       const result = await response.json();
       console.log('[PhotoUploadScreen] Partner created and photo uploaded:', result);
       
+      // Reset state before navigation to ensure clean state
+      resetState();
+      
       // Navigate to Dashboard after successful creation (not goBack which would go to Partners)
       const tabNavigator = navigation.getParent();
       if (tabNavigator) {
@@ -116,8 +130,10 @@ export default function PhotoUploadScreen() {
         'Error',
         error instanceof Error ? error.message : 'Failed to create partner and upload photo'
       );
+    } finally {
+      setLoading(false);
     }
-  }, [uploadData, navigation]);
+  }, [uploadData, navigation, resetState]);
 
   // Track if this is the first focus to avoid clearing state on initial mount
   const isFirstFocus = useRef(true);
@@ -129,7 +145,7 @@ export default function PhotoUploadScreen() {
       // Only clear state on subsequent focuses (not the first mount)
       // This prevents clearing state when the screen first loads, but clears it
       // when user navigates back to the screen after uploading/cancelling
-      if (!isFirstFocus.current && !uploading && !showProgressModal && !hasResetThisFocus.current) {
+      if (!isFirstFocus.current && !uploading && !showProgressModal && !loading && !hasResetThisFocus.current) {
         // Reset state without navigating (resetState doesn't call onCancel)
         // This will clear any stale state from previous uploads
         resetState();
@@ -142,8 +158,33 @@ export default function PhotoUploadScreen() {
       return () => {
         hasResetThisFocus.current = false;
       };
-    }, [uploading, showProgressModal, resetState]) // resetState is now stable (wrapped in useCallback)
+    }, [uploading, showProgressModal, loading, resetState]) // resetState is now stable (wrapped in useCallback)
   );
+
+  // Configure back button behavior based on source
+  useLayoutEffect(() => {
+    if (source === 'Dashboard') {
+      navigation.setOptions({
+        headerBackTitle: 'Dashboard',
+        headerBackTitleVisible: false,
+      });
+      
+      // Override back button behavior
+      const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+        // Only handle back button if it's the default back action
+        if (e.data.action.type === 'GO_BACK') {
+          e.preventDefault();
+          // Navigate to Dashboard tab instead
+          const tabNavigator = navigation.getParent();
+          if (tabNavigator) {
+            tabNavigator.navigate('Dashboard');
+          }
+        }
+      });
+      
+      return unsubscribe;
+    }
+  }, [navigation, source]);
 
   // When analysis completes without partnerId, handle the decision
   useEffect(() => {
@@ -179,6 +220,7 @@ export default function PhotoUploadScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         Alert.alert('Error', 'Not authenticated');
+        setLoading(false);
         return;
       }
 
@@ -215,6 +257,9 @@ export default function PhotoUploadScreen() {
       const result = await response.json();
       console.log('[PhotoUploadScreen] Partner created and photo uploaded:', result);
       
+      // Reset state before navigation to ensure clean state
+      resetState();
+      
       // Navigate to Dashboard after successful creation (not goBack which would go to Partners)
       const tabNavigator = navigation.getParent();
       if (tabNavigator) {
@@ -229,7 +274,7 @@ export default function PhotoUploadScreen() {
     } finally {
       setLoading(false);
     }
-  }, [uploadData, selectedFaceDescriptor, navigation]);
+  }, [uploadData, selectedFaceDescriptor, navigation, resetState]);
 
   const handleCreateNewPartner = async () => {
     if (!uploadData) {

@@ -1,7 +1,7 @@
 import { createSupabaseServerComponentClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Partner } from '@/shared';
+import { Partner, PARTNER_SORT_ORDER } from '@/shared';
 import Header from '@/components/Header';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import PartnerCard from '@/components/PartnerCard';
@@ -28,7 +28,7 @@ export default async function PartnersPage() {
     .from('partners')
     .select('*')
     .eq('user_id', session.user.id)
-    .order('updated_at', { ascending: false });
+    .order(PARTNER_SORT_ORDER.field, { ascending: PARTNER_SORT_ORDER.ascending });
 
   if (partnersError) {
     console.error('Error fetching partners:', partnersError);

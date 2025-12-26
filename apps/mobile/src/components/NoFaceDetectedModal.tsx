@@ -11,13 +11,16 @@ interface NoFaceDetectedModalProps {
   visible: boolean;
   onProceed: () => void;
   onCancel: () => void;
+  partnerId?: string;
 }
 
 export default function NoFaceDetectedModal({
   visible,
   onProceed,
   onCancel,
+  partnerId,
 }: NoFaceDetectedModalProps) {
+  const buttonText = partnerId ? 'Yes, Upload Photo' : 'Create New Partner';
   return (
     <Modal
       visible={visible}
@@ -42,10 +45,10 @@ export default function NoFaceDetectedModal({
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.proceedButton}
+              style={styles.createButton}
               onPress={onProceed}
             >
-              <Text style={styles.proceedButtonText}>Upload Anyway</Text>
+              <Text style={styles.createButtonText}>{buttonText}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -92,7 +95,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   cancelButton: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
@@ -103,13 +106,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  proceedButton: {
-    paddingHorizontal: 20,
+  createButton: {
+    paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
     backgroundColor: '#dc2626',
+    minWidth: 140,
+    alignItems: 'center',
   },
-  proceedButtonText: {
+  createButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',

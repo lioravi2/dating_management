@@ -8,7 +8,7 @@
         "src/*"
       ],
       "@dating-app/shared": [
-        "../../packages/shared/src"
+        "../../packages/shared"
       ]
     }
   },
