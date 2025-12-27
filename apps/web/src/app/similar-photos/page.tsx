@@ -10,6 +10,7 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 import { getPhotoUrl } from '@/lib/photo-utils';
 import { PhotoUploadAnalysis, FaceMatch } from '@/shared';
 import BlackFlagIcon from '@/components/BlackFlagIcon';
+import AlertDialog from '@/components/AlertDialog';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,6 +68,11 @@ export default function SimilarPhotosPage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [partnerLimitMessage, setPartnerLimitMessage] = useState<string | null>(null);
+  const [alertDialog, setAlertDialog] = useState<{ open: boolean; title: string; message: string }>({
+    open: false,
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -319,7 +325,11 @@ export default function SimilarPhotosPage() {
                             try {
                               const uploadDataStr = sessionStorage.getItem(currentUploadDataKey);
                               if (!uploadDataStr) {
-                                alert('Upload data not found. Please try uploading again.');
+                                setAlertDialog({
+                                  open: true,
+                                  title: 'Upload Error',
+                                  message: 'Upload data not found. Please try uploading again.',
+                                });
                                 return;
                               }
 
@@ -370,11 +380,19 @@ export default function SimilarPhotosPage() {
                               environment.redirect('/dashboard');
                             } catch (error) {
                               console.error('[SimilarPhotos] Error uploading photo:', error);
-                              alert(error instanceof Error ? error.message : 'Failed to upload photo');
+                              setAlertDialog({
+                                open: true,
+                                title: 'Upload Error',
+                                message: error instanceof Error ? error.message : 'Failed to upload photo',
+                              });
                             }
                           } else {
                             console.error('[SimilarPhotos] No uploadDataKey found');
-                            alert('Upload data not found. Please try uploading again.');
+                            setAlertDialog({
+                              open: true,
+                              title: 'Upload Error',
+                              message: 'Upload data not found. Please try uploading again.',
+                            });
                           }
                         }}
                         className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm sm:text-base"
@@ -466,7 +484,11 @@ export default function SimilarPhotosPage() {
                         return;
                       }
                       
-                      alert(result.message || result.error || 'Failed to create partner');
+                      setAlertDialog({
+                        open: true,
+                        title: 'Error',
+                        message: result.message || result.error || 'Failed to create partner',
+                      });
                       setCreating(false);
                       return;
                     }
@@ -487,7 +509,11 @@ export default function SimilarPhotosPage() {
                     if (error instanceof Error && (error.message.includes('PARTNER_LIMIT_REACHED') || error.message.includes('partner limit'))) {
                       setPartnerLimitMessage(error.message || 'Partner limit reached');
                     } else {
-                      alert('Failed to create partner. Please try again.');
+                      setAlertDialog({
+                        open: true,
+                        title: 'Error',
+                        message: 'Failed to create partner. Please try again.',
+                      });
                     }
                   } finally {
                     setCreating(false);
@@ -516,6 +542,13 @@ export default function SimilarPhotosPage() {
           </div>
         </div>
       </main>
+
+      <AlertDialog
+        open={alertDialog.open}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        onClose={() => setAlertDialog({ open: false, title: '', message: '' })}
+      />
     </div>
   );
 }

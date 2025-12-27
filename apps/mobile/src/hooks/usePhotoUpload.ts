@@ -577,7 +577,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
               return;
             }
 
-            const faceDescriptor = detections[0].descriptor;
+            const faceDescriptor = validDetections[0].descriptor;
             await handleFaceAnalysis(faceDescriptor);
           } else {
             // No detections and no error (or error was already handled above)

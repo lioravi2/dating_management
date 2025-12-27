@@ -497,7 +497,7 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
             }
 
             // Single face - proceed with analysis
-            const faceDescriptor = detections[0].descriptor;
+            const faceDescriptor = validDetections[0].descriptor;
             await handleFaceAnalysis(faceDescriptor);
           } else {
             // No face detected - show modal
