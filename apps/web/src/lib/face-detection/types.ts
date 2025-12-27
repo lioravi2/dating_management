@@ -24,6 +24,8 @@ export interface FaceDetectionResult {
 export interface MultipleFaceDetectionResult {
   detections: FaceDetectionResult[];
   error: string | null;
+  filteredCount?: number;
+  warning?: string;
 }
 
 /**

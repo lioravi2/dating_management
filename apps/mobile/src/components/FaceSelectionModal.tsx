@@ -28,6 +28,7 @@ interface FaceSelectionModalProps {
   detections: FaceDetection[];
   onSelect: (detection: FaceDetection) => void;
   onCancel: () => void;
+  warning?: string;
 }
 
 export default function FaceSelectionModal({
@@ -36,6 +37,7 @@ export default function FaceSelectionModal({
   detections,
   onSelect,
   onCancel,
+  warning,
 }: FaceSelectionModalProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
@@ -199,6 +201,11 @@ export default function FaceSelectionModal({
       <View style={styles.overlay}>
         <View style={styles.modal}>
           <Text style={styles.title}>Select a Face</Text>
+          {warning && (
+            <View style={styles.warningContainer}>
+              <Text style={styles.warningText}>{warning}</Text>
+            </View>
+          )}
           <Text style={styles.subtitle}>
             Multiple faces detected. Tap on the face you want to upload.
           </Text>
@@ -627,6 +634,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  warningContainer: {
+    padding: 12,
+    borderRadius: 6,
+    backgroundColor: '#fef3c7',
+    marginBottom: 16,
+  },
+  warningText: {
+    color: '#92400e',
+    fontSize: 14,
   },
 });
 

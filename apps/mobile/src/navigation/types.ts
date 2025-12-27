@@ -1,6 +1,7 @@
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
+  Share: undefined;
 };
 
 export type AuthStackParamList = {
@@ -41,6 +42,10 @@ export type PartnersStackParamList = {
 export type UploadStackParamList = {
   UploadPhoto: { partnerId: string };
   SimilarPhotos: { partnerId: string; photoId: string };
+};
+
+export type ShareStackParamList = {
+  ShareHandler: { imageUri: string };
 };
 
 

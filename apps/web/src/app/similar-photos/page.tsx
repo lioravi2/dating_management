@@ -66,6 +66,7 @@ export default function SimilarPhotosPage() {
   const [similarPartners, setSimilarPartners] = useState<SimilarPartner[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [partnerLimitMessage, setPartnerLimitMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -201,6 +202,19 @@ export default function SimilarPhotosPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow p-6">
+          {/* Partner limit error message */}
+          {partnerLimitMessage && (
+            <div className="mb-4 p-3 rounded bg-red-50 text-red-800 border border-red-200">
+              <p className="mb-2">{partnerLimitMessage}</p>
+              <Link
+                href="/upgrade"
+                className="inline-block px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-center text-sm font-semibold"
+              >
+                Upgrade to Pro
+              </Link>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
             {imageUrl ? (
               <img
@@ -399,6 +413,9 @@ export default function SimilarPhotosPage() {
                     return;
                   }
 
+                  // Clear any previous error messages
+                  setPartnerLimitMessage(null);
+
                   // Get upload data from sessionStorage
                   const uploadDataStr = sessionStorage.getItem(uploadDataKey);
                   if (!uploadDataStr) {
@@ -441,6 +458,14 @@ export default function SimilarPhotosPage() {
 
                     if (!response.ok) {
                       console.error('Error creating partner:', result.error);
+                      
+                      // Check for partner limit error
+                      if (response.status === 403 && result.error === 'PARTNER_LIMIT_REACHED') {
+                        setPartnerLimitMessage(result.message || 'Partner limit reached');
+                        setCreating(false);
+                        return;
+                      }
+                      
                       alert(result.message || result.error || 'Failed to create partner');
                       setCreating(false);
                       return;
@@ -457,7 +482,13 @@ export default function SimilarPhotosPage() {
                     environment.redirect('/dashboard');
                   } catch (error) {
                     console.error('Error creating partner:', error);
-                    alert('Failed to create partner. Please try again.');
+                    
+                    // Check if it's a partner limit error (in case it wasn't caught above)
+                    if (error instanceof Error && (error.message.includes('PARTNER_LIMIT_REACHED') || error.message.includes('partner limit'))) {
+                      setPartnerLimitMessage(error.message || 'Partner limit reached');
+                    } else {
+                      alert('Failed to create partner. Please try again.');
+                    }
                   } finally {
                     setCreating(false);
                   }

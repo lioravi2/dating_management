@@ -163,6 +163,41 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
     };
   };
 
+  // Prepare image for face detection with higher quality to avoid detection issues
+  // This uses less compression (0.95) and larger max size to preserve detail for face detection
+  const prepareImageForFaceDetection = async (uri: string, width: number, height: number): Promise<{
+    uri: string;
+    width: number;
+    height: number;
+    mimeType: string;
+  }> => {
+    // Resize if too large (max 3000px on longest side for face detection)
+    // This is larger than the upload optimization to preserve more detail
+    const MAX_DIMENSION = 3000;
+    let actions: ImageManipulator.Action[] = [];
+    
+    if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+      const scale = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+      const newWidth = Math.round(width * scale);
+      const newHeight = Math.round(height * scale);
+      actions.push({ resize: { width: newWidth, height: newHeight } });
+    }
+
+    // Use higher quality (0.95) for face detection to preserve detail
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      actions,
+      { compress: 0.95, format: ImageManipulator.SaveFormat.JPEG }
+    );
+
+    return {
+      uri: result.uri,
+      width: result.width,
+      height: result.height,
+      mimeType: 'image/jpeg',
+    };
+  };
+
   const performUpload = async (faceDescriptor: number[] | null = null) => {
     if (!uploadDataRef.current) {
       throw new Error('Upload data not available');
@@ -334,10 +369,17 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
       setUploadProgress('detecting_faces');
       let detections: any[] = [];
       try {
+        // Prepare high-quality image for face detection (better than optimized version)
+        const faceDetectionImage = await prepareImageForFaceDetection(
+          asset.uri,
+          asset.width,
+          asset.height
+        );
+
         const detectFormData = new FormData();
         detectFormData.append('file', {
-          uri: optimized.uri,
-          type: optimized.mimeType,
+          uri: faceDetectionImage.uri,
+          type: faceDetectionImage.mimeType,
           name: uploadDataRef.current.fileName,
         } as any);
 

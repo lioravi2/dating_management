@@ -36,6 +36,15 @@
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "SEND",
+          "data": [
+            {
+              "mimeType": "image/*"
+            }
+          ],
+          "category": ["DEFAULT"]
         }
       ]
     },

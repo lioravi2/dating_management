@@ -183,24 +183,17 @@ export async function POST(request: NextRequest) {
     console.log(`[Face Detection] Detection completed in ${(detectionDuration / 1000).toFixed(2)}s`);
     console.log(`[Face Detection] Found ${detections.length} face(s)`);
 
-    // Filter by confidence threshold (0.8 = 80% confidence) to reduce false positives
+    // Filter by confidence threshold (0.65 = 65% confidence) to reduce false positives
     // This helps filter out animal faces and other non-human detections
-    // Higher threshold is needed because ssdMobilenetv1 can give relatively high scores to animal faces
-    // due to similar facial structure (two eyes, nose, mouth in similar positions)
-    const MIN_CONFIDENCE = 0.8;
+    // Lowered from 0.8 to 0.65 to allow valid human faces with glasses/angles while still filtering most animal faces
+    // ssdMobilenetv1 can give relatively high scores to animal faces due to similar facial structure
+    const MIN_CONFIDENCE = 0.65;
     const filteredDetections = detections.filter(detection => {
       const score = detection.detection.score;
       console.log(`[Face Detection] Detection confidence score: ${score.toFixed(3)}`);
       return score >= MIN_CONFIDENCE;
     });
     console.log(`[Face Detection] Filtered to ${filteredDetections.length} face(s) with confidence >= ${MIN_CONFIDENCE} (out of ${detections.length} total detections)`);
-
-    if (filteredDetections.length === 0) {
-      return NextResponse.json({
-        detections: [],
-        error: 'No faces detected',
-      });
-    }
 
     // Scale bounding boxes back to original size if we resized
     // This ensures coordinates are in original image space (matching web app behavior)
@@ -211,8 +204,43 @@ export async function POST(request: NextRequest) {
     
     console.log(`[Face Detection] Scaling coordinates: input=${inputWidth}x${inputHeight}, original=${originalWidth}x${originalHeight}, scale=${scaleX.toFixed(3)}x${scaleY.toFixed(3)}`);
 
+    // Filter by minimum face size (120px minimum dimension)
+    const MIN_FACE_SIZE = 120;
+    const sizeFilteredDetections = filteredDetections.filter(detection => {
+      const box = detection.detection.box;
+      // Scale to original image dimensions
+      const faceWidth = box.width * scaleX;
+      const faceHeight = box.height * scaleY;
+      const minDimension = Math.min(faceWidth, faceHeight);
+      
+      console.log(`[Face Detection] Face size: ${faceWidth.toFixed(0)}x${faceHeight.toFixed(0)}px (min dimension: ${minDimension.toFixed(0)}px)`);
+      
+      if (minDimension < MIN_FACE_SIZE) {
+        console.log(`[Face Detection] Face too small (${minDimension.toFixed(0)}px < ${MIN_FACE_SIZE}px), filtering out`);
+        return false;
+      }
+      
+      return true;
+    });
+    console.log(`[Face Detection] Filtered to ${sizeFilteredDetections.length} face(s) with size >= ${MIN_FACE_SIZE}px (out of ${filteredDetections.length} confidence-filtered detections)`);
+
+    // Calculate how many faces were filtered due to size
+    const filteredCount = filteredDetections.length - sizeFilteredDetections.length;
+
+    if (sizeFilteredDetections.length === 0) {
+      return NextResponse.json({
+        detections: [],
+        error: filteredDetections.length > 0 
+          ? `Face(s) detected but too small (minimum ${MIN_FACE_SIZE}px required)`
+          : 'No faces detected',
+        details: filteredDetections.length > 0 
+          ? `Face(s) detected but too small (minimum ${MIN_FACE_SIZE}px required)`
+          : 'No faces detected',
+      });
+    }
+
     // Convert detections to response format (same structure as web app)
-    const results = filteredDetections.map((detection) => {
+    const results = sizeFilteredDetections.map((detection) => {
       const box = detection.detection.box;
       return {
         descriptor: Array.from(detection.descriptor),
@@ -231,6 +259,10 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({
       detections: results,
+      ...(filteredCount > 0 && {
+        filteredCount,
+        warning: `${filteredCount} face${filteredCount > 1 ? 's' : ''} could not be processed due to low resolution`,
+      }),
     });
   } catch (error) {
     const totalDuration = Date.now() - startTime;

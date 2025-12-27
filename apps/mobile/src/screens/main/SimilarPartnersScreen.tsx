@@ -232,13 +232,21 @@ export default function SimilarPartnersScreen() {
             style: 'destructive',
             onPress: () => {
               setLoading(false);
-              navigation.goBack();
+              // Navigate to Dashboard when canceling (not goBack which would go to PhotoUpload)
+              const tabNavigator = navigation.getParent();
+              if (tabNavigator) {
+                tabNavigator.navigate('Dashboard');
+              }
             },
           },
         ]
       );
     } else {
-      navigation.goBack();
+      // Navigate to Dashboard when canceling (not goBack which would go to PhotoUpload)
+      const tabNavigator = navigation.getParent();
+      if (tabNavigator) {
+        tabNavigator.navigate('Dashboard');
+      }
     }
   };
 

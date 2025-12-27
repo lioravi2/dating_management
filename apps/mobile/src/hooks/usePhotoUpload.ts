@@ -29,9 +29,11 @@ export interface UsePhotoUploadReturn {
   selectedImageUri: string | null;
   analysisData: PhotoUploadAnalysis | null;
   selectedFaceDescriptor: number[] | null;
+  faceSizeWarning: string;
   
   // Actions
   handleUploadPhoto: () => Promise<void>;
+  processImageUri: (uri: string, width?: number, height?: number, fileName?: string) => Promise<void>;
   handleFaceSelected: (detection: any) => Promise<void>;
   handleNoFaceProceed: () => Promise<void>;
   handleSamePersonProceed: () => Promise<void>;
@@ -62,6 +64,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [analysisData, setAnalysisData] = useState<PhotoUploadAnalysis | null>(null);
   const [selectedFaceDescriptor, setSelectedFaceDescriptor] = useState<number[] | null>(null);
+  const [faceSizeWarning, setFaceSizeWarning] = useState<string>('');
   
   const uploadDataRef = useRef<{
     optimizedUri: string;
@@ -107,6 +110,41 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
       uri,
       resize ? [{ resize }] : [],
       { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+    );
+
+    return {
+      uri: result.uri,
+      width: result.width,
+      height: result.height,
+      mimeType: 'image/jpeg',
+    };
+  };
+
+  // Prepare image for face detection with higher quality to avoid detection issues
+  // This uses less compression (0.95) and larger max size to preserve detail for face detection
+  const prepareImageForFaceDetection = async (
+    uri: string,
+    width: number,
+    height: number
+  ): Promise<{ uri: string; width: number; height: number; mimeType: string }> => {
+    // Resize if too large (max 3000px on longest side for face detection)
+    // This is larger than the upload optimization to preserve more detail
+    const MAX_DIMENSION = 3000;
+    let resize: { width: number; height: number } | undefined;
+    
+    if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+      const scale = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+      resize = {
+        width: Math.round(width * scale),
+        height: Math.round(height * scale),
+      };
+    }
+
+    // Use higher quality (0.95) for face detection to preserve detail
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      resize ? [{ resize }] : [],
+      { compress: 0.95, format: ImageManipulator.SaveFormat.JPEG }
     );
 
     return {
@@ -219,6 +257,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     setFaceDetections([]);
     setSelectedFaceDescriptor(null);
     setAnalysisData(null);
+    setFaceSizeWarning('');
     
     onSuccess?.();
   };
@@ -370,34 +409,29 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     }
   };
 
-  const handleUploadPhoto = async () => {
-    const hasPermission = await requestImagePickerPermission();
-    if (!hasPermission) return;
-
+  // Process image from URI (for share intents or direct image processing)
+  const processImageUri = async (uri: string, width?: number, height?: number, fileName: string = 'photo.jpg') => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: 'images',
-        allowsEditing: false,
-        quality: 1.0,
-        allowsMultipleSelection: false,
-      });
-
-      if (result.canceled || !result.assets[0]) {
-        return;
-      }
-
-      const asset = result.assets[0];
       setUploading(true);
       setShowProgressModal(true);
       setUploadProgress('preparing');
 
       abortControllerRef.current = new AbortController();
 
+      // Get image dimensions if not provided
+      let imageWidth = width;
+      let imageHeight = height;
+      if (!imageWidth || !imageHeight) {
+        const imageInfo = await ImageManipulator.manipulateAsync(uri, [], { format: ImageManipulator.SaveFormat.JPEG });
+        imageWidth = imageInfo.width;
+        imageHeight = imageInfo.height;
+      }
+
       // Optimize image
       const optimized = await optimizeImage(
-        asset.uri,
-        asset.width,
-        asset.height
+        uri,
+        imageWidth,
+        imageHeight
       );
 
       if (abortControllerRef.current?.signal.aborted) {
@@ -409,7 +443,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
         width: optimized.width,
         height: optimized.height,
         mimeType: optimized.mimeType,
-        fileName: asset.fileName || 'photo.jpg',
+        fileName: fileName,
       };
 
       setSelectedImageUri(optimized.uri);
@@ -429,10 +463,17 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
       setUploadProgress('detecting_faces');
       let detections: any[] = [];
       try {
+        // Prepare high-quality image for face detection (better than optimized version)
+        const faceDetectionImage = await prepareImageForFaceDetection(
+          uri,
+          imageWidth,
+          imageHeight
+        );
+
         const detectFormData = new FormData();
         detectFormData.append('file', {
-          uri: optimized.uri,
-          type: optimized.mimeType,
+          uri: faceDetectionImage.uri,
+          type: faceDetectionImage.mimeType,
           name: uploadDataRef.current.fileName,
         } as any);
 
@@ -483,6 +524,31 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
             return;
           }
 
+          // Store warning if present (some faces filtered but valid ones remain)
+          if (detectData.warning) {
+            setFaceSizeWarning(detectData.warning);
+          } else {
+            setFaceSizeWarning('');
+          }
+
+          // Check for error first (e.g., all faces too small)
+          if (detectData.error) {
+            // Check if it's a face size error (all faces filtered) - show no face modal (same behavior: cancel or upload anyway)
+            if (detectData.error.includes('too small') || detectData.error.includes('minimum')) {
+              setShowProgressModal(false);
+              setShowNoFaceModal(true);
+              return;
+            }
+            // For "No faces detected" error with no detections, show no face modal
+            if ((detectData.error === 'No faces detected' || detectData.error.includes('No faces')) && 
+                (!Array.isArray(detectData.detections) || detectData.detections.length === 0)) {
+              setShowProgressModal(false);
+              setShowNoFaceModal(true);
+              return;
+            }
+          }
+
+          // Process detections if available
           if (Array.isArray(detectData.detections) && detectData.detections.length > 0) {
             detections = detectData.detections;
             
@@ -514,6 +580,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
             const faceDescriptor = detections[0].descriptor;
             await handleFaceAnalysis(faceDescriptor);
           } else {
+            // No detections and no error (or error was already handled above)
             setShowProgressModal(false);
             setShowNoFaceModal(true);
             return;
@@ -577,6 +644,40 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
         setShowProgressModal(false);
         setShowNoFaceModal(true);
       }
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
+        return;
+      }
+      console.error('Error uploading photo:', err);
+      Alert.alert('Upload Error', err instanceof Error ? err.message : 'Failed to upload photo');
+      cancelUpload();
+    }
+  };
+
+  const handleUploadPhoto = async () => {
+    const hasPermission = await requestImagePickerPermission();
+    if (!hasPermission) return;
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        allowsEditing: false,
+        quality: 1.0,
+        allowsMultipleSelection: false,
+      });
+
+      if (result.canceled || !result.assets[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      // Use processImageUri with asset data
+      await processImageUri(
+        asset.uri,
+        asset.width,
+        asset.height,
+        asset.fileName || 'photo.jpg'
+      );
     } catch (err: any) {
       if (err?.name === 'AbortError' || abortControllerRef.current?.signal.aborted) {
         return;
@@ -664,6 +765,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     setFaceDetections([]);
     setSelectedFaceDescriptor(null);
     setAnalysisData(null);
+    setFaceSizeWarning('');
     // Note: Don't call onCancel here - this is just for resetting state
   }, []); // Empty deps - this function doesn't depend on any props or state
 
@@ -683,7 +785,9 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     selectedImageUri,
     analysisData,
     selectedFaceDescriptor,
+    faceSizeWarning,
     handleUploadPhoto,
+    processImageUri,
     handleFaceSelected,
     handleNoFaceProceed,
     handleSamePersonProceed,

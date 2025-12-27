@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, ActivityIndicator, Alert, Linking } from 'react-native';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -29,6 +29,7 @@ export default function PhotoUploadScreen() {
   
   const [matches, setMatches] = useState<FaceMatch[]>([]);
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string>('');
   
   const {
     uploading,
@@ -41,6 +42,7 @@ export default function PhotoUploadScreen() {
     selectedImageUri,
     analysisData,
     selectedFaceDescriptor,
+    faceSizeWarning,
     handleUploadPhoto,
     handleFaceSelected,
     handleNoFaceProceed: hookHandleNoFaceProceed,
@@ -64,6 +66,12 @@ export default function PhotoUploadScreen() {
       }
     },
   });
+
+  // Wrapper to clear message when canceling
+  const handleCancel = useCallback(() => {
+    setMessage(''); // Clear any error messages when canceling
+    cancelUpload();
+  }, [cancelUpload]);
 
   // Override handleNoFaceProceed to create partner in background when no partnerId
   const handleNoFaceProceed = useCallback(async () => {
@@ -110,6 +118,15 @@ export default function PhotoUploadScreen() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        
+        // Check for partner limit error
+        if (response.status === 403 && errorData.error === 'PARTNER_LIMIT_REACHED') {
+          resetState(); // Clear upload state
+          setMessage(errorData.message || 'Partner limit reached');
+          setLoading(false);
+          return;
+        }
+        
         throw new Error(errorData.error || errorData.details || 'Failed to create partner');
       }
 
@@ -126,10 +143,17 @@ export default function PhotoUploadScreen() {
       }
     } catch (error) {
       console.error('[PhotoUploadScreen] Error creating partner:', error);
-      Alert.alert(
-        'Error',
-        error instanceof Error ? error.message : 'Failed to create partner and upload photo'
-      );
+      
+      // Check if it's a partner limit error (in case it wasn't caught above)
+      if (error instanceof Error && error.message.includes('PARTNER_LIMIT_REACHED')) {
+        resetState();
+        setMessage(error.message);
+      } else {
+        Alert.alert(
+          'Error',
+          error instanceof Error ? error.message : 'Failed to create partner and upload photo'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -137,7 +161,6 @@ export default function PhotoUploadScreen() {
 
   // Track if this is the first focus to avoid clearing state on initial mount
   const isFirstFocus = useRef(true);
-  const hasResetThisFocus = useRef(false);
   
   // Clear state when screen comes into focus (user navigates to it fresh)
   useFocusEffect(
@@ -145,20 +168,17 @@ export default function PhotoUploadScreen() {
       // Only clear state on subsequent focuses (not the first mount)
       // This prevents clearing state when the screen first loads, but clears it
       // when user navigates back to the screen after uploading/cancelling
-      if (!isFirstFocus.current && !uploading && !showProgressModal && !loading && !hasResetThisFocus.current) {
-        // Reset state without navigating (resetState doesn't call onCancel)
-        // This will clear any stale state from previous uploads
+      if (!isFirstFocus.current && !uploading && !showProgressModal && !loading) {
+        // Always reset state when returning to screen (after first mount)
+        // This ensures clean state when returning from SimilarPartners or other screens
         resetState();
-        hasResetThisFocus.current = true;
+        // Also clear local state that's not part of the hook
+        setMatches([]);
+        setMessage('');
       } else {
         isFirstFocus.current = false;
       }
-      
-      // Reset the flag when screen loses focus (cleanup function)
-      return () => {
-        hasResetThisFocus.current = false;
-      };
-    }, [uploading, showProgressModal, loading, resetState]) // resetState is now stable (wrapped in useCallback)
+    }, [uploading, showProgressModal, loading, resetState]) // Only depend on loading states, not on the state values themselves
   );
 
   // Configure back button behavior based on source
@@ -251,6 +271,15 @@ export default function PhotoUploadScreen() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        
+        // Check for partner limit error
+        if (response.status === 403 && errorData.error === 'PARTNER_LIMIT_REACHED') {
+          resetState(); // Clear upload state
+          setMessage(errorData.message || 'Partner limit reached');
+          setLoading(false);
+          return;
+        }
+        
         throw new Error(errorData.error || errorData.details || 'Failed to create partner');
       }
 
@@ -323,15 +352,44 @@ export default function PhotoUploadScreen() {
           </Text>
         </View>
 
+        {/* Error message container */}
+        {message && (
+          <View style={[styles.messageBox, styles.errorBox]}>
+            <Text style={[styles.messageText, styles.errorText]}>
+              {message}
+            </Text>
+            <TouchableOpacity
+              style={styles.upgradeButton}
+              onPress={() => {
+                const webAppUrl = process.env.EXPO_PUBLIC_WEB_APP_URL;
+                if (webAppUrl) {
+                  Linking.openURL(`${webAppUrl}/upgrade`).catch((err) => {
+                    console.error('Error opening upgrade page:', err);
+                  });
+                }
+              }}
+            >
+              <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Face size warning */}
+        {faceSizeWarning && (
+          <View style={[styles.messageBox, styles.warningBox]}>
+            <Text style={[styles.messageText, styles.warningText]}>
+              {faceSizeWarning}
+            </Text>
+          </View>
+        )}
+
         {/* Only show photo preview and controls if we're not in any modal state */}
         {selectedImageUri && !showProgressModal && !showFaceSelectionModal && !showNoFaceModal && !showSamePersonModal && !analysisData && (
           <View style={styles.imagePreview}>
             <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
             <TouchableOpacity
               style={styles.removeButton}
-              onPress={() => {
-                cancelUpload();
-              }}
+              onPress={handleCancel}
             >
               <Text style={styles.removeButtonText}>Remove Photo</Text>
             </TouchableOpacity>
@@ -339,10 +397,13 @@ export default function PhotoUploadScreen() {
         )}
 
         {/* Show "Select Photo" button when no image is selected and no modals are showing */}
-        {!selectedImageUri && !uploading && !showProgressModal && !showFaceSelectionModal && !showNoFaceModal && !showSamePersonModal && (
+        {!selectedImageUri && !uploading && !showProgressModal && !showFaceSelectionModal && !showNoFaceModal && !showSamePersonModal && !loading && (
           <TouchableOpacity
             style={styles.uploadButton}
-            onPress={handleUploadPhoto}
+            onPress={() => {
+              setMessage(''); // Clear any previous error messages when starting new upload
+              handleUploadPhoto();
+            }}
             disabled={uploading}
           >
             <Text style={styles.uploadButtonText}>Select Photo</Text>
@@ -398,7 +459,7 @@ export default function PhotoUploadScreen() {
       <PhotoUploadProgressModal
         visible={showProgressModal}
         currentStep={uploadProgress}
-        onCancel={cancelUpload}
+        onCancel={handleCancel}
       />
 
       <FaceSelectionModal
@@ -406,19 +467,20 @@ export default function PhotoUploadScreen() {
         imageUri={selectedImageUri || ''}
         detections={faceDetections}
         onSelect={handleFaceSelected}
-        onCancel={cancelUpload}
+        onCancel={handleCancel}
+        warning={faceSizeWarning || undefined}
       />
 
       <NoFaceDetectedModal
         visible={showNoFaceModal}
         onProceed={handleNoFaceProceed}
-        onCancel={cancelUpload}
+        onCancel={handleCancel}
       />
 
       <SamePersonWarningModal
         visible={showSamePersonModal}
         onProceed={handleSamePersonProceed}
-        onCancel={cancelUpload}
+        onCancel={handleCancel}
       />
     </View>
   );
@@ -567,5 +629,38 @@ const styles = StyleSheet.create({
     marginTop: 12,
     color: '#6b7280',
     fontSize: 14,
+  },
+  messageBox: {
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 16,
+  },
+  errorBox: {
+    backgroundColor: '#fee2e2',
+  },
+  messageText: {
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  errorText: {
+    color: '#dc2626',
+  },
+  upgradeButton: {
+    backgroundColor: '#dc2626',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  upgradeButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  warningBox: {
+    backgroundColor: '#fef3c7',
+  },
+  warningText: {
+    color: '#92400e',
   },
 });

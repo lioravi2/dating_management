@@ -46,6 +46,8 @@ export function PhotoUploadWithFaceMatch({
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [userAccountType, setUserAccountType] = useState<'free' | 'pro' | null>(null);
   const [photoLimitMessage, setPhotoLimitMessage] = useState<{ type: 'error'; text: string | React.ReactNode } | null>(null);
+  const [partnerLimitMessage, setPartnerLimitMessage] = useState<{ type: 'error'; text: string | React.ReactNode } | null>(null);
+  const [faceSizeWarning, setFaceSizeWarning] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   // Modal states
@@ -170,6 +172,8 @@ export function PhotoUploadWithFaceMatch({
     fileRef.current = file; // Store in ref immediately
     setUploadError(null);
     setPhotoLimitMessage(null); // Clear any previous photo limit messages
+    setPartnerLimitMessage(null); // Clear any previous partner limit messages
+    setFaceSizeWarning(null); // Clear any previous face size warnings
     setDetectionResult(null);
     setMultipleDetections(null);
     setAnalysis(null);
@@ -201,16 +205,27 @@ export function PhotoUploadWithFaceMatch({
       const allFacesResult: MultipleFaceDetectionResult = await detectAllFaces(img);
       console.log('[PhotoUpload] Face detection result:', { 
         detectionsCount: allFacesResult.detections.length, 
-        error: allFacesResult.error 
+        error: allFacesResult.error,
+        warning: allFacesResult.warning
       });
+      
+      // Store warning if present
+      if (allFacesResult.warning) {
+        setFaceSizeWarning(allFacesResult.warning);
+      }
       
       if (allFacesResult.error) {
         setAnalyzing(false);
-        setAlertDialog({
-          open: true,
-          title: 'Face Detection Error',
-          message: allFacesResult.error || 'Unknown face detection error',
-        });
+        // Check if it's a face size error - show no face modal (same behavior: cancel or upload anyway)
+        if (allFacesResult.error.includes('too small') || allFacesResult.error.includes('minimum')) {
+          setShowNoFaceModal(true);
+        } else {
+          setAlertDialog({
+            open: true,
+            title: 'Face Detection Error',
+            message: allFacesResult.error || 'Unknown face detection error',
+          });
+        }
         return;
       }
       
@@ -534,8 +549,28 @@ export function PhotoUploadWithFaceMatch({
               });
               
               if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-                throw new Error(error.error || error.details || 'Failed to create partner and upload photo');
+                const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                
+                // Check for partner limit error
+                if (response.status === 403 && errorData.error === 'PARTNER_LIMIT_REACHED') {
+                  resetState(); // Clear upload state
+                  setPartnerLimitMessage({
+                    type: 'error',
+                    text: (
+                      <>
+                        {errorData.message || 'Partner limit reached. Please '}
+                        <Link href="/upgrade" className="underline font-semibold">
+                          upgrade to Pro
+                        </Link>
+                        {' to add more partners.'}
+                      </>
+                    ),
+                  });
+                  setUploading(false);
+                  return;
+                }
+                
+                throw new Error(errorData.error || errorData.details || 'Failed to create partner and upload photo');
               }
               
               const result = await response.json();
@@ -552,12 +587,30 @@ export function PhotoUploadWithFaceMatch({
               }, 1500);
             } catch (error) {
               console.error('Error creating partner:', error);
-              setUploadError(error instanceof Error ? error.message : 'Failed to create partner');
-              setAlertDialog({
-                open: true,
-                title: 'Upload Error',
-                message: error instanceof Error ? error.message : 'Failed to create partner and upload photo',
-              });
+              
+              // Check if it's a partner limit error (in case it wasn't caught above)
+              if (error instanceof Error && (error.message.includes('PARTNER_LIMIT_REACHED') || error.message.includes('partner limit'))) {
+                resetState();
+                setPartnerLimitMessage({
+                  type: 'error',
+                  text: (
+                    <>
+                      {error.message || 'Partner limit reached. Please '}
+                      <Link href="/upgrade" className="underline font-semibold">
+                        upgrade to Pro
+                      </Link>
+                      {' to add more partners.'}
+                    </>
+                  ),
+                });
+              } else {
+                setUploadError(error instanceof Error ? error.message : 'Failed to create partner');
+                setAlertDialog({
+                  open: true,
+                  title: 'Upload Error',
+                  message: error instanceof Error ? error.message : 'Failed to create partner and upload photo',
+                });
+              }
               setUploading(false);
             }
           } else {
@@ -734,6 +787,8 @@ export function PhotoUploadWithFaceMatch({
     setAnalyzing(false);
     setUploading(false);
     setPhotoLimitMessage(null);
+    setPartnerLimitMessage(null);
+    setFaceSizeWarning(null);
   };
 
   // Set mounted state to prevent hydration errors
@@ -1105,6 +1160,24 @@ export function PhotoUploadWithFaceMatch({
         </div>
       )}
 
+      {partnerLimitMessage && (
+        <div
+          className={`mb-4 p-3 rounded ${
+            partnerLimitMessage.type === 'error'
+              ? 'bg-red-50 text-red-800'
+              : 'bg-green-50 text-green-800'
+          }`}
+        >
+          {partnerLimitMessage.text}
+        </div>
+      )}
+
+      {faceSizeWarning && (
+        <div className="mb-4 p-3 rounded bg-yellow-50 text-yellow-800 border border-yellow-200">
+          <p className="text-sm">{faceSizeWarning}</p>
+        </div>
+      )}
+
       <ImagePicker
         ref={imagePickerRef}
         onSelect={handleFileSelect}
@@ -1219,8 +1292,29 @@ export function PhotoUploadWithFaceMatch({
                       });
                       
                       if (!response.ok) {
-                        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-                        throw new Error(error.error || error.details || 'Failed to create partner and upload photo');
+                        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                        
+                        // Check for partner limit error
+                        if (response.status === 403 && errorData.error === 'PARTNER_LIMIT_REACHED') {
+                          resetState(); // Clear upload state
+                          setPartnerLimitMessage({
+                            type: 'error',
+                            text: (
+                              <>
+                                {errorData.message || 'Partner limit reached. Please '}
+                                <Link href="/upgrade" className="underline font-semibold">
+                                  upgrade to Pro
+                                </Link>
+                                {' to add more partners.'}
+                              </>
+                            ),
+                          });
+                          setUploading(false);
+                          setShowNoFaceModal(false);
+                          return;
+                        }
+                        
+                        throw new Error(errorData.error || errorData.details || 'Failed to create partner and upload photo');
                       }
                       
                       const result = await response.json();
@@ -1238,12 +1332,31 @@ export function PhotoUploadWithFaceMatch({
                     }
                   } catch (error) {
                     console.error('Error uploading photo:', error);
-                    setUploadError(error instanceof Error ? error.message : 'Failed to upload photo');
-                    setAlertDialog({
-                      open: true,
-                      title: 'Upload Error',
-                      message: error instanceof Error ? error.message : 'Failed to upload photo',
-                    });
+                    
+                    // Check if it's a partner limit error (in case it wasn't caught above)
+                    if (error instanceof Error && (error.message.includes('PARTNER_LIMIT_REACHED') || error.message.includes('partner limit'))) {
+                      resetState();
+                      setPartnerLimitMessage({
+                        type: 'error',
+                        text: (
+                          <>
+                            {error.message || 'Partner limit reached. Please '}
+                            <Link href="/upgrade" className="underline font-semibold">
+                              upgrade to Pro
+                            </Link>
+                            {' to add more partners.'}
+                          </>
+                        ),
+                      });
+                      setShowNoFaceModal(false);
+                    } else {
+                      setUploadError(error instanceof Error ? error.message : 'Failed to upload photo');
+                      setAlertDialog({
+                        open: true,
+                        title: 'Upload Error',
+                        message: error instanceof Error ? error.message : 'Failed to upload photo',
+                      });
+                    }
                   } finally {
                     setUploading(false);
                   }
@@ -1288,7 +1401,13 @@ export function PhotoUploadWithFaceMatch({
           onCancel={() => {
             setShowMultipleFacesModal(false);
             resetState();
+            if (onCancel) {
+              onCancel();
+            } else {
+              navigation.push('/dashboard');
+            }
           }}
+          warning={faceSizeWarning || undefined}
         />
       )}
 

@@ -10,6 +10,7 @@ interface FaceSelectionUIProps {
   detections: FaceDetectionResult[];
   onSelect: (detection: FaceDetectionResult) => void;
   onCancel: () => void;
+  warning?: string;
 }
 
 export function FaceSelectionUI({
@@ -17,6 +18,7 @@ export function FaceSelectionUI({
   detections,
   onSelect,
   onCancel,
+  warning,
 }: FaceSelectionUIProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -255,6 +257,11 @@ export function FaceSelectionUI({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-auto">
         <h2 className="text-xl font-bold mb-4">Select a Face</h2>
+        {warning && (
+          <div className="mb-4 p-3 rounded bg-yellow-50 text-yellow-800 border border-yellow-200">
+            <p className="text-sm">{warning}</p>
+          </div>
+        )}
         <p className="text-gray-600 mb-4">
           Multiple faces detected. Please tap/click on the face you want to upload.
         </p>

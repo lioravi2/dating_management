@@ -14,6 +14,8 @@ export class FaceApiProvider implements IFaceDetectionProvider {
   private loading = false;
   private error: string | null = null;
   private readonly MODEL_URL = '/models';
+  private readonly MIN_FACE_SIZE = 120; // Minimum width or height in pixels
+  private readonly MIN_CONFIDENCE = 0.65; // Minimum confidence score (0.65 = 65%) to filter out animal faces
 
   async initialize(): Promise<void> {
     if (this.modelsLoaded) return;
@@ -149,6 +151,16 @@ export class FaceApiProvider implements IFaceDetectionProvider {
         };
       }
 
+      // Check confidence threshold (filter out animal faces)
+      if (detection.detection.score < this.MIN_CONFIDENCE) {
+        return {
+          descriptor: null,
+          boundingBox: null,
+          confidence: null,
+          error: `Face confidence too low (${(detection.detection.score * 100).toFixed(0)}%). Minimum ${(this.MIN_CONFIDENCE * 100).toFixed(0)}% required.`,
+        };
+      }
+
       // Scale bounding box back to original size if we resized
       const inputWidth = createdCanvas ? createdCanvas.width : (image instanceof ImageData ? image.width : (image instanceof HTMLImageElement ? (image.naturalWidth || image.width) : image.width));
       const inputHeight = createdCanvas ? createdCanvas.height : (image instanceof ImageData ? image.height : (image instanceof HTMLImageElement ? (image.naturalHeight || image.height) : image.height));
@@ -166,6 +178,17 @@ export class FaceApiProvider implements IFaceDetectionProvider {
         confidence: detection.detection.score,
         error: null,
       };
+
+      // Validate face size
+      const minDimension = Math.min(result.boundingBox.width, result.boundingBox.height);
+      if (minDimension < this.MIN_FACE_SIZE) {
+        return {
+          descriptor: null,
+          boundingBox: null,
+          confidence: null,
+          error: `Face too small (${Math.round(minDimension)}px). Minimum ${this.MIN_FACE_SIZE}px required for accurate recognition.`,
+        };
+      }
 
       // Explicitly dispose of TensorFlow.js tensors to free GPU memory
       try {
@@ -288,15 +311,35 @@ export class FaceApiProvider implements IFaceDetectionProvider {
         .withFaceLandmarks()
         .withFaceDescriptors();
 
+      // Filter by confidence threshold (0.65 = 65% confidence) to reduce false positives
+      // This helps filter out animal faces and other non-human detections
+      // Lowered from 0.8 to 0.65 to allow valid human faces with glasses/angles while still filtering most animal faces
+      const confidenceFilteredDetections = detections.filter(detection => {
+        const score = detection.detection.score;
+        return score >= this.MIN_CONFIDENCE;
+      });
+
       // Scale bounding boxes back to original size if we resized
       const inputWidth = createdCanvas ? createdCanvas.width : (image instanceof ImageData ? image.width : (image instanceof HTMLImageElement ? (image.naturalWidth || image.width) : image.width));
       const inputHeight = createdCanvas ? createdCanvas.height : (image instanceof ImageData ? image.height : (image instanceof HTMLImageElement ? (image.naturalHeight || image.height) : image.height));
       const scaleX = originalWidth / inputWidth;
       const scaleY = originalHeight / inputHeight;
 
+      // Filter by minimum face size
+      const sizeFilteredDetections = confidenceFilteredDetections.filter(detection => {
+        const box = detection.detection.box;
+        const faceWidth = box.width * scaleX;
+        const faceHeight = box.height * scaleY;
+        const minDimension = Math.min(faceWidth, faceHeight);
+        return minDimension >= this.MIN_FACE_SIZE;
+      });
+
+      const filteredCount = confidenceFilteredDetections.length - sizeFilteredDetections.length;
+      const confidenceFilteredCount = detections.length - confidenceFilteredDetections.length;
+
       // Extract data immediately and dispose of tensors to prevent GPU memory leak
       const result = {
-        detections: detections.map(detection => ({
+        detections: sizeFilteredDetections.map(detection => ({
           descriptor: Array.from(detection.descriptor),
           boundingBox: {
             x: detection.detection.box.x * scaleX,
@@ -307,7 +350,15 @@ export class FaceApiProvider implements IFaceDetectionProvider {
           confidence: detection.detection.score,
           error: null,
         })),
-        error: null,
+        error: sizeFilteredDetections.length === 0 && detections.length > 0
+          ? confidenceFilteredDetections.length === 0
+            ? `Face(s) detected but confidence too low (minimum ${(this.MIN_CONFIDENCE * 100).toFixed(0)}% required)`
+            : `Face(s) detected but too small (minimum ${this.MIN_FACE_SIZE}px required)`
+          : null,
+        ...(filteredCount > 0 && {
+          filteredCount,
+          warning: `${filteredCount} face${filteredCount > 1 ? 's' : ''} could not be processed due to low resolution`,
+        }),
       };
 
       // Explicitly dispose of TensorFlow.js tensors to free GPU memory
