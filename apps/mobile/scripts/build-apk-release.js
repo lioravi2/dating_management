@@ -14,6 +14,7 @@ const SCRIPTS_DIR = __dirname;
 const PROJECT_ROOT = path.resolve(SCRIPTS_DIR, '..');
 const ANDROID_DIR = path.join(PROJECT_ROOT, 'android');
 const APK_RELEASE_PATH = path.join(ANDROID_DIR, 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
+const BUILD_INFO_PATH = path.join(PROJECT_ROOT, 'src', 'lib', 'build-info.ts');
 
 console.log('═══════════════════════════════════════════════════════════');
 console.log('  Production APK Build - Standalone (No Metro)');
@@ -46,6 +47,27 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Generate a unique build number (6-digit random number)
+function generateBuildNumber() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Write build info to TypeScript file
+function writeBuildInfo(buildNumber, buildDate) {
+  const content = `// This file is auto-generated during the build process
+// Do not edit manually - it will be overwritten on each build
+
+export const BUILD_NUMBER: string = '${buildNumber}';
+export const BUILD_DATE: string | undefined = '${buildDate}';
+`;
+  try {
+    fs.writeFileSync(BUILD_INFO_PATH, content, 'utf8');
+    console.log(`  ✓ Build info written: ${buildNumber}`);
+  } catch (error) {
+    console.log(`  ⚠ Could not write build info: ${error.message}`);
+  }
+}
+
 (async () => {
   // Phase 1: Cleanup (optional)
   console.log('📦 Phase 1: Cleanup');
@@ -69,8 +91,16 @@ function sleep(ms) {
     console.log('  ℹ Skipping build artifact cleanup (set CLEAN_BUILD=true to enable)\n');
   }
 
-  // Phase 2: Build Release APK
-  console.log('🔨 Phase 2: Building Release APK');
+  // Phase 2: Generate Build Number
+  console.log('🔢 Phase 2: Generating Build Number');
+  console.log('───────────────────────────────────────────────────────────');
+  const buildNumber = generateBuildNumber();
+  const buildDate = new Date().toISOString();
+  writeBuildInfo(buildNumber, buildDate);
+  console.log(`  📦 Build Number: ${buildNumber}\n`);
+
+  // Phase 3: Build Release APK
+  console.log('🔨 Phase 3: Building Release APK');
   console.log('───────────────────────────────────────────────────────────');
   console.log('  → Building standalone APK (JS bundled, no Metro connection)...\n');
 
@@ -118,8 +148,8 @@ function sleep(ms) {
       process.exit(1);
     }
 
-    // Phase 3: Output Results
-    console.log('\n📱 Phase 3: Build Results');
+    // Phase 4: Output Results
+    console.log('\n📱 Phase 4: Build Results');
     console.log('───────────────────────────────────────────────────────────');
 
     const releaseApk = getFileInfo(APK_RELEASE_PATH);
@@ -128,6 +158,7 @@ function sleep(ms) {
     console.log('\n  ✓ Release APK built successfully!');
     console.log(`  📦 Size: ${releaseApk.sizeMB} MB`);
     console.log(`  🕒 Modified: ${releaseApk.modified.toLocaleString()}`);
+    console.log(`  🔢 Build Number: ${buildNumber}`);
 
     console.log('\n  ═══════════════════════════════════════════════════════');
     console.log('  📍 APK LOCATION (for manual transfer):');
@@ -135,6 +166,11 @@ function sleep(ms) {
     console.log(`  ${APK_RELEASE_PATH}`);
     console.log(`\n  Relative path (from project root):`);
     console.log(`  ${apkRelativePath}`);
+    console.log('  ═══════════════════════════════════════════════════════');
+    console.log('\n  ═══════════════════════════════════════════════════════');
+    console.log('  🔢 BUILD NUMBER (check in app dashboard):');
+    console.log('  ═══════════════════════════════════════════════════════');
+    console.log(`  ${buildNumber}`);
     console.log('  ═══════════════════════════════════════════════════════\n');
 
     console.log('  💡 Next Steps:');
@@ -155,5 +191,6 @@ function sleep(ms) {
     process.exit(1);
   });
 })();
+
 
 

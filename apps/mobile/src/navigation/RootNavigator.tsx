@@ -96,7 +96,8 @@ export default function RootNavigator() {
         if (session && navigationRef.current) {
           const shareIntent = await getInitialShareIntent();
           if (shareIntent) {
-            // Reset navigation stack and navigate to PhotoUpload screen with shared image
+            // Reset navigation stack to Dashboard first, then navigate to PhotoUpload
+            // This ensures the user sees the Dashboard before the upload screen
             navigationRef.current.reset({
               index: 0,
               routes: [
@@ -104,6 +105,9 @@ export default function RootNavigator() {
                   name: 'Main',
                   state: {
                     routes: [
+                      {
+                        name: 'Dashboard',
+                      },
                       {
                         name: 'Partners',
                         state: {
@@ -120,11 +124,27 @@ export default function RootNavigator() {
                         },
                       },
                     ],
-                    index: 1, // Partners tab index
+                    index: 0, // Start at Dashboard tab
                   },
                 },
               ],
             });
+            
+            // Navigate to PhotoUpload after a short delay to show Dashboard first
+            setTimeout(() => {
+              if (navigationRef.current) {
+                navigationRef.current.navigate('Main', {
+                  screen: 'Partners',
+                  params: {
+                    screen: 'PhotoUpload',
+                    params: {
+                      imageUri: shareIntent.imageUri,
+                      source: 'Share',
+                    },
+                  },
+                });
+              }
+            }, 300);
           }
         }
       }
@@ -152,6 +172,8 @@ export default function RootNavigator() {
     // Listen for share intents when app is already running
     const removeShareListener = setupShareIntentListener((shareIntent) => {
       if (navigationRef.current && session) {
+        // When sharing again, navigate to Dashboard first, then to PhotoUpload
+        // This ensures the user sees the Dashboard before the upload screen
         navigationRef.current.reset({
           index: 0,
           routes: [
@@ -159,6 +181,9 @@ export default function RootNavigator() {
               name: 'Main',
               state: {
                 routes: [
+                  {
+                    name: 'Dashboard',
+                  },
                   {
                     name: 'Partners',
                     state: {
@@ -175,11 +200,27 @@ export default function RootNavigator() {
                     },
                   },
                 ],
-                index: 1, // Partners tab index
+                index: 0, // Start at Dashboard tab
               },
             },
           ],
         });
+        
+        // Navigate to PhotoUpload after a short delay to show Dashboard first
+        setTimeout(() => {
+          if (navigationRef.current) {
+            navigationRef.current.navigate('Main', {
+              screen: 'Partners',
+              params: {
+                screen: 'PhotoUpload',
+                params: {
+                  imageUri: shareIntent.imageUri,
+                  source: 'Share',
+                },
+              },
+            });
+          }
+        }, 300);
       }
     });
 

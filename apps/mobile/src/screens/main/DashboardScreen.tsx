@@ -10,6 +10,7 @@ import { getPartnerProfilePictureUrl } from '../../lib/photo-utils';
 import BlackFlagIcon from '../../components/BlackFlagIcon';
 import { MainTabParamList } from '../../navigation/types';
 import { PartnersStackParamList } from '../../navigation/types';
+import { BUILD_NUMBER } from '../../lib/build-info';
 
 type DashboardScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Dashboard'>,
@@ -290,6 +291,10 @@ export default function DashboardScreen() {
         </View>
       </View>
       </ScrollView>
+      {/* Build number in bottom right corner */}
+      <View style={styles.buildNumberContainer}>
+        <Text style={styles.buildNumberText}>{BUILD_NUMBER}</Text>
+      </View>
     </View>
   );
 }
@@ -470,6 +475,21 @@ const styles = StyleSheet.create({
   actionSubtitle: {
     fontSize: 14,
     color: '#6b7280',
+  },
+  buildNumberContainer: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  buildNumberText: {
+    fontSize: 10,
+    color: '#fff',
+    fontFamily: 'monospace',
+    fontWeight: '600',
   },
 });
 

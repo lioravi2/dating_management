@@ -18,6 +18,7 @@ const PROJECT_ROOT = path.resolve(SCRIPTS_DIR, '..');
 const ANDROID_DIR = path.join(PROJECT_ROOT, 'android');
 const APK_DEBUG_PATH = path.join(ANDROID_DIR, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
 const APK_RELEASE_PATH = path.join(ANDROID_DIR, 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
+const BUILD_INFO_PATH = path.join(PROJECT_ROOT, 'src', 'lib', 'build-info.ts');
 
 console.log('═══════════════════════════════════════════════════════════');
 console.log('  APK Build Script - Clean Build with Port 8081');
@@ -146,6 +147,27 @@ async function waitForMetroReady(port = PORT, maxWait = 30000) {
   return false;
 }
 
+// Generate a unique build number (6-digit random number)
+function generateBuildNumber() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Write build info to TypeScript file
+function writeBuildInfo(buildNumber, buildDate) {
+  const content = `// This file is auto-generated during the build process
+// Do not edit manually - it will be overwritten on each build
+
+export const BUILD_NUMBER: string = '${buildNumber}';
+export const BUILD_DATE: string | undefined = '${buildDate}';
+`;
+  try {
+    fs.writeFileSync(BUILD_INFO_PATH, content, 'utf8');
+    console.log(`  ✓ Build info written: ${buildNumber}`);
+  } catch (error) {
+    console.log(`  ⚠ Could not write build info: ${error.message}`);
+  }
+}
+
 // Main execution wrapped in async function
 (async () => {
   // Phase 1: Cleanup
@@ -189,8 +211,16 @@ async function waitForMetroReady(port = PORT, maxWait = 30000) {
     console.log('  ℹ Skipping build artifact cleanup (set CLEAN_BUILD=true to enable)\n');
   }
 
-  // Phase 2: Preparation
-  console.log('🔧 Phase 2: Preparation');
+  // Phase 2: Generate Build Number
+  console.log('🔢 Phase 2: Generating Build Number');
+  console.log('───────────────────────────────────────────────────────────');
+  const buildNumber = generateBuildNumber();
+  const buildDate = new Date().toISOString();
+  writeBuildInfo(buildNumber, buildDate);
+  console.log(`  📦 Build Number: ${buildNumber}\n`);
+
+  // Phase 3: Preparation
+  console.log('🔧 Phase 3: Preparation');
   console.log('───────────────────────────────────────────────────────────');
 
   // Check ADB connection (optional - only for automatic installation)
@@ -221,8 +251,8 @@ async function waitForMetroReady(port = PORT, maxWait = 30000) {
     }
   }
 
-  // Phase 3: Start Metro First
-  console.log('🚀 Phase 3: Starting Metro Bundler');
+  // Phase 4: Start Metro First
+  console.log('🚀 Phase 4: Starting Metro Bundler');
   console.log('───────────────────────────────────────────────────────────');
   console.log(`  → Starting Metro on port ${PORT}...\n`);
 
@@ -286,8 +316,8 @@ async function waitForMetroReady(port = PORT, maxWait = 30000) {
     console.log('  → Attempting to continue with build...\n');
   }
 
-  // Phase 4: Build
-  console.log('🔨 Phase 4: Building APK');
+  // Phase 5: Build
+  console.log('🔨 Phase 5: Building APK');
   console.log('───────────────────────────────────────────────────────────');
   console.log(`  → Building APK (will connect to Metro on port ${PORT})...\n`);
   if (metroReady) {
@@ -422,8 +452,8 @@ async function waitForMetroReady(port = PORT, maxWait = 30000) {
         process.exit(1);
       }
 
-      // Phase 5: Output Results
-      console.log('\n📱 Phase 5: Build Results');
+      // Phase 6: Output Results
+      console.log('\n📱 Phase 6: Build Results');
       console.log('───────────────────────────────────────────────────────────');
 
       // Calculate relative paths from apps/mobile directory
@@ -443,6 +473,7 @@ async function waitForMetroReady(port = PORT, maxWait = 30000) {
         console.log('\n  ✓ Debug APK built successfully!');
         console.log(`  📦 Size: ${debugApk.sizeMB} MB`);
         console.log(`  🕒 Modified: ${debugApk.modified.toLocaleString()}`);
+        console.log(`  🔢 Build Number: ${buildNumber}`);
       }
 
       if (releaseApk.exists) {
@@ -451,6 +482,7 @@ async function waitForMetroReady(port = PORT, maxWait = 30000) {
         console.log('\n  ✓ Release APK built successfully!');
         console.log(`  📦 Size: ${releaseApk.sizeMB} MB`);
         console.log(`  🕒 Modified: ${releaseApk.modified.toLocaleString()}`);
+        console.log(`  🔢 Build Number: ${buildNumber}`);
       }
 
       if (!debugApk.exists && !releaseApk.exists) {
@@ -472,6 +504,11 @@ async function waitForMetroReady(port = PORT, maxWait = 30000) {
       console.log(`  ${apkPath}`);
       console.log(`\n  Relative path (from project root):`);
       console.log(`  ${apkRelativePath}`);
+      console.log('  ═══════════════════════════════════════════════════════');
+      console.log('\n  ═══════════════════════════════════════════════════════');
+      console.log('  🔢 BUILD NUMBER (check in app dashboard):');
+      console.log('  ═══════════════════════════════════════════════════════');
+      console.log(`  ${buildNumber}`);
       console.log('  ═══════════════════════════════════════════════════════\n');
 
       console.log('  💡 Next Steps:');
