@@ -1,0 +1,22 @@
+{
+  "name": "metro-test",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --port 8082 --lan",
+    "build:apk": "node scripts/build-apk.js",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
+  },
+  "dependencies": {
+    "expo": "~54.0.30",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "@react-native-async-storage/async-storage": "^2.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}

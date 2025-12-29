@@ -27,6 +27,7 @@ export default function DevSignInButton({ onMessageChange, loading, setLoading }
 
     try {
       const webAppUrl = process.env.EXPO_PUBLIC_WEB_APP_URL;
+      
       if (!webAppUrl) {
         onMessageChange('Web app URL not configured. Set EXPO_PUBLIC_WEB_APP_URL in .env', 'error');
         setLoading(false);
@@ -36,36 +37,67 @@ export default function DevSignInButton({ onMessageChange, loading, setLoading }
       const apiUrl = `${webAppUrl}/api/auth/dev-signin`;
       console.log('[DEV-SIGNIN] Calling API:', apiUrl);
       
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'avilior@hotmail.com' }),
-      });
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'avilior@hotmail.com' }),
+          signal: controller.signal,
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        onMessageChange(errorData.error || 'Dev sign-in failed', 'error');
-        setLoading(false);
-        return;
-      }
+        clearTimeout(timeoutId);
 
-      const data = await response.json();
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          onMessageChange(errorData.error || 'Dev sign-in failed', 'error');
+          setLoading(false);
+          return;
+        }
 
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-      });
+        const data = await response.json();
 
-      if (sessionError) {
-        onMessageChange(sessionError.message, 'error');
-      } else {
-        onMessageChange('Dev sign-in successful!', 'success');
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        });
+
+        if (sessionError) {
+          onMessageChange(sessionError.message, 'error');
+        } else {
+          onMessageChange('Dev sign-in successful!', 'success');
+        }
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError?.name === 'AbortError') {
+          onMessageChange('Request timed out. Please check your network connection and try again.', 'error');
+        } else {
+          throw fetchError;
+        }
       }
     } catch (error) {
       console.error('[DEV-SIGNIN] Error details:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      const webAppUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || 'not configured';
-      onMessageChange(`Dev sign-in failed: ${errorMsg}. Make sure web app is running at ${webAppUrl} and EXPO_PUBLIC_WEB_APP_URL is set correctly.`, 'error');
+      
+      // Provide more helpful error messages
+      if (errorMsg.includes('Network request failed') || errorMsg.includes('Failed to fetch')) {
+        const webAppUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || 'not configured';
+        const isLocalUrl = webAppUrl.includes('localhost') || 
+                          webAppUrl.includes('127.0.0.1') || 
+                          /^http:\/\/192\.168\.\d+\.\d+/.test(webAppUrl) ||
+                          /^http:\/\/10\.\d+\.\d+\.\d+/.test(webAppUrl);
+        
+        if (isLocalUrl) {
+          onMessageChange(`Cannot connect to local development server at ${webAppUrl}. Make sure the web app is running and accessible from your device.`, 'error');
+        } else {
+          onMessageChange('Network error: Cannot reach the web app server. Please check your internet connection and that the server is running.', 'error');
+        }
+      } else {
+        onMessageChange(`Dev sign-in failed: ${errorMsg}`, 'error');
+      }
     } finally {
       setLoading(false);
     }

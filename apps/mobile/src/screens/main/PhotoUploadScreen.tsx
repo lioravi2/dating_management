@@ -25,11 +25,12 @@ type PhotoUploadScreenNavigationProp = CompositeNavigationProp<
 export default function PhotoUploadScreen() {
   const navigation = useNavigation<PhotoUploadScreenNavigationProp>();
   const route = useRoute<PhotoUploadScreenRouteProp>();
-  const { source } = route.params || {};
+  const { source, imageUri } = route.params || {};
   
   const [matches, setMatches] = useState<FaceMatch[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string>('');
+  const hasProcessedImageUriRef = useRef(false);
   
   const {
     uploading,
@@ -43,7 +44,9 @@ export default function PhotoUploadScreen() {
     analysisData,
     selectedFaceDescriptor,
     faceSizeWarning,
+    noFaceErrorMessage,
     handleUploadPhoto,
+    processImageUri,
     handleFaceSelected,
     handleNoFaceProceed: hookHandleNoFaceProceed,
     handleSamePersonProceed,
@@ -181,11 +184,27 @@ export default function PhotoUploadScreen() {
     }, [uploading, showProgressModal, loading, resetState]) // Only depend on loading states, not on the state values themselves
   );
 
+  // Auto-process imageUri if provided (e.g., from share intent)
+  useEffect(() => {
+    // Reset the ref if imageUri changes (new share intent)
+    if (imageUri) {
+      // Only process if we haven't processed this specific imageUri yet
+      // and we're not currently uploading or have a selected image
+      if (!hasProcessedImageUriRef.current && !uploading && !selectedImageUri) {
+        hasProcessedImageUriRef.current = true;
+        processImageUri(imageUri);
+      }
+    } else {
+      // Reset ref when imageUri is cleared
+      hasProcessedImageUriRef.current = false;
+    }
+  }, [imageUri, processImageUri, uploading, selectedImageUri]);
+
   // Configure back button behavior based on source
   useLayoutEffect(() => {
-    if (source === 'Dashboard') {
+    if (source === 'Dashboard' || source === 'Share') {
       navigation.setOptions({
-        headerBackTitle: 'Dashboard',
+        headerBackTitle: source === 'Share' ? 'Dashboard' : 'Dashboard',
         headerBackTitleVisible: false,
       });
       
@@ -396,8 +415,8 @@ export default function PhotoUploadScreen() {
           </View>
         )}
 
-        {/* Show "Select Photo" button when no image is selected and no modals are showing */}
-        {!selectedImageUri && !uploading && !showProgressModal && !showFaceSelectionModal && !showNoFaceModal && !showSamePersonModal && !loading && (
+        {/* Show "Select Photo" button when no image is selected, no imageUri provided, and no modals are showing */}
+        {!selectedImageUri && !imageUri && !uploading && !showProgressModal && !showFaceSelectionModal && !showNoFaceModal && !showSamePersonModal && !loading && (
           <TouchableOpacity
             style={styles.uploadButton}
             onPress={() => {
@@ -475,6 +494,7 @@ export default function PhotoUploadScreen() {
         visible={showNoFaceModal}
         onProceed={handleNoFaceProceed}
         onCancel={handleCancel}
+        errorMessage={noFaceErrorMessage}
       />
 
       <SamePersonWarningModal

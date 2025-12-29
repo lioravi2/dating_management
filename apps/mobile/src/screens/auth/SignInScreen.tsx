@@ -113,6 +113,16 @@ export default function SignInScreen({ navigation }: SignInScreenProps) {
         ) {
           setMessage('A user with this email wasn\'t found. Would you like to sign up instead?');
           setMessageType('error');
+        } else if (
+          error.status === 502 ||
+          error.message.toLowerCase().includes('502') ||
+          error.message.toLowerCase().includes('bad gateway') ||
+          error.message.toLowerCase().includes('cloudflare') ||
+          error.message.toLowerCase().includes('proxy')
+        ) {
+          // Handle Cloudflare/proxy errors
+          setMessage('Server error (502). This is usually temporary. Please try again in a few moments. If the problem persists, check your internet connection.');
+          setMessageType('error');
         } else {
           setMessage(error.message);
           setMessageType('error');
@@ -123,7 +133,19 @@ export default function SignInScreen({ navigation }: SignInScreenProps) {
       }
     } catch (error) {
       console.error('Sign in error:', error);
-      setMessage('An error occurred. Please try again.');
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      
+      // Handle network errors
+      if (
+        errorMsg.includes('Network request failed') ||
+        errorMsg.includes('Failed to fetch') ||
+        errorMsg.includes('502') ||
+        errorMsg.includes('Bad Gateway')
+      ) {
+        setMessage('Network error: Cannot connect to authentication server. Please check your internet connection and try again.');
+      } else {
+        setMessage('An error occurred. Please try again.');
+      }
       setMessageType('error');
     } finally {
       setLoading(false);

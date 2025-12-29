@@ -188,9 +188,16 @@ export async function POST(request: NextRequest) {
     // Lowered from 0.8 to 0.65 to allow valid human faces with glasses/angles while still filtering most animal faces
     // ssdMobilenetv1 can give relatively high scores to animal faces due to similar facial structure
     const MIN_CONFIDENCE = 0.65;
+    const lowConfidenceDetections: Array<{ score: number; box: { width: number; height: number } }> = [];
     const filteredDetections = detections.filter(detection => {
       const score = detection.detection.score;
       console.log(`[Face Detection] Detection confidence score: ${score.toFixed(3)}`);
+      if (score < MIN_CONFIDENCE) {
+        lowConfidenceDetections.push({
+          score,
+          box: detection.detection.box,
+        });
+      }
       return score >= MIN_CONFIDENCE;
     });
     console.log(`[Face Detection] Filtered to ${filteredDetections.length} face(s) with confidence >= ${MIN_CONFIDENCE} (out of ${detections.length} total detections)`);
@@ -206,6 +213,7 @@ export async function POST(request: NextRequest) {
 
     // Filter by minimum face size (120px minimum dimension)
     const MIN_FACE_SIZE = 120;
+    const tooSmallDetections: Array<{ width: number; height: number; minDimension: number; confidence: number }> = [];
     const sizeFilteredDetections = filteredDetections.filter(detection => {
       const box = detection.detection.box;
       // Scale to original image dimensions
@@ -217,6 +225,12 @@ export async function POST(request: NextRequest) {
       
       if (minDimension < MIN_FACE_SIZE) {
         console.log(`[Face Detection] Face too small (${minDimension.toFixed(0)}px < ${MIN_FACE_SIZE}px), filtering out`);
+        tooSmallDetections.push({
+          width: faceWidth,
+          height: faceHeight,
+          minDimension,
+          confidence: detection.detection.score,
+        });
         return false;
       }
       
@@ -228,14 +242,54 @@ export async function POST(request: NextRequest) {
     const filteredCount = filteredDetections.length - sizeFilteredDetections.length;
 
     if (sizeFilteredDetections.length === 0) {
+      // Build detailed diagnostic information
+      const diagnostics: any = {
+        imageDimensions: {
+          original: { width: originalWidth, height: originalHeight },
+          processed: { width: inputWidth, height: inputHeight },
+        },
+        thresholds: {
+          minConfidence: MIN_CONFIDENCE,
+          minFaceSize: MIN_FACE_SIZE,
+        },
+        rawDetections: detections.length,
+        confidenceFiltered: filteredDetections.length,
+        sizeFiltered: sizeFilteredDetections.length,
+      };
+
+      if (detections.length === 0) {
+        diagnostics.reason = 'No faces detected by the model';
+      } else if (filteredDetections.length === 0) {
+        diagnostics.reason = 'Faces detected but confidence too low';
+        diagnostics.lowConfidenceDetections = lowConfidenceDetections.map(d => ({
+          confidence: d.score,
+          confidencePercent: (d.score * 100).toFixed(1) + '%',
+          requiredPercent: (MIN_CONFIDENCE * 100).toFixed(0) + '%',
+        }));
+      } else {
+        diagnostics.reason = 'Faces detected but too small';
+        diagnostics.tooSmallDetections = tooSmallDetections.map(d => ({
+          size: `${Math.round(d.width)}x${Math.round(d.height)}px`,
+          minDimension: Math.round(d.minDimension),
+          requiredSize: MIN_FACE_SIZE,
+          confidence: d.confidence,
+          confidencePercent: (d.confidence * 100).toFixed(1) + '%',
+        }));
+      }
+
       return NextResponse.json({
         detections: [],
         error: filteredDetections.length > 0 
           ? `Face(s) detected but too small (minimum ${MIN_FACE_SIZE}px required)`
+          : detections.length > 0
+          ? `Face(s) detected but confidence too low (minimum ${(MIN_CONFIDENCE * 100).toFixed(0)}% required)`
           : 'No faces detected',
         details: filteredDetections.length > 0 
           ? `Face(s) detected but too small (minimum ${MIN_FACE_SIZE}px required)`
+          : detections.length > 0
+          ? `Face(s) detected but confidence too low (minimum ${(MIN_CONFIDENCE * 100).toFixed(0)}% required)`
           : 'No faces detected',
+        diagnostics,
       });
     }
 

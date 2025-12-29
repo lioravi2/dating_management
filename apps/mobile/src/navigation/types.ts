@@ -2,6 +2,7 @@ export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
   Share: undefined;
+  MetroConfig: undefined;
 };
 
 export type AuthStackParamList = {
@@ -36,7 +37,7 @@ export type PartnersStackParamList = {
     faceDescriptor: number[] | null;
     imageUri: string; // Original image URI for preview
   };
-  PhotoUpload: { partnerId?: string; source?: 'Dashboard' | 'PartnersList' };
+  PhotoUpload: { partnerId?: string; source?: 'Dashboard' | 'PartnersList' | 'Share'; imageUri?: string };
 };
 
 export type UploadStackParamList = {

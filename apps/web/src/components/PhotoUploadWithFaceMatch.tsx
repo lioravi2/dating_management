@@ -52,6 +52,7 @@ export function PhotoUploadWithFaceMatch({
 
   // Modal states
   const [showNoFaceModal, setShowNoFaceModal] = useState(false);
+  const [noFaceErrorMessage, setNoFaceErrorMessage] = useState<string | undefined>(undefined);
   const [showMultipleFacesModal, setShowMultipleFacesModal] = useState(false);
   const [showSamePersonModal, setShowSamePersonModal] = useState(false);
   const [showCreateNewPartnerModal, setShowCreateNewPartnerModal] = useState(false);
@@ -218,6 +219,7 @@ export function PhotoUploadWithFaceMatch({
         setAnalyzing(false);
         // Check if it's a face size error - show no face modal (same behavior: cancel or upload anyway)
         if (allFacesResult.error.includes('too small') || allFacesResult.error.includes('minimum')) {
+          setNoFaceErrorMessage(allFacesResult.error);
           setShowNoFaceModal(true);
         } else {
           setAlertDialog({
@@ -235,6 +237,7 @@ export function PhotoUploadWithFaceMatch({
         // No face detected
         console.log('[PhotoUpload] No faces detected');
         setAnalyzing(false);
+        setNoFaceErrorMessage(undefined); // No custom message for actual "no face" case
         setShowNoFaceModal(true);
         return;
       }
@@ -789,6 +792,7 @@ export function PhotoUploadWithFaceMatch({
     setPhotoLimitMessage(null);
     setPartnerLimitMessage(null);
     setFaceSizeWarning(null);
+    setNoFaceErrorMessage(undefined);
   };
 
   // Set mounted state to prevent hydration errors
@@ -1245,10 +1249,23 @@ export function PhotoUploadWithFaceMatch({
       {showNoFaceModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md">
-            <h2 className="text-xl font-bold mb-4">No Face Detected</h2>
-            <p className="text-gray-600 mb-4">
-              We couldn't detect a face in this photo. The photo may not be clear enough.
-            </p>
+            {(() => {
+              const isFaceTooSmall = noFaceErrorMessage?.includes('too small') || noFaceErrorMessage?.includes('minimum');
+              const title = isFaceTooSmall ? 'Face Too Small' : 'No Face Detected';
+              const defaultMessage = isFaceTooSmall
+                ? 'The face in this photo is too small to be accurately recognized. For best results, use a photo where the face is clearly visible and larger.'
+                : 'We couldn\'t detect a face in this photo. The photo may not be clear enough, or there may be no face visible.';
+              const message = noFaceErrorMessage && isFaceTooSmall ? noFaceErrorMessage : defaultMessage;
+              
+              return (
+                <>
+                  <h2 className="text-xl font-bold mb-4">{title}</h2>
+                  <p className="text-gray-600 mb-4">
+                    {message}
+                  </p>
+                </>
+              );
+            })()}
             <div className="flex gap-4 justify-end">
               <button
                 onClick={async () => {
@@ -1268,6 +1285,7 @@ export function PhotoUploadWithFaceMatch({
                   
                   setUploading(true);
                   setShowNoFaceModal(false);
+                  setNoFaceErrorMessage(undefined);
                   
                   try {
                     if (partnerId) {
@@ -1311,6 +1329,7 @@ export function PhotoUploadWithFaceMatch({
                           });
                           setUploading(false);
                           setShowNoFaceModal(false);
+                          setNoFaceErrorMessage(undefined);
                           return;
                         }
                         
@@ -1349,6 +1368,7 @@ export function PhotoUploadWithFaceMatch({
                         ),
                       });
                       setShowNoFaceModal(false);
+                      setNoFaceErrorMessage(undefined);
                     } else {
                       setUploadError(error instanceof Error ? error.message : 'Failed to upload photo');
                       setAlertDialog({
@@ -1375,6 +1395,7 @@ export function PhotoUploadWithFaceMatch({
               <button
                 onClick={() => {
                   setShowNoFaceModal(false);
+                  setNoFaceErrorMessage(undefined);
                   resetState();
                   if (onCancel) {
                     onCancel();

@@ -30,6 +30,7 @@ export interface UsePhotoUploadReturn {
   analysisData: PhotoUploadAnalysis | null;
   selectedFaceDescriptor: number[] | null;
   faceSizeWarning: string;
+  noFaceErrorMessage: string | undefined;
   
   // Actions
   handleUploadPhoto: () => Promise<void>;
@@ -65,6 +66,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
   const [analysisData, setAnalysisData] = useState<PhotoUploadAnalysis | null>(null);
   const [selectedFaceDescriptor, setSelectedFaceDescriptor] = useState<number[] | null>(null);
   const [faceSizeWarning, setFaceSizeWarning] = useState<string>('');
+  const [noFaceErrorMessage, setNoFaceErrorMessage] = useState<string | undefined>(undefined);
   
   const uploadDataRef = useRef<{
     optimizedUri: string;
@@ -535,6 +537,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
           if (detectData.error) {
             // Check if it's a face size error (all faces filtered) - show no face modal (same behavior: cancel or upload anyway)
             if (detectData.error.includes('too small') || detectData.error.includes('minimum')) {
+              setNoFaceErrorMessage(detectData.error);
               setShowProgressModal(false);
               setShowNoFaceModal(true);
               return;
@@ -542,6 +545,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
             // For "No faces detected" error with no detections, show no face modal
             if ((detectData.error === 'No faces detected' || detectData.error.includes('No faces')) && 
                 (!Array.isArray(detectData.detections) || detectData.detections.length === 0)) {
+              setNoFaceErrorMessage(undefined); // No custom message for actual "no face" case
               setShowProgressModal(false);
               setShowNoFaceModal(true);
               return;
@@ -564,6 +568,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
             );
             
             if (validDetections.length === 0) {
+              setNoFaceErrorMessage(undefined); // No custom message for this case
               setShowProgressModal(false);
               setShowNoFaceModal(true);
               return;
@@ -581,6 +586,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
             await handleFaceAnalysis(faceDescriptor);
           } else {
             // No detections and no error (or error was already handled above)
+            setNoFaceErrorMessage(undefined); // No custom message for this case
             setShowProgressModal(false);
             setShowNoFaceModal(true);
             return;
@@ -588,6 +594,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
         } else {
           // Face detection API returned non-200 status
           // Show no face modal to let user decide
+          setNoFaceErrorMessage(undefined); // No custom message for API errors
           setShowProgressModal(false);
           setShowNoFaceModal(true);
           return;
@@ -641,6 +648,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
         console.error('[usePhotoUpload] Face detection error:', detectError);
         
         // Show no face modal to let user decide (same as when no face is detected)
+        setNoFaceErrorMessage(undefined); // No custom message for detection errors
         setShowProgressModal(false);
         setShowNoFaceModal(true);
       }
@@ -786,6 +794,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     analysisData,
     selectedFaceDescriptor,
     faceSizeWarning,
+    noFaceErrorMessage,
     handleUploadPhoto,
     processImageUri,
     handleFaceSelected,

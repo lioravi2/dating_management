@@ -45,6 +45,7 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
   const [showFaceSelectionModal, setShowFaceSelectionModal] = useState(false);
   const [showNoFaceModal, setShowNoFaceModal] = useState(false);
   const [showSamePersonModal, setShowSamePersonModal] = useState(false);
+  const [noFaceErrorMessage, setNoFaceErrorMessage] = useState<string | undefined>(undefined);
   
   // Face detection data
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -292,6 +293,7 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
     setUploadProgress('preparing');
     setUploading(false);
     setError(null);
+    setNoFaceErrorMessage(undefined);
     uploadDataRef.current = null;
     setSelectedImageUri(null);
     setFaceDetections([]);
@@ -462,6 +464,25 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
             return;
           }
 
+          // Check for error first (e.g., all faces too small)
+          if (detectData.error) {
+            // Check if it's a face size error (all faces filtered) - show no face modal with error message
+            if (detectData.error.includes('too small') || detectData.error.includes('minimum')) {
+              setNoFaceErrorMessage(detectData.error);
+              setShowProgressModal(false);
+              setShowNoFaceModal(true);
+              return;
+            }
+            // For "No faces detected" error with no detections, show no face modal
+            if ((detectData.error === 'No faces detected' || detectData.error.includes('No faces')) && 
+                (!Array.isArray(detectData.detections) || detectData.detections.length === 0)) {
+              setNoFaceErrorMessage(undefined); // No custom message for actual "no face" case
+              setShowProgressModal(false);
+              setShowNoFaceModal(true);
+              return;
+            }
+          }
+
           // Handle response - check for detections array (could be empty array, null, or undefined)
           if (Array.isArray(detectData.detections) && detectData.detections.length > 0) {
             detections = detectData.detections;
@@ -481,6 +502,7 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
             
             if (validDetections.length === 0) {
               console.error('[PartnerPhotos] No valid detections found:', detections);
+              setNoFaceErrorMessage(undefined); // No custom message for this case
               setShowProgressModal(false);
               setShowNoFaceModal(true);
               return;
@@ -501,6 +523,7 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
             await handleFaceAnalysis(faceDescriptor);
           } else {
             // No face detected - show modal
+            setNoFaceErrorMessage(undefined); // No custom message for this case
             setShowProgressModal(false);
             setShowNoFaceModal(true);
             return;
@@ -1164,8 +1187,10 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
           setUploading(false);
           uploadDataRef.current = null;
           setSelectedImageUri(null);
+          setNoFaceErrorMessage(undefined);
         }}
         partnerId={partnerId}
+        errorMessage={noFaceErrorMessage}
       />
 
       {/* Same Person Warning Modal */}
