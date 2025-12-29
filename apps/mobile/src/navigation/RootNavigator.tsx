@@ -18,6 +18,7 @@ export default function RootNavigator() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigationRef = useRef<any>(null);
+  const shareIntentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle deep links (magic link callbacks)
   const handleDeepLink = (url: string) => {
@@ -131,7 +132,11 @@ export default function RootNavigator() {
             });
             
             // Navigate to PhotoUpload after a short delay to show Dashboard first
-            setTimeout(() => {
+            // Clear any existing timeout before creating a new one
+            if (shareIntentTimeoutRef.current) {
+              clearTimeout(shareIntentTimeoutRef.current);
+            }
+            shareIntentTimeoutRef.current = setTimeout(() => {
               if (navigationRef.current) {
                 navigationRef.current.navigate('Main', {
                   screen: 'Partners',
@@ -144,6 +149,7 @@ export default function RootNavigator() {
                   },
                 });
               }
+              shareIntentTimeoutRef.current = null;
             }, 300);
           }
         }
@@ -207,7 +213,11 @@ export default function RootNavigator() {
         });
         
         // Navigate to PhotoUpload after a short delay to show Dashboard first
-        setTimeout(() => {
+        // Clear any existing timeout before creating a new one to prevent multiple navigation calls
+        if (shareIntentTimeoutRef.current) {
+          clearTimeout(shareIntentTimeoutRef.current);
+        }
+        shareIntentTimeoutRef.current = setTimeout(() => {
           if (navigationRef.current) {
             navigationRef.current.navigate('Main', {
               screen: 'Partners',
@@ -220,6 +230,7 @@ export default function RootNavigator() {
               },
             });
           }
+          shareIntentTimeoutRef.current = null;
         }, 300);
       }
     });
@@ -227,6 +238,11 @@ export default function RootNavigator() {
     return () => {
       subscription.unsubscribe();
       removeShareListener();
+      // Clean up any pending timeout on unmount
+      if (shareIntentTimeoutRef.current) {
+        clearTimeout(shareIntentTimeoutRef.current);
+        shareIntentTimeoutRef.current = null;
+      }
     };
   }, [session]);
 
