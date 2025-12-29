@@ -29,7 +29,8 @@ export default function App() {
 
   useEffect(() => {
     // Check if DevSettings API is available
-    setDevSettingsAvailable(typeof DevSettings !== 'undefined' && DevSettings !== null);
+    const isDevSettingsAvailable = typeof DevSettings !== 'undefined' && DevSettings !== null;
+    setDevSettingsAvailable(isDevSettingsAvailable);
 
     // Load saved Metro host
     AsyncStorage.getItem('metro_host').then((saved) => {
@@ -38,15 +39,15 @@ export default function App() {
       }
     });
 
-    // Gather debug information
-    gatherDebugInfo();
+    // Gather debug information using the computed value directly
+    gatherDebugInfo(isDevSettingsAvailable);
   }, []);
 
-  const gatherDebugInfo = () => {
+  const gatherDebugInfo = (isDevSettingsAvailable: boolean) => {
     const info: string[] = [];
     
     info.push('=== Debug Information ===');
-    info.push(`DevSettings API Available: ${devSettingsAvailable ? 'Yes' : 'No'}`);
+    info.push(`DevSettings API Available: ${isDevSettingsAvailable ? 'Yes' : 'No'}`);
     info.push(`React Native Version: ${require('react-native/package.json').version}`);
     info.push(`Expo Version: ${require('expo/package.json').version}`);
     info.push(`Platform: ${require('react-native').Platform.OS}`);
@@ -110,20 +111,21 @@ export default function App() {
       let errorMessage = 'Connection failed';
       let errorDetails = '';
 
-      if (error.message) {
-        errorMessage = error.message;
+      const errorMsg = error?.message || '';
+      if (errorMsg) {
+        errorMessage = errorMsg;
       }
 
-      if (error.name === 'AbortError' || error.message.includes('aborted')) {
+      if (error.name === 'AbortError' || (errorMsg && errorMsg.includes('aborted'))) {
         errorMessage = 'Connection timeout';
         errorDetails = 'Connection timed out after 5 seconds. Metro may be slow to respond or not reachable.';
-      } else if (error.name === 'TypeError' && error.message.includes('Network request failed')) {
+      } else if (error.name === 'TypeError' && errorMsg && errorMsg.includes('Network request failed')) {
         errorDetails = 'Network request failed. Possible causes:\n';
         errorDetails += '• Metro is not running\n';
         errorDetails += '• Wrong IP address or port\n';
         errorDetails += '• Firewall blocking connection\n';
         errorDetails += '• Device and computer not on same network';
-      } else if (error.message.includes('timeout')) {
+      } else if (errorMsg && errorMsg.includes('timeout')) {
         errorDetails = 'Connection timeout. Metro may be slow to respond.';
       } else {
         errorDetails = error.toString();
