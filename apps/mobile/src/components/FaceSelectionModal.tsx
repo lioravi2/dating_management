@@ -29,6 +29,7 @@ interface FaceSelectionModalProps {
   onSelect: (detection: FaceDetection) => void;
   onCancel: () => void;
   warning?: string;
+  imageDimensions?: { width: number; height: number };
 }
 
 export default function FaceSelectionModal({
@@ -38,6 +39,7 @@ export default function FaceSelectionModal({
   onSelect,
   onCancel,
   warning,
+  imageDimensions: providedImageDimensions,
 }: FaceSelectionModalProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
@@ -91,26 +93,32 @@ export default function FaceSelectionModal({
 
   useEffect(() => {
     if (visible && imageUri) {
-      console.log('[FaceSelectionModal] Loading image dimensions for:', imageUri);
-      console.log('[FaceSelectionModal] Detections count:', detections.length);
-      Image.getSize(
-        imageUri,
-        (width, height) => {
-          console.log('[FaceSelectionModal] Image dimensions loaded:', width, height);
-          setImageDimensions({ width, height });
-        },
-        (error) => {
-          console.error('[FaceSelectionModal] Error getting image size:', error);
-          // Fallback dimensions
-          setImageDimensions({ width: 800, height: 600 });
-        }
-      );
+      // Use provided dimensions if available, otherwise load them
+      if (providedImageDimensions) {
+        console.log('[FaceSelectionModal] Using provided image dimensions:', providedImageDimensions);
+        setImageDimensions(providedImageDimensions);
+      } else {
+        console.log('[FaceSelectionModal] Loading image dimensions for:', imageUri);
+        console.log('[FaceSelectionModal] Detections count:', detections.length);
+        Image.getSize(
+          imageUri,
+          (width, height) => {
+            console.log('[FaceSelectionModal] Image dimensions loaded:', width, height);
+            setImageDimensions({ width, height });
+          },
+          (error) => {
+            console.error('[FaceSelectionModal] Error getting image size:', error);
+            // Fallback dimensions
+            setImageDimensions({ width: 800, height: 600 });
+          }
+        );
+      }
     } else {
       setImageDimensions(null);
       setDisplayLayout(null);
       setSelectedIndex(null);
     }
-  }, [visible, imageUri, detections.length]);
+  }, [visible, imageUri, detections.length, providedImageDimensions]);
 
   const handleImageLayout = (event: any) => {
     const { x, y, width, height } = event.nativeEvent.layout;
@@ -444,9 +452,8 @@ export default function FaceSelectionModal({
                     )}
                     {isSelected && (
                       <>
-                        <TouchableOpacity
-                          activeOpacity={0.8}
-                          onPress={() => setSelectedIndex(index)}
+                        {/* Green border box - use View instead of TouchableOpacity to avoid visual artifacts */}
+                        <View
                           style={[
                             styles.boundingBox,
                             {
@@ -458,6 +465,26 @@ export default function FaceSelectionModal({
                               borderWidth: 3,
                               elevation: 20,
                               zIndex: 21,
+                              backgroundColor: 'transparent',
+                            },
+                          ]}
+                          pointerEvents="none"
+                        />
+                        {/* Touchable area for selection - larger than box for easier clicking */}
+                        <TouchableOpacity
+                          activeOpacity={1.0}
+                          android_ripple={null}
+                          onPress={() => {
+                            console.log(`[FaceSelectionModal] Face ${index + 1} selected`);
+                            setSelectedIndex(index);
+                          }}
+                          style={[
+                            styles.boundingBoxTouchable,
+                            {
+                              left: boxLeft - boxWidth * 0.3,
+                              top: boxTop - boxHeight * 0.3,
+                              width: boxWidth * 1.6,
+                              height: boxHeight * 1.6,
                             },
                           ]}
                         />
@@ -574,6 +601,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     zIndex: 25, // Higher than bounding box so it's clickable
     elevation: 25, // Android
+    borderWidth: 0,
+    borderRadius: 0,
   },
   selectedLabel: {
     position: 'absolute',
