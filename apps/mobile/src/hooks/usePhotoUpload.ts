@@ -27,8 +27,6 @@ export interface UsePhotoUploadReturn {
   showSamePersonModal: boolean;
   faceDetections: any[];
   selectedImageUri: string | null;
-  faceDetectionImageUri: string | null;
-  faceDetectionImageDimensions: { width: number; height: number } | null;
   analysisData: PhotoUploadAnalysis | null;
   selectedFaceDescriptor: number[] | null;
   faceSizeWarning: string;
@@ -65,8 +63,6 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
   const [showSamePersonModal, setShowSamePersonModal] = useState(false);
   const [faceDetections, setFaceDetections] = useState<any[]>([]);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [faceDetectionImageUri, setFaceDetectionImageUri] = useState<string | null>(null);
-  const [faceDetectionImageDimensions, setFaceDetectionImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [analysisData, setAnalysisData] = useState<PhotoUploadAnalysis | null>(null);
   const [selectedFaceDescriptor, setSelectedFaceDescriptor] = useState<number[] | null>(null);
   const [faceSizeWarning, setFaceSizeWarning] = useState<string>('');
@@ -168,13 +164,6 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
   ): Promise<{ uri: string; width: number; height: number }> => {
     // API now returns coordinates in original image space, so use them directly
     // But we need to validate and clamp to ensure they're within image bounds
-    
-    // Validate aspect ratio before cropping to catch any partial faces that slipped through
-    const aspectRatio = boundingBox.width / boundingBox.height;
-    if (aspectRatio < 0.75 || aspectRatio > 1.4) {
-      throw new Error(`Invalid face aspect ratio (${aspectRatio.toFixed(2)}). This may be a partial face.`);
-    }
-    
     const cropX = Math.max(0, Math.min(Math.round(boundingBox.x), originalDimensions.width - 1));
     const cropY = Math.max(0, Math.min(Math.round(boundingBox.y), originalDimensions.height - 1));
     
@@ -190,7 +179,6 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
       original: originalDimensions,
       boundingBox,
       crop: { x: cropX, y: cropY, width: cropWidth, height: cropHeight },
-      aspectRatio: aspectRatio.toFixed(2),
     });
 
     // Validate crop parameters
@@ -268,8 +256,6 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     setUploading(false);
     uploadDataRef.current = null;
     setSelectedImageUri(null);
-    setFaceDetectionImageUri(null);
-    setFaceDetectionImageDimensions(null);
     setFaceDetections([]);
     setSelectedFaceDescriptor(null);
     setAnalysisData(null);
@@ -485,10 +471,6 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
           imageWidth,
           imageHeight
         );
-
-        // Store face detection image data for use in FaceSelectionModal
-        setFaceDetectionImageUri(faceDetectionImage.uri);
-        setFaceDetectionImageDimensions({ width: faceDetectionImage.width, height: faceDetectionImage.height });
 
         const detectFormData = new FormData();
         detectFormData.append('file', {
@@ -732,24 +714,9 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
         setShowProgressModal(true);
         setUploadProgress('preparing');
         
-        // Scale bounding box from face detection image space to optimized image space
-        let boundingBoxToUse = detection.boundingBox;
-        if (faceDetectionImageDimensions && 
-            (faceDetectionImageDimensions.width !== uploadDataRef.current.width || 
-             faceDetectionImageDimensions.height !== uploadDataRef.current.height)) {
-          const scaleX = uploadDataRef.current.width / faceDetectionImageDimensions.width;
-          const scaleY = uploadDataRef.current.height / faceDetectionImageDimensions.height;
-          boundingBoxToUse = {
-            x: detection.boundingBox.x * scaleX,
-            y: detection.boundingBox.y * scaleY,
-            width: detection.boundingBox.width * scaleX,
-            height: detection.boundingBox.height * scaleY,
-          };
-        }
-        
         const cropped = await cropImageToFace(
           uploadDataRef.current.optimizedUri,
-          boundingBoxToUse,
+          detection.boundingBox,
           { width: uploadDataRef.current.width, height: uploadDataRef.current.height }
         );
         
@@ -803,8 +770,6 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     setUploading(false);
     uploadDataRef.current = null;
     setSelectedImageUri(null);
-    setFaceDetectionImageUri(null);
-    setFaceDetectionImageDimensions(null);
     setFaceDetections([]);
     setSelectedFaceDescriptor(null);
     setAnalysisData(null);
@@ -826,8 +791,6 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     showSamePersonModal,
     faceDetections,
     selectedImageUri,
-    faceDetectionImageUri,
-    faceDetectionImageDimensions,
     analysisData,
     selectedFaceDescriptor,
     faceSizeWarning,
@@ -842,4 +805,3 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     uploadData: uploadDataRef.current,
   };
 }
-

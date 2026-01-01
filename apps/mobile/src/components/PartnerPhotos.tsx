@@ -49,6 +49,8 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
   
   // Face detection data
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [faceDetectionImageUri, setFaceDetectionImageUri] = useState<string | null>(null);
+  const [faceDetectionImageDimensions, setFaceDetectionImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [faceDetections, setFaceDetections] = useState<any[]>([]);
   const [selectedFaceDescriptor, setSelectedFaceDescriptor] = useState<number[] | null>(null);
   const [analysisData, setAnalysisData] = useState<PhotoUploadAnalysis | null>(null);
@@ -262,6 +264,8 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
     setUploading(false);
     uploadDataRef.current = null;
     setSelectedImageUri(null);
+    setFaceDetectionImageUri(null);
+    setFaceDetectionImageDimensions(null);
     setFaceDetections([]);
     setSelectedFaceDescriptor(null);
     setAnalysisData(null);
@@ -296,6 +300,8 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
     setNoFaceErrorMessage(undefined);
     uploadDataRef.current = null;
     setSelectedImageUri(null);
+    setFaceDetectionImageUri(null);
+    setFaceDetectionImageDimensions(null);
     setFaceDetections([]);
     setSelectedFaceDescriptor(null);
     setAnalysisData(null);
@@ -377,6 +383,10 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
           asset.width,
           asset.height
         );
+
+        // Store face detection image data for use in FaceSelectionModal
+        setFaceDetectionImageUri(faceDetectionImage.uri);
+        setFaceDetectionImageDimensions({ width: faceDetectionImage.width, height: faceDetectionImage.height });
 
         const detectFormData = new FormData();
         detectFormData.append('file', {
@@ -759,6 +769,13 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
     try {
       // API now returns coordinates in original image space, so use them directly
       // But we need to validate and clamp to ensure they're within image bounds
+      
+      // Validate aspect ratio before cropping to catch any partial faces that slipped through
+      const aspectRatio = boundingBox.width / boundingBox.height;
+      if (aspectRatio < 0.75 || aspectRatio > 1.4) {
+        throw new Error(`Invalid face aspect ratio (${aspectRatio.toFixed(2)}). This may be a partial face.`);
+      }
+      
       const cropX = Math.max(0, Math.min(Math.round(boundingBox.x), originalDimensions.width - 1));
       const cropY = Math.max(0, Math.min(Math.round(boundingBox.y), originalDimensions.height - 1));
       
@@ -774,6 +791,7 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
         original: originalDimensions,
         boundingBox,
         crop: { x: cropX, y: cropY, width: cropWidth, height: cropHeight },
+        aspectRatio: aspectRatio.toFixed(2),
       });
 
       // Validate crop parameters
@@ -824,16 +842,22 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
     }
     
     // Crop image to selected face if bounding box is available
-    if (detection.boundingBox && uploadDataRef.current) {
+    // IMPORTANT: Use faceDetectionImageUri and faceDetectionImageDimensions because
+    // the bounding boxes are in the coordinate space of the face detection image
+    if (detection.boundingBox && faceDetectionImageUri && faceDetectionImageDimensions) {
       try {
         setShowProgressModal(true);
         setUploadProgress('preparing');
         
-        console.log('[PartnerPhotos] Cropping image to selected face...', detection.boundingBox);
+        console.log('[PartnerPhotos] Cropping image to selected face...', {
+          boundingBox: detection.boundingBox,
+          imageUri: faceDetectionImageUri,
+          imageDimensions: faceDetectionImageDimensions,
+        });
         const cropped = await cropImageToFace(
-          uploadDataRef.current.optimizedUri,
+          faceDetectionImageUri,
           detection.boundingBox,
-          { width: uploadDataRef.current.width, height: uploadDataRef.current.height }
+          faceDetectionImageDimensions
         );
         
         // Update upload data with cropped image
@@ -943,6 +967,8 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
         setUploading(false);
         uploadDataRef.current = null;
         setSelectedImageUri(null);
+        setFaceDetectionImageUri(null);
+        setFaceDetectionImageDimensions(null);
         setFaceDetections([]);
         setSelectedFaceDescriptor(null);
         setAnalysisData(null);
@@ -1158,12 +1184,13 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
       />
 
       {/* Face Selection Modal */}
-      {selectedImageUri && (
+      {(faceDetectionImageUri || selectedImageUri) && (
         <FaceSelectionModal
           visible={showFaceSelectionModal}
-          imageUri={selectedImageUri}
+          imageUri={faceDetectionImageUri || selectedImageUri || ''}
           detections={faceDetections}
           onSelect={handleFaceSelected}
+          imageDimensions={faceDetectionImageDimensions || undefined}
           onCancel={() => {
             setShowFaceSelectionModal(false);
             setShowProgressModal(false);
@@ -1171,6 +1198,8 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
             setUploading(false);
             uploadDataRef.current = null;
             setSelectedImageUri(null);
+            setFaceDetectionImageUri(null);
+            setFaceDetectionImageDimensions(null);
             setFaceDetections([]);
           }}
         />
@@ -1187,6 +1216,8 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
           setUploading(false);
           uploadDataRef.current = null;
           setSelectedImageUri(null);
+          setFaceDetectionImageUri(null);
+          setFaceDetectionImageDimensions(null);
           setNoFaceErrorMessage(undefined);
         }}
         partnerId={partnerId}
@@ -1204,6 +1235,8 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
           setUploading(false);
           uploadDataRef.current = null;
           setSelectedImageUri(null);
+          setFaceDetectionImageUri(null);
+          setFaceDetectionImageDimensions(null);
           setSelectedFaceDescriptor(null);
           setAnalysisData(null);
         }}
