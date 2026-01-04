@@ -8,6 +8,12 @@ const nextConfig = {
     ],
   },
   webpack: (config, { isServer, webpack }) => {
+    // Add alias for shared package
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@dating-app/shared': require('path').resolve(__dirname, '../../packages/shared'),
+    };
+    
     // Fix for face-api.js Node.js module warnings
     if (!isServer) {
       config.resolve.fallback = {

@@ -60,16 +60,33 @@ export default function MainNavigator() {
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
-            // Reset the Partners stack to PartnersList when tab is pressed
-            const state = navigation.getState();
-            const partnersTab = state.routes.find((r) => r.name === 'Partners');
-            if (partnersTab && partnersTab.state) {
-              const partnersStackState = partnersTab.state;
-              // If we're not already on PartnersList, reset the entire stack
-              if (partnersStackState.index !== 0 || partnersStackState.routes[0]?.name !== 'PartnersList') {
-                // Use CommonActions.reset to completely reset the Partners stack
-                navigation.dispatch(
-                  CommonActions.reset({
+            try {
+              // Reset the Partners stack to PartnersList when tab is pressed
+              const state = navigation.getState();
+              
+              // Validate navigation state structure
+              if (!state || !state.routes || !Array.isArray(state.routes)) {
+                console.warn('[MainNavigator] Invalid navigation state structure');
+                return;
+              }
+              
+              const partnersTab = state.routes.find((r) => r && r.name === 'Partners');
+              if (partnersTab && partnersTab.state) {
+                const partnersStackState = partnersTab.state;
+                
+                // Validate stack state structure
+                if (!partnersStackState || typeof partnersStackState.index !== 'number' || !Array.isArray(partnersStackState.routes)) {
+                  console.warn('[MainNavigator] Invalid Partners stack state structure');
+                  return;
+                }
+                
+                // If we're not already on PartnersList, reset the entire stack
+                const isOnPartnersList = partnersStackState.index === 0 && 
+                                         partnersStackState.routes[0]?.name === 'PartnersList';
+                
+                if (!isOnPartnersList) {
+                  // Use CommonActions.reset to completely reset the Partners stack
+                  const resetAction = CommonActions.reset({
                     index: 0,
                     routes: [
                       {
@@ -80,9 +97,39 @@ export default function MainNavigator() {
                         },
                       },
                     ],
-                  })
-                );
+                  });
+                  
+                  // Dispatch and validate the action was created successfully
+                  if (resetAction) {
+                    navigation.dispatch(resetAction);
+                    
+                    // Verify the reset succeeded by checking the new state
+                    // Note: getState() may not immediately reflect changes, so we check after a brief delay
+                    setTimeout(() => {
+                      try {
+                        const newState = navigation.getState();
+                        const newPartnersTab = newState?.routes?.find((r) => r && r.name === 'Partners');
+                        const newStackState = newPartnersTab?.state;
+                        
+                        if (newStackState && 
+                            newStackState.index === 0 && 
+                            newStackState.routes?.[0]?.name === 'PartnersList') {
+                          // Reset succeeded
+                        } else {
+                          console.warn('[MainNavigator] Navigation reset may not have succeeded - state verification failed');
+                        }
+                      } catch (verifyError) {
+                        console.warn('[MainNavigator] Error verifying navigation reset:', verifyError);
+                      }
+                    }, 100);
+                  } else {
+                    console.warn('[MainNavigator] Failed to create reset action');
+                  }
+                }
               }
+            } catch (error) {
+              console.error('[MainNavigator] Error resetting Partners navigation:', error);
+              // Don't prevent tab navigation on error - allow default behavior
             }
           },
         })}
