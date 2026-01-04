@@ -191,6 +191,23 @@ export default function SimilarPartnersScreen() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        
+        // Check for partner limit error
+        if (response.status === 403 && errorData.error === 'PARTNER_LIMIT_REACHED') {
+          setLoading(false);
+          setUploadingPartnerId(null);
+          // Note: SimilarPartnersScreen doesn't have a message state,
+          // so we'll show an Alert here as a fallback, but ideally this should
+          // navigate back to PhotoUploadScreen where the message can be displayed
+          const errorMessage = errorData.message || 'Partner limit reached';
+          Alert.alert(
+            'Partner Limit Reached',
+            errorMessage,
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        
         throw new Error(errorData.error || errorData.details || 'Failed to create partner');
       }
 
@@ -206,10 +223,26 @@ export default function SimilarPartnersScreen() {
       }
     } catch (error) {
       console.error('[SimilarPartnersScreen] Error creating partner:', error);
-      Alert.alert(
-        'Error',
-        error instanceof Error ? error.message : 'Failed to create partner and upload photo'
-      );
+      
+      // Check if it's a partner limit error (in case it wasn't caught above)
+      if (error instanceof Error && error.message.includes('PARTNER_LIMIT_REACHED')) {
+        setLoading(false);
+        setUploadingPartnerId(null);
+        // Note: SimilarPartnersScreen doesn't have a message state,
+        // so we'll show an Alert here as a fallback
+        Alert.alert(
+          'Partner Limit Reached',
+          error.message,
+          [{ text: 'OK' }]
+        );
+      } else {
+        setLoading(false);
+        setUploadingPartnerId(null);
+        Alert.alert(
+          'Error',
+          error instanceof Error ? error.message : 'Failed to create partner and upload photo'
+        );
+      }
     } finally {
       setLoading(false);
       setUploadingPartnerId(null);

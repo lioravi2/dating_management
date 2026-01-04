@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CommonActions } from '@react-navigation/native';
 import { MainTabParamList } from './types';
 import DashboardScreen from '../screens/main/DashboardScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
@@ -57,6 +58,34 @@ export default function MainNavigator() {
           tabBarLabel: 'Partners',
           tabBarIcon: () => null, // We'll add icons later if needed
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            // Reset the Partners stack to PartnersList when tab is pressed
+            const state = navigation.getState();
+            const partnersTab = state.routes.find((r) => r.name === 'Partners');
+            if (partnersTab && partnersTab.state) {
+              const partnersStackState = partnersTab.state;
+              // If we're not already on PartnersList, reset the entire stack
+              if (partnersStackState.index !== 0 || partnersStackState.routes[0]?.name !== 'PartnersList') {
+                // Use CommonActions.reset to completely reset the Partners stack
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [
+                      {
+                        name: 'Partners',
+                        state: {
+                          routes: [{ name: 'PartnersList' }],
+                          index: 0,
+                        },
+                      },
+                    ],
+                  })
+                );
+              }
+            }
+          },
+        })}
       />
       <Tab.Screen
         name="Profile"

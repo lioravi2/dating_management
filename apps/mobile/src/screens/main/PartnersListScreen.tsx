@@ -14,6 +14,7 @@ import {
 import { supabase } from '../../lib/supabase/client';
 import { Partner, PARTNER_SORT_ORDER } from '@dating-app/shared';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { CommonActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PartnersStackParamList } from '../../navigation/types';
 import { getPartnerProfilePictureUrl } from '../../lib/photo-utils';

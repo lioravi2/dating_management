@@ -25,11 +25,12 @@ type PhotoUploadScreenNavigationProp = CompositeNavigationProp<
 export default function PhotoUploadScreen() {
   const navigation = useNavigation<PhotoUploadScreenNavigationProp>();
   const route = useRoute<PhotoUploadScreenRouteProp>();
-  const { source, imageUri } = route.params || {};
+  const { source, imageUri, timestamp } = route.params || {};
   
   const [matches, setMatches] = useState<FaceMatch[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string>('');
+  const [partnerLimitMessage, setPartnerLimitMessage] = useState<string>('');
   const hasProcessedImageUriRef = useRef(false);
   
   const {
@@ -41,6 +42,8 @@ export default function PhotoUploadScreen() {
     showSamePersonModal,
     faceDetections,
     selectedImageUri,
+    faceDetectionImageUri,
+    faceDetectionImageDimensions,
     analysisData,
     selectedFaceDescriptor,
     faceSizeWarning,
@@ -124,9 +127,10 @@ export default function PhotoUploadScreen() {
         
         // Check for partner limit error
         if (response.status === 403 && errorData.error === 'PARTNER_LIMIT_REACHED') {
-          resetState(); // Clear upload state
-          setMessage(errorData.message || 'Partner limit reached');
+          resetState(); // Clear upload state (this also dismisses progress modal)
           setLoading(false);
+          const errorMessage = errorData.message || 'Partner limit reached';
+          setPartnerLimitMessage(errorMessage);
           return;
         }
         
@@ -149,9 +153,12 @@ export default function PhotoUploadScreen() {
       
       // Check if it's a partner limit error (in case it wasn't caught above)
       if (error instanceof Error && error.message.includes('PARTNER_LIMIT_REACHED')) {
-        resetState();
-        setMessage(error.message);
+        resetState(); // Clear upload state (this also dismisses progress modal)
+        setLoading(false);
+        setPartnerLimitMessage(error.message);
       } else {
+        resetState(); // Clear upload state on any error
+        setLoading(false);
         Alert.alert(
           'Error',
           error instanceof Error ? error.message : 'Failed to create partner and upload photo'
@@ -159,29 +166,44 @@ export default function PhotoUploadScreen() {
       }
     } finally {
       setLoading(false);
+      // Ensure progress modal is dismissed even if there was an error
+      resetState();
     }
   }, [uploadData, navigation, resetState]);
 
-  // Track if this is the first focus to avoid clearing state on initial mount
-  const isFirstFocus = useRef(true);
+  // Track previous route params to detect fresh navigation
+  const prevRouteParamsRef = useRef<{ source?: string; imageUri?: string; timestamp?: number } | null>(null);
+  const isMountedRef = useRef(false);
   
-  // Clear state when screen comes into focus (user navigates to it fresh)
+  // Clear state when screen comes into focus or when route params change (fresh navigation)
   useFocusEffect(
     useCallback(() => {
-      // Only clear state on subsequent focuses (not the first mount)
-      // This prevents clearing state when the screen first loads, but clears it
-      // when user navigates back to the screen after uploading/cancelling
-      if (!isFirstFocus.current && !uploading && !showProgressModal && !loading) {
-        // Always reset state when returning to screen (after first mount)
-        // This ensures clean state when returning from SimilarPartners or other screens
+      const currentParams = { source, imageUri, timestamp };
+      const prevParams = prevRouteParamsRef.current;
+      
+      // Check if this is a fresh navigation (params changed or first time)
+      const isFreshNavigation = !prevParams || 
+        prevParams.source !== currentParams.source || 
+        prevParams.imageUri !== currentParams.imageUri ||
+        prevParams.timestamp !== currentParams.timestamp;
+      
+      // Clear state if:
+      // 1. Fresh navigation (new route params) OR first mount
+      // 2. Not currently uploading/processing
+      // 3. No selected image (to avoid clearing during active upload)
+      if ((isFreshNavigation || !isMountedRef.current) && !uploading && !showProgressModal && !loading && !selectedImageUri) {
+        // Reset all state for fresh navigation
         resetState();
-        // Also clear local state that's not part of the hook
         setMatches([]);
         setMessage('');
-      } else {
-        isFirstFocus.current = false;
+        setPartnerLimitMessage('');
+        hasProcessedImageUriRef.current = false;
       }
-    }, [uploading, showProgressModal, loading, resetState]) // Only depend on loading states, not on the state values themselves
+      
+      // Update refs for next comparison
+      prevRouteParamsRef.current = currentParams;
+      isMountedRef.current = true;
+    }, [source, imageUri, timestamp, uploading, showProgressModal, loading, selectedImageUri, resetState])
   );
 
   // Auto-process imageUri if provided (e.g., from share intent)
@@ -192,6 +214,10 @@ export default function PhotoUploadScreen() {
       // and we're not currently uploading or have a selected image
       if (!hasProcessedImageUriRef.current && !uploading && !selectedImageUri) {
         hasProcessedImageUriRef.current = true;
+        // Clear any previous error messages before processing new image
+        setMessage('');
+        setPartnerLimitMessage('');
+        // Process image - partner limit will be checked by API when creating partner
         processImageUri(imageUri);
       }
     } else {
@@ -293,9 +319,10 @@ export default function PhotoUploadScreen() {
         
         // Check for partner limit error
         if (response.status === 403 && errorData.error === 'PARTNER_LIMIT_REACHED') {
-          resetState(); // Clear upload state
-          setMessage(errorData.message || 'Partner limit reached');
+          resetState(); // Clear upload state (this also dismisses progress modal)
           setLoading(false);
+          const errorMessage = errorData.message || 'Partner limit reached';
+          setPartnerLimitMessage(errorMessage);
           return;
         }
         
@@ -315,12 +342,24 @@ export default function PhotoUploadScreen() {
       }
     } catch (error) {
       console.error('[PhotoUploadScreen] Error creating partner:', error);
-      Alert.alert(
-        'Error',
-        error instanceof Error ? error.message : 'Failed to create partner and upload photo'
-      );
+      
+      // Check if it's a partner limit error (in case it wasn't caught above)
+      if (error instanceof Error && error.message.includes('PARTNER_LIMIT_REACHED')) {
+        resetState(); // Clear upload state (this also dismisses progress modal)
+        setLoading(false);
+        setPartnerLimitMessage(error.message);
+      } else {
+        resetState(); // Clear upload state on any error
+        setLoading(false);
+        Alert.alert(
+          'Error',
+          error instanceof Error ? error.message : 'Failed to create partner and upload photo'
+        );
+      }
     } finally {
       setLoading(false);
+      // Ensure progress modal is dismissed even if there was an error
+      resetState();
     }
   }, [uploadData, selectedFaceDescriptor, navigation, resetState]);
 
@@ -371,6 +410,31 @@ export default function PhotoUploadScreen() {
           </Text>
         </View>
 
+        {/* Partner limit message (yellow, like add partner) */}
+        {partnerLimitMessage && (
+          <View style={[styles.messageBox, styles.yellowAlertBox]}>
+            <Text style={[styles.messageText, styles.yellowAlertTitle]}>
+              Partner Limit Reached
+            </Text>
+            <Text style={[styles.messageText, styles.yellowAlertText]}>
+              {partnerLimitMessage}
+            </Text>
+            <TouchableOpacity
+              style={styles.upgradeButtonYellow}
+              onPress={() => {
+                const webAppUrl = process.env.EXPO_PUBLIC_WEB_APP_URL;
+                if (webAppUrl) {
+                  Linking.openURL(`${webAppUrl}/upgrade`).catch((err) => {
+                    console.error('Error opening upgrade page:', err);
+                  });
+                }
+              }}
+            >
+              <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Error message container */}
         {message && (
           <View style={[styles.messageBox, styles.errorBox]}>
@@ -420,7 +484,11 @@ export default function PhotoUploadScreen() {
           <TouchableOpacity
             style={styles.uploadButton}
             onPress={() => {
-              setMessage(''); // Clear any previous error messages when starting new upload
+              // Clear all previous state when starting a new upload
+              setMessage('');
+              setPartnerLimitMessage('');
+              setMatches([]);
+              // Partner limit will be checked by API when creating partner
               handleUploadPhoto();
             }}
             disabled={uploading}
@@ -483,11 +551,12 @@ export default function PhotoUploadScreen() {
 
       <FaceSelectionModal
         visible={showFaceSelectionModal}
-        imageUri={selectedImageUri || ''}
+        imageUri={faceDetectionImageUri || selectedImageUri || ''}
         detections={faceDetections}
         onSelect={handleFaceSelected}
         onCancel={handleCancel}
         warning={faceSizeWarning || undefined}
+        imageDimensions={faceDetectionImageDimensions || undefined}
       />
 
       <NoFaceDetectedModal
@@ -682,5 +751,29 @@ const styles = StyleSheet.create({
   },
   warningText: {
     color: '#92400e',
+  },
+  yellowAlertBox: {
+    backgroundColor: '#fef9c3', // yellow-50 equivalent
+    borderWidth: 1,
+    borderColor: '#fde047', // yellow-200 equivalent
+    borderRadius: 8,
+  },
+  yellowAlertTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#78350f', // yellow-800 equivalent
+    marginBottom: 8,
+  },
+  yellowAlertText: {
+    fontSize: 14,
+    color: '#854d0e', // yellow-700 equivalent
+    marginBottom: 12,
+  },
+  upgradeButtonYellow: {
+    backgroundColor: '#eab308', // yellow-500 equivalent
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
   },
 });

@@ -186,7 +186,11 @@ export function PhotoUploadWithFaceMatch({
     // Get image dimensions
     const img = new Image();
     img.onload = async () => {
-      const dims = { width: img.width, height: img.height };
+      // Use naturalWidth/naturalHeight to get actual image dimensions, not displayed size
+      const dims = { 
+        width: img.naturalWidth || img.width, 
+        height: img.naturalHeight || img.height 
+      };
       setImageDimensions(dims);
       dimensionsRef.current = dims; // Store in ref immediately
 

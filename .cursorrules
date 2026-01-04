@@ -1,5 +1,15 @@
 # Cursor Rules for Dating App Development
 
+> **⚠️ DEPRECATED:** This file is legacy. Rules have been migrated to `.cursor/rules/` following Cursor best practices.
+> 
+> **Active rules are now in:**
+> - `.cursor/rules/ui-components/` - UI component standards
+> - `.cursor/rules/android-abstractions/` - Android migration abstractions
+> - `.cursor/rules/mobile-builds/` - Mobile app build requirements
+> - `.cursor/rules/build-numbers/` - Build number visibility and summaries
+> 
+> This file is kept for reference but will not be actively used by Cursor.
+
 ## 🚫 CRITICAL RULES - NEVER VIOLATE
 
 ### 1. NO WINDOW MODALS - Use React Components Only
@@ -210,6 +220,44 @@ const params = navigation.getParams();
 const value = params.key;
 ```
 
+### 4. MOBILE APP BUILD REQUIREMENTS
+
+**CRITICAL:** The mobile app is built as a standalone release APK with no development dependencies.
+
+#### Build Configuration
+- **ONLY use release builds:** `npm run build:apk:release` in `apps/mobile/`
+- **NO USB debugging:** Mobile device is NOT connected via USB cable - builds must be transferable as standalone APK files
+- **NO Metro bundler connection:** JavaScript code MUST be bundled into the APK during build - the app runs independently without requiring a Metro bundler connection to the development PC
+- **Standalone operation:** The built APK must function completely independently - no network connection to development machine required
+
+#### Build Process Requirements
+- Build scripts MUST generate a unique build number for each release build
+- Build number MUST be written to `apps/mobile/src/lib/build-info.ts` during the build process
+- Build number MUST be displayed in the app's dashboard screen (see `apps/mobile/src/screens/main/DashboardScreen.tsx`)
+- Build number MUST be prominently displayed in the terminal output after successful build completion
+
+#### Build Number Display Format
+**In Terminal (after build):**
+```
+════════════════════════════════════════════════════════
+  🔢 BUILD NUMBER (check in app dashboard):
+  ══════════════════════════════════════════════════════
+  [BUILD_NUMBER]
+  ══════════════════════════════════════════════════════
+```
+
+**In App Dashboard:**
+- Build number MUST be visible in the dashboard UI (bottom right corner or similar location)
+- Import from `apps/mobile/src/lib/build-info.ts`: `import { BUILD_NUMBER } from '../../lib/build-info';`
+- Display format: `{BUILD_NUMBER}` (e.g., "191016")
+
+#### Build Script Requirements
+- Build scripts (`apps/mobile/scripts/build-apk-release.js`) MUST:
+  1. Generate a unique 6-digit build number
+  2. Write the build number to `apps/mobile/src/lib/build-info.ts` before bundling
+  3. Display the build number prominently in terminal output after successful build
+  4. Include build number in the build results summary section
+
 ## 📋 CODE REVIEW CHECKLIST
 
 Before submitting code, verify:
@@ -223,6 +271,8 @@ Before submitting code, verify:
 - [ ] No direct `usePathname` or `useSearchParams` - use `navigation.getCurrentPath()` and `navigation.getParams()` instead
 - [ ] No direct HTML file inputs - use `ImagePicker` component instead
 - [ ] No direct `FileReader` usage - use `fileUtils` instead
+- [ ] Mobile builds use `npm run build:apk:release` only (no debug builds)
+- [ ] Mobile build scripts generate and display build numbers correctly
 
 ## 🎯 EXAMPLES OF CORRECT PATTERNS
 
@@ -329,6 +379,9 @@ export default function MyPage() {
 3. **Not showing loading spinner** - Always show visual feedback
 4. **Using `window.location.href`** - Use `environment.redirect()` instead
 5. **Direct Next.js imports** - Always use abstraction layers
+6. **Suggesting USB debugging for mobile** - Mobile device is NOT connected via USB
+7. **Suggesting Metro bundler for mobile** - Mobile app must be standalone with bundled JS
+8. **Forgetting build numbers** - Every release build MUST have a visible build number
 
 ## 📚 REFERENCE DOCUMENTATION
 
@@ -338,6 +391,9 @@ export default function MyPage() {
 - Environment Helper: `apps/web/src/lib/environment/`
 - Image Picker: `apps/web/src/components/ImagePicker/`
 - File Utils: `apps/web/src/lib/file-utils/`
+- Mobile Build Scripts: `apps/mobile/scripts/build-apk-release.js`
+- Mobile Build Info: `apps/mobile/src/lib/build-info.ts`
+- Mobile Dashboard: `apps/mobile/src/screens/main/DashboardScreen.tsx`
 
 ## ⚠️ ENFORCEMENT
 
@@ -345,37 +401,71 @@ These rules are CRITICAL for:
 1. Maintaining consistent UX (no browser modals)
 2. Preventing duplicate submissions (loading states)
 3. Ensuring Android migration compatibility (abstractions)
+4. Ensuring mobile builds are standalone and properly versioned
 
 Any code that violates these rules MUST be rejected and fixed before merging.
 
 ## 📝 SUMMARY AND COMMUNICATION RULES
 
-### Version Publishing Summary Format
+### Build Number and Version Publishing Summary Format
 
-**REQUIRED:** When a version is published (code is committed and pushed, or a build is deployed), the first row of the summary in the chat MUST include the build information.
+**REQUIRED:** When a version is published (code is committed and pushed, or a build is deployed), the summary MUST include build information prominently.
+
+#### Web App Build Summary Format
+
+**REQUIRED:** When a web app version is published (committed and pushed, or deployed to Vercel), the first line of the summary MUST include:
 
 **Format:**
-- Include build status (success/failure)
-- Include build timestamp or commit hash if available
-- Include deployment platform (Vercel, local, etc.) if applicable
-- Place this information as the first line of any summary after publishing
+- Build status (success/failure)
+- Build number (from `BUILD_NUMBER` in `apps/web/src/lib/version.ts`)
+- Build timestamp or commit hash if available
+- Deployment platform (Vercel, local, etc.) if applicable
 
 **Example:**
 ```
-✅ Build successful - Published to Vercel at 12:45:23 UTC (commit: abc1234)
+✅ Build successful - Build #abc1234 - Published to Vercel at 12:45:23 UTC (commit: abc1234)
 [Rest of summary...]
 ```
 
 **OR:**
 
 ```
-❌ Build failed - Vercel deployment error at 12:45:23 UTC
+❌ Build failed - Build #dev - Vercel deployment error at 12:45:23 UTC
 [Error details and rest of summary...]
 ```
 
-This ensures immediate visibility of build status in conversation summaries.
+#### Mobile App Build Summary Format
 
+**REQUIRED:** When a mobile app release build completes (`npm run build:apk:release`), the summary MUST include:
 
+**Format:**
+- Build status (success/failure)
+- Build number (the 6-digit number generated during build)
+- APK file location
+- Build number MUST be displayed in a clearly marked section
 
+**Example:**
+```
+✅ Mobile Release Build successful - Build #191016
+📦 APK: android\app\build\outputs\apk\release\app-release.apk
+🔢 Build Number: 191016 (visible in app dashboard)
+[Rest of summary...]
+```
 
+**Terminal Output Requirements:**
+- Build scripts MUST display build number in a clearly marked section after successful build
+- Format should match the example shown in terminal output (lines 1001-1004 in build script output)
+- Build number MUST be displayed both inline with build results AND in a dedicated section
 
+#### Build Number Visibility Requirements
+
+**Web App:**
+- Build number MUST be visible in the web app UI (via `VersionFooter` component showing `v{APP_VERSION} (build {BUILD_NUMBER})`)
+- Build number is sourced from `apps/web/src/lib/version.ts`
+
+**Mobile App:**
+- Build number MUST be visible in the mobile app dashboard (bottom right corner or similar)
+- Build number is sourced from `apps/mobile/src/lib/build-info.ts`
+- Build number is generated during build process and written to `build-info.ts` before bundling
+
+This ensures immediate visibility of build status and build numbers in conversation summaries and in the applications themselves.

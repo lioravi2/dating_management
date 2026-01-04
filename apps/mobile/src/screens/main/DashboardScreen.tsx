@@ -276,10 +276,11 @@ export default function DashboardScreen() {
             onPress={() => {
               // Navigate to Partners tab first, then to PhotoUpload screen
               // Use setTimeout to ensure navigation stack is ready
+              // Add timestamp to ensure fresh navigation each time
               setTimeout(() => {
                 navigation.navigate('Partners', {
                   screen: 'PhotoUpload',
-                  params: { source: 'Dashboard' },
+                  params: { source: 'Dashboard', timestamp: Date.now() },
                 });
               }, 100);
             }}

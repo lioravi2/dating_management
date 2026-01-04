@@ -5,6 +5,11 @@ import * as faceapi from 'face-api.js';
 import * as tf from '@tensorflow/tfjs';
 import { createCanvas, loadImage, Image as CanvasImage, Canvas as CanvasClass, ImageData as CanvasImageData } from 'canvas';
 import path from 'path';
+import { 
+  validateFaceDetection, 
+  getDefaultConfig,
+  type LandmarkPosition 
+} from '@dating-app/shared';
 
 // face-api.js bundles its own TensorFlow.js, but we need to ensure TensorFlow is initialized
 // with the CPU backend before face-api.js tries to use it
@@ -183,25 +188,6 @@ export async function POST(request: NextRequest) {
     console.log(`[Face Detection] Detection completed in ${(detectionDuration / 1000).toFixed(2)}s`);
     console.log(`[Face Detection] Found ${detections.length} face(s)`);
 
-    // Filter by confidence threshold (0.65 = 65% confidence) to reduce false positives
-    // This helps filter out animal faces and other non-human detections
-    // Lowered from 0.8 to 0.65 to allow valid human faces with glasses/angles while still filtering most animal faces
-    // ssdMobilenetv1 can give relatively high scores to animal faces due to similar facial structure
-    const MIN_CONFIDENCE = 0.65;
-    const lowConfidenceDetections: Array<{ score: number; box: { width: number; height: number } }> = [];
-    const filteredDetections = detections.filter(detection => {
-      const score = detection.detection.score;
-      console.log(`[Face Detection] Detection confidence score: ${score.toFixed(3)}`);
-      if (score < MIN_CONFIDENCE) {
-        lowConfidenceDetections.push({
-          score,
-          box: detection.detection.box,
-        });
-      }
-      return score >= MIN_CONFIDENCE;
-    });
-    console.log(`[Face Detection] Filtered to ${filteredDetections.length} face(s) with confidence >= ${MIN_CONFIDENCE} (out of ${detections.length} total detections)`);
-
     // Scale bounding boxes back to original size if we resized
     // This ensures coordinates are in original image space (matching web app behavior)
     const inputWidth = inputCanvas.width;
@@ -211,37 +197,71 @@ export async function POST(request: NextRequest) {
     
     console.log(`[Face Detection] Scaling coordinates: input=${inputWidth}x${inputHeight}, original=${originalWidth}x${originalHeight}, scale=${scaleX.toFixed(3)}x${scaleY.toFixed(3)}`);
 
-    // Filter by minimum face size (120px minimum dimension)
-    const MIN_FACE_SIZE = 120;
-    const tooSmallDetections: Array<{ width: number; height: number; minDimension: number; confidence: number }> = [];
-    const sizeFilteredDetections = filteredDetections.filter(detection => {
-      const box = detection.detection.box;
-      // Scale to original image dimensions
-      const faceWidth = box.width * scaleX;
-      const faceHeight = box.height * scaleY;
-      const minDimension = Math.min(faceWidth, faceHeight);
-      
-      console.log(`[Face Detection] Face size: ${faceWidth.toFixed(0)}x${faceHeight.toFixed(0)}px (min dimension: ${minDimension.toFixed(0)}px)`);
-      
-      if (minDimension < MIN_FACE_SIZE) {
-        console.log(`[Face Detection] Face too small (${minDimension.toFixed(0)}px < ${MIN_FACE_SIZE}px), filtering out`);
-        tooSmallDetections.push({
-          width: faceWidth,
-          height: faceHeight,
-          minDimension,
-          confidence: detection.detection.score,
-        });
-        return false;
-      }
-      
-      return true;
+    // Get quality config
+    const qualityConfig = getDefaultConfig();
+
+    // Validate each detection using shared validation
+    const validationResults = detections.map(detection => {
+      // Scale bounding box to original dimensions
+      const boundingBox = {
+        x: detection.detection.box.x * scaleX,
+        y: detection.detection.box.y * scaleY,
+        width: detection.detection.box.width * scaleX,
+        height: detection.detection.box.height * scaleY,
+      };
+
+      // Extract landmarks if available (scale to original dimensions)
+      const landmarks: LandmarkPosition[] | undefined = detection.landmarks
+        ? detection.landmarks.positions.map(pos => ({
+            x: pos.x * scaleX,
+            y: pos.y * scaleY,
+          }))
+        : undefined;
+
+      // Validate face quality
+      const validationResult = validateFaceDetection(
+        boundingBox,
+        { width: originalWidth, height: originalHeight },
+        landmarks,
+        detection.detection.score,
+        qualityConfig
+      );
+
+      console.log(`[Face Detection] Detection validation: confidence=${detection.detection.score.toFixed(3)}, valid=${validationResult.isValid}, reasons=${validationResult.reasons.join('; ')}`);
+
+      return {
+        detection,
+        boundingBox,
+        validationResult,
+      };
     });
-    console.log(`[Face Detection] Filtered to ${sizeFilteredDetections.length} face(s) with size >= ${MIN_FACE_SIZE}px (out of ${filteredDetections.length} confidence-filtered detections)`);
 
-    // Calculate how many faces were filtered due to size
-    const filteredCount = filteredDetections.length - sizeFilteredDetections.length;
+    // Filter to only valid detections
+    const validatedDetections = validationResults.filter(item => item.validationResult.isValid);
+    const invalidDetections = validationResults.filter(item => !item.validationResult.isValid);
 
-    if (sizeFilteredDetections.length === 0) {
+    // Group invalid detections by reason for diagnostics
+    const invalidByReason: Record<string, Array<{ confidence: number; reasons: string[] }>> = {};
+    invalidDetections.forEach(item => {
+      item.validationResult.reasons.forEach(reason => {
+        if (!invalidByReason[reason]) {
+          invalidByReason[reason] = [];
+        }
+        invalidByReason[reason].push({
+          confidence: item.detection.detection.score,
+          reasons: item.validationResult.reasons,
+        });
+      });
+    });
+
+    console.log(`[Face Detection] Filtered to ${validatedDetections.length} valid face(s) (out of ${detections.length} total detections)`);
+    if (invalidDetections.length > 0) {
+      console.log(`[Face Detection] Invalid detections by reason:`, invalidByReason);
+    }
+
+    const filteredCount = detections.length - validatedDetections.length;
+
+    if (validatedDetections.length === 0) {
       // Build detailed diagnostic information
       const diagnostics: any = {
         imageDimensions: {
@@ -249,62 +269,48 @@ export async function POST(request: NextRequest) {
           processed: { width: inputWidth, height: inputHeight },
         },
         thresholds: {
-          minConfidence: MIN_CONFIDENCE,
-          minFaceSize: MIN_FACE_SIZE,
+          minConfidence: qualityConfig.minConfidence,
+          minFaceSize: qualityConfig.minPixelSize,
+          minFaceAreaPercentage: qualityConfig.minFaceAreaPercentage,
+          minRelativeSize: qualityConfig.minRelativeSize,
+          aspectRatioMin: qualityConfig.minAspectRatio,
+          aspectRatioMax: qualityConfig.maxAspectRatio,
+          minLandmarkCoverage: qualityConfig.minLandmarkCoverage,
         },
         rawDetections: detections.length,
-        confidenceFiltered: filteredDetections.length,
-        sizeFiltered: sizeFilteredDetections.length,
+        validatedDetections: validatedDetections.length,
+        invalidDetections: invalidDetections.length,
+        invalidByReason,
       };
 
       if (detections.length === 0) {
         diagnostics.reason = 'No faces detected by the model';
-      } else if (filteredDetections.length === 0) {
-        diagnostics.reason = 'Faces detected but confidence too low';
-        diagnostics.lowConfidenceDetections = lowConfidenceDetections.map(d => ({
-          confidence: d.score,
-          confidencePercent: (d.score * 100).toFixed(1) + '%',
-          requiredPercent: (MIN_CONFIDENCE * 100).toFixed(0) + '%',
-        }));
       } else {
-        diagnostics.reason = 'Faces detected but too small';
-        diagnostics.tooSmallDetections = tooSmallDetections.map(d => ({
-          size: `${Math.round(d.width)}x${Math.round(d.height)}px`,
-          minDimension: Math.round(d.minDimension),
-          requiredSize: MIN_FACE_SIZE,
-          confidence: d.confidence,
-          confidencePercent: (d.confidence * 100).toFixed(1) + '%',
-        }));
+        // Get the first reason from the first invalid detection
+        const firstInvalid = invalidDetections[0];
+        diagnostics.reason = firstInvalid?.validationResult.reasons[0] || 'Face(s) detected but validation failed';
+        diagnostics.allReasons = invalidDetections.flatMap(d => d.validationResult.reasons);
       }
+
+      // Get error message from first invalid detection
+      const errorMessage = invalidDetections.length > 0
+        ? invalidDetections[0].validationResult.reasons[0]
+        : 'No faces detected';
 
       return NextResponse.json({
         detections: [],
-        error: filteredDetections.length > 0 
-          ? `Face(s) detected but too small (minimum ${MIN_FACE_SIZE}px required)`
-          : detections.length > 0
-          ? `Face(s) detected but confidence too low (minimum ${(MIN_CONFIDENCE * 100).toFixed(0)}% required)`
-          : 'No faces detected',
-        details: filteredDetections.length > 0 
-          ? `Face(s) detected but too small (minimum ${MIN_FACE_SIZE}px required)`
-          : detections.length > 0
-          ? `Face(s) detected but confidence too low (minimum ${(MIN_CONFIDENCE * 100).toFixed(0)}% required)`
-          : 'No faces detected',
+        error: errorMessage,
+        details: errorMessage,
         diagnostics,
       });
     }
 
     // Convert detections to response format (same structure as web app)
-    const results = sizeFilteredDetections.map((detection) => {
-      const box = detection.detection.box;
+    const results = validatedDetections.map((item) => {
       return {
-        descriptor: Array.from(detection.descriptor),
-        boundingBox: {
-          x: box.x * scaleX,
-          y: box.y * scaleY,
-          width: box.width * scaleX,
-          height: box.height * scaleY,
-        },
-        confidence: detection.detection.score,
+        descriptor: Array.from(item.detection.descriptor),
+        boundingBox: item.boundingBox,
+        confidence: item.detection.detection.score,
       };
     });
 

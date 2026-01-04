@@ -8,14 +8,18 @@ import {
 } from '../types';
 import { imageProcessor } from '@/lib/image-processing';
 import { WebCanvas, WebImage } from '@/lib/image-processing/web-processor';
+import { 
+  validateFaceDetection, 
+  getDefaultConfig,
+  type LandmarkPosition 
+} from '@dating-app/shared';
 
 export class FaceApiProvider implements IFaceDetectionProvider {
   private modelsLoaded = false;
   private loading = false;
   private error: string | null = null;
   private readonly MODEL_URL = '/models';
-  private readonly MIN_FACE_SIZE = 120; // Minimum width or height in pixels
-  private readonly MIN_CONFIDENCE = 0.65; // Minimum confidence score (0.65 = 65%) to filter out animal faces
+  private readonly qualityConfig = getDefaultConfig();
 
   async initialize(): Promise<void> {
     if (this.modelsLoaded) return;
@@ -151,44 +155,57 @@ export class FaceApiProvider implements IFaceDetectionProvider {
         };
       }
 
-      // Check confidence threshold (filter out animal faces)
-      if (detection.detection.score < this.MIN_CONFIDENCE) {
-        return {
-          descriptor: null,
-          boundingBox: null,
-          confidence: null,
-          error: `Face confidence too low (${(detection.detection.score * 100).toFixed(0)}%). Minimum ${(this.MIN_CONFIDENCE * 100).toFixed(0)}% required.`,
-        };
-      }
-
       // Scale bounding box back to original size if we resized
       const inputWidth = createdCanvas ? createdCanvas.width : (image instanceof ImageData ? image.width : (image instanceof HTMLImageElement ? (image.naturalWidth || image.width) : image.width));
       const inputHeight = createdCanvas ? createdCanvas.height : (image instanceof ImageData ? image.height : (image instanceof HTMLImageElement ? (image.naturalHeight || image.height) : image.height));
       const scaleX = originalWidth / inputWidth;
       const scaleY = originalHeight / inputHeight;
 
-      const result = {
-        descriptor: Array.from(detection.descriptor),
-        boundingBox: {
-          x: detection.detection.box.x * scaleX,
-          y: detection.detection.box.y * scaleY,
-          width: detection.detection.box.width * scaleX,
-          height: detection.detection.box.height * scaleY,
-        },
-        confidence: detection.detection.score,
-        error: null,
+      // Scale bounding box to original dimensions
+      const boundingBox = {
+        x: detection.detection.box.x * scaleX,
+        y: detection.detection.box.y * scaleY,
+        width: detection.detection.box.width * scaleX,
+        height: detection.detection.box.height * scaleY,
       };
 
-      // Validate face size
-      const minDimension = Math.min(result.boundingBox.width, result.boundingBox.height);
-      if (minDimension < this.MIN_FACE_SIZE) {
+      // Extract landmarks if available (scale to original dimensions)
+      const landmarks: LandmarkPosition[] | undefined = detection.landmarks
+        ? detection.landmarks.positions.map(pos => ({
+            x: pos.x * scaleX,
+            y: pos.y * scaleY,
+          }))
+        : undefined;
+
+      // Validate face quality using shared validation
+      const validationResult = validateFaceDetection(
+        boundingBox,
+        { width: originalWidth, height: originalHeight },
+        landmarks,
+        detection.detection.score,
+        this.qualityConfig
+      );
+
+      if (!validationResult.isValid) {
+        // Return first reason as error message (or combine all reasons)
+        const errorMessage = validationResult.reasons.length > 0
+          ? validationResult.reasons[0]
+          : 'Face validation failed';
+        
         return {
           descriptor: null,
           boundingBox: null,
           confidence: null,
-          error: `Face too small (${Math.round(minDimension)}px). Minimum ${this.MIN_FACE_SIZE}px required for accurate recognition.`,
+          error: errorMessage,
         };
       }
+
+      const result = {
+        descriptor: Array.from(detection.descriptor),
+        boundingBox,
+        confidence: detection.detection.score,
+        error: null,
+      };
 
       // Explicitly dispose of TensorFlow.js tensors to free GPU memory
       try {
@@ -311,50 +328,89 @@ export class FaceApiProvider implements IFaceDetectionProvider {
         .withFaceLandmarks()
         .withFaceDescriptors();
 
-      // Filter by confidence threshold (0.65 = 65% confidence) to reduce false positives
-      // This helps filter out animal faces and other non-human detections
-      // Lowered from 0.8 to 0.65 to allow valid human faces with glasses/angles while still filtering most animal faces
-      const confidenceFilteredDetections = detections.filter(detection => {
-        const score = detection.detection.score;
-        return score >= this.MIN_CONFIDENCE;
-      });
-
       // Scale bounding boxes back to original size if we resized
       const inputWidth = createdCanvas ? createdCanvas.width : (image instanceof ImageData ? image.width : (image instanceof HTMLImageElement ? (image.naturalWidth || image.width) : image.width));
       const inputHeight = createdCanvas ? createdCanvas.height : (image instanceof ImageData ? image.height : (image instanceof HTMLImageElement ? (image.naturalHeight || image.height) : image.height));
       const scaleX = originalWidth / inputWidth;
       const scaleY = originalHeight / inputHeight;
 
-      // Filter by minimum face size
-      const sizeFilteredDetections = confidenceFilteredDetections.filter(detection => {
-        const box = detection.detection.box;
-        const faceWidth = box.width * scaleX;
-        const faceHeight = box.height * scaleY;
-        const minDimension = Math.min(faceWidth, faceHeight);
-        return minDimension >= this.MIN_FACE_SIZE;
-      });
-
-      const filteredCount = confidenceFilteredDetections.length - sizeFilteredDetections.length;
-      const confidenceFilteredCount = detections.length - confidenceFilteredDetections.length;
-
-      // Extract data immediately and dispose of tensors to prevent GPU memory leak
-      const result = {
-        detections: sizeFilteredDetections.map(detection => ({
-          descriptor: Array.from(detection.descriptor),
-          boundingBox: {
+      // Validate each detection using shared validation
+      const validatedDetections = detections
+        .map(detection => {
+          // Scale bounding box to original dimensions
+          const boundingBox = {
             x: detection.detection.box.x * scaleX,
             y: detection.detection.box.y * scaleY,
             width: detection.detection.box.width * scaleX,
             height: detection.detection.box.height * scaleY,
-          },
-          confidence: detection.detection.score,
+          };
+
+          // Extract landmarks if available (scale to original dimensions)
+          const landmarks: LandmarkPosition[] | undefined = detection.landmarks
+            ? detection.landmarks.positions.map(pos => ({
+                x: pos.x * scaleX,
+                y: pos.y * scaleY,
+              }))
+            : undefined;
+
+          // Validate face quality
+          const validationResult = validateFaceDetection(
+            boundingBox,
+            { width: originalWidth, height: originalHeight },
+            landmarks,
+            detection.detection.score,
+            this.qualityConfig
+          );
+
+          return {
+            detection,
+            boundingBox,
+            validationResult,
+          };
+        })
+        .filter(item => item.validationResult.isValid);
+
+      const filteredCount = detections.length - validatedDetections.length;
+
+      // Generate error message if no valid detections
+      let errorMessage: string | null = null;
+      if (validatedDetections.length === 0 && detections.length > 0) {
+        // Get reasons from first invalid detection for error message
+        const firstInvalid = detections
+          .map(detection => {
+            const boundingBox = {
+              x: detection.detection.box.x * scaleX,
+              y: detection.detection.box.y * scaleY,
+              width: detection.detection.box.width * scaleX,
+              height: detection.detection.box.height * scaleY,
+            };
+            const landmarks: LandmarkPosition[] | undefined = detection.landmarks
+              ? detection.landmarks.positions.map(pos => ({
+                  x: pos.x * scaleX,
+                  y: pos.y * scaleY,
+                }))
+              : undefined;
+            return validateFaceDetection(
+              boundingBox,
+              { width: originalWidth, height: originalHeight },
+              landmarks,
+              detection.detection.score,
+              this.qualityConfig
+            );
+          })
+          .find(v => !v.isValid);
+        errorMessage = firstInvalid?.reasons[0] || 'Face(s) detected but validation failed';
+      }
+
+      // Extract data immediately and dispose of tensors to prevent GPU memory leak
+      const result = {
+        detections: validatedDetections.map(item => ({
+          descriptor: Array.from(item.detection.descriptor),
+          boundingBox: item.boundingBox,
+          confidence: item.detection.detection.score,
           error: null,
         })),
-        error: sizeFilteredDetections.length === 0 && detections.length > 0
-          ? confidenceFilteredDetections.length === 0
-            ? `Face(s) detected but confidence too low (minimum ${(this.MIN_CONFIDENCE * 100).toFixed(0)}% required)`
-            : `Face(s) detected but too small (minimum ${this.MIN_FACE_SIZE}px required)`
-          : null,
+        error: errorMessage,
         ...(filteredCount > 0 && {
           filteredCount,
           warning: `${filteredCount} face${filteredCount > 1 ? 's' : ''} could not be processed due to low resolution`,

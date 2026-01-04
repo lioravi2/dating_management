@@ -18,7 +18,6 @@ export default function RootNavigator() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigationRef = useRef<any>(null);
-  const shareIntentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle deep links (magic link callbacks)
   const handleDeepLink = (url: string) => {
@@ -97,8 +96,7 @@ export default function RootNavigator() {
         if (session && navigationRef.current) {
           const shareIntent = await getInitialShareIntent();
           if (shareIntent) {
-            // Reset navigation stack to Dashboard first, then navigate to PhotoUpload
-            // This ensures the user sees the Dashboard before the upload screen
+            // Navigate directly to PhotoUpload when share intent is received
             navigationRef.current.reset({
               index: 0,
               routes: [
@@ -106,9 +104,6 @@ export default function RootNavigator() {
                   name: 'Main',
                   state: {
                     routes: [
-                      {
-                        name: 'Dashboard',
-                      },
                       {
                         name: 'Partners',
                         state: {
@@ -125,32 +120,11 @@ export default function RootNavigator() {
                         },
                       },
                     ],
-                    index: 0, // Start at Dashboard tab
+                    index: 0, // Start at Partners tab (which contains PhotoUpload)
                   },
                 },
               ],
             });
-            
-            // Navigate to PhotoUpload after a short delay to show Dashboard first
-            // Clear any existing timeout before creating a new one
-            if (shareIntentTimeoutRef.current) {
-              clearTimeout(shareIntentTimeoutRef.current);
-            }
-            shareIntentTimeoutRef.current = setTimeout(() => {
-              if (navigationRef.current) {
-                navigationRef.current.navigate('Main', {
-                  screen: 'Partners',
-                  params: {
-                    screen: 'PhotoUpload',
-                    params: {
-                      imageUri: shareIntent.imageUri,
-                      source: 'Share',
-                    },
-                  },
-                });
-              }
-              shareIntentTimeoutRef.current = null;
-            }, 300);
           }
         }
       }
@@ -178,8 +152,7 @@ export default function RootNavigator() {
     // Listen for share intents when app is already running
     const removeShareListener = setupShareIntentListener((shareIntent) => {
       if (navigationRef.current && session) {
-        // When sharing again, navigate to Dashboard first, then to PhotoUpload
-        // This ensures the user sees the Dashboard before the upload screen
+        // Navigate directly to PhotoUpload when share intent is received
         navigationRef.current.reset({
           index: 0,
           routes: [
@@ -187,9 +160,6 @@ export default function RootNavigator() {
               name: 'Main',
               state: {
                 routes: [
-                  {
-                    name: 'Dashboard',
-                  },
                   {
                     name: 'Partners',
                     state: {
@@ -206,43 +176,17 @@ export default function RootNavigator() {
                     },
                   },
                 ],
-                index: 0, // Start at Dashboard tab
+                index: 0, // Start at Partners tab (which contains PhotoUpload)
               },
             },
           ],
         });
-        
-        // Navigate to PhotoUpload after a short delay to show Dashboard first
-        // Clear any existing timeout before creating a new one to prevent multiple navigation calls
-        if (shareIntentTimeoutRef.current) {
-          clearTimeout(shareIntentTimeoutRef.current);
-        }
-        shareIntentTimeoutRef.current = setTimeout(() => {
-          if (navigationRef.current) {
-            navigationRef.current.navigate('Main', {
-              screen: 'Partners',
-              params: {
-                screen: 'PhotoUpload',
-                params: {
-                  imageUri: shareIntent.imageUri,
-                  source: 'Share',
-                },
-              },
-            });
-          }
-          shareIntentTimeoutRef.current = null;
-        }, 300);
       }
     });
 
     return () => {
       subscription.unsubscribe();
       removeShareListener();
-      // Clean up any pending timeout on unmount
-      if (shareIntentTimeoutRef.current) {
-        clearTimeout(shareIntentTimeoutRef.current);
-        shareIntentTimeoutRef.current = null;
-      }
     };
   }, [session]);
 

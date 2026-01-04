@@ -63,6 +63,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
   const [showSamePersonModal, setShowSamePersonModal] = useState(false);
   const [faceDetections, setFaceDetections] = useState<any[]>([]);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [faceDetectionImageDimensions, setFaceDetectionImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [analysisData, setAnalysisData] = useState<PhotoUploadAnalysis | null>(null);
   const [selectedFaceDescriptor, setSelectedFaceDescriptor] = useState<number[] | null>(null);
   const [faceSizeWarning, setFaceSizeWarning] = useState<string>('');
@@ -162,6 +163,10 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     boundingBox: { x: number; y: number; width: number; height: number },
     originalDimensions: { width: number; height: number }
   ): Promise<{ uri: string; width: number; height: number }> => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePhotoUpload.ts:161',message:'CROP IMAGE TO FACE',data:{inputBoundingBox:boundingBox,targetImageDimensions:originalDimensions},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     // API now returns coordinates in original image space, so use them directly
     // But we need to validate and clamp to ensure they're within image bounds
     const cropX = Math.max(0, Math.min(Math.round(boundingBox.x), originalDimensions.width - 1));
@@ -180,6 +185,10 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
       boundingBox,
       crop: { x: cropX, y: cropY, width: cropWidth, height: cropHeight },
     });
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePhotoUpload.ts:183',message:'Calculated crop parameters',data:{cropX,cropY,cropWidth,cropHeight,fromBoundingBox:boundingBox,aspectRatio:(cropWidth/cropHeight).toFixed(2)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
     // Validate crop parameters
     if (cropX < 0 || cropY < 0 || cropWidth <= 0 || cropHeight <= 0) {
@@ -256,6 +265,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     setUploading(false);
     uploadDataRef.current = null;
     setSelectedImageUri(null);
+    setFaceDetectionImageDimensions(null);
     setFaceDetections([]);
     setSelectedFaceDescriptor(null);
     setAnalysisData(null);
@@ -471,6 +481,9 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
           imageWidth,
           imageHeight
         );
+
+        // Store face detection image dimensions for coordinate scaling
+        setFaceDetectionImageDimensions({ width: faceDetectionImage.width, height: faceDetectionImage.height });
 
         const detectFormData = new FormData();
         detectFormData.append('file', {
@@ -700,6 +713,10 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     setShowFaceSelectionModal(false);
     setSelectedFaceDescriptor(detection.descriptor);
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePhotoUpload.ts:704',message:'HANDLE FACE SELECTED',data:{detectionBoundingBox:detection.boundingBox,faceDetectionImageDimensions,uploadData:uploadDataRef.current?{width:uploadDataRef.current.width,height:uploadDataRef.current.height,optimizedUri:uploadDataRef.current.optimizedUri}:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       setShowProgressModal(false);
@@ -714,11 +731,44 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
         setShowProgressModal(true);
         setUploadProgress('preparing');
         
+        // Scale bounding box from face detection image space to optimized image space
+        // Validate that face detection dimensions are available before proceeding
+        if (!faceDetectionImageDimensions) {
+          throw new Error('Face detection image dimensions not available. Cannot scale bounding box coordinates.');
+        }
+        
+        const needsScaling = faceDetectionImageDimensions.width !== uploadDataRef.current.width || 
+                            faceDetectionImageDimensions.height !== uploadDataRef.current.height;
+        
+        let boundingBoxToUse = detection.boundingBox;
+        if (needsScaling) {
+          const scaleX = uploadDataRef.current.width / faceDetectionImageDimensions.width;
+          const scaleY = uploadDataRef.current.height / faceDetectionImageDimensions.height;
+          boundingBoxToUse = {
+            x: detection.boundingBox.x * scaleX,
+            y: detection.boundingBox.y * scaleY,
+            width: detection.boundingBox.width * scaleX,
+            height: detection.boundingBox.height * scaleY,
+          };
+        }
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePhotoUpload.ts:732',message:'BEFORE CROP - COORDINATE SPACE CHECK',data:{optimizedImageDimensions:{width:uploadDataRef.current.width,height:uploadDataRef.current.height},needsScaling,scaleX:needsScaling?uploadDataRef.current.width/faceDetectionImageDimensions.width:1,scaleY:needsScaling?uploadDataRef.current.height/faceDetectionImageDimensions.height:1,originalBoundingBox:detection.boundingBox,scaledBoundingBox:boundingBoxToUse,usingScaledBox:needsScaling},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePhotoUpload.ts:743',message:'Calling cropImageToFace',data:{imageUri:uploadDataRef.current.optimizedUri,boundingBox:boundingBoxToUse,imageDimensions:{width:uploadDataRef.current.width,height:uploadDataRef.current.height},wasScaled:needsScaling},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        
         const cropped = await cropImageToFace(
           uploadDataRef.current.optimizedUri,
-          detection.boundingBox,
+          boundingBoxToUse,
           { width: uploadDataRef.current.width, height: uploadDataRef.current.height }
         );
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9fdef7ce-e7de-4bc0-af40-30ebb2c95ac0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'usePhotoUpload.ts:750',message:'After cropImageToFace',data:{croppedDimensions:{width:cropped.width,height:cropped.height},croppedUri:cropped.uri},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         
         uploadDataRef.current.optimizedUri = cropped.uri;
         uploadDataRef.current.width = cropped.width;
@@ -770,6 +820,7 @@ export function usePhotoUpload(options: UsePhotoUploadOptions = {}): UsePhotoUpl
     setUploading(false);
     uploadDataRef.current = null;
     setSelectedImageUri(null);
+    setFaceDetectionImageDimensions(null);
     setFaceDetections([]);
     setSelectedFaceDescriptor(null);
     setAnalysisData(null);

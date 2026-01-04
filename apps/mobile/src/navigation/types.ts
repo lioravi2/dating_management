@@ -37,7 +37,7 @@ export type PartnersStackParamList = {
     faceDescriptor: number[] | null;
     imageUri: string; // Original image URI for preview
   };
-  PhotoUpload: { partnerId?: string; source?: 'Dashboard' | 'PartnersList' | 'Share'; imageUri?: string };
+  PhotoUpload: { partnerId?: string; source?: 'Dashboard' | 'PartnersList' | 'Share'; imageUri?: string; timestamp?: number };
 };
 
 export type UploadStackParamList = {

@@ -32,10 +32,40 @@ export default function App() {
     const isDevSettingsAvailable = typeof DevSettings !== 'undefined' && DevSettings !== null;
     setDevSettingsAvailable(isDevSettingsAvailable);
 
-    // Load saved Metro host
-    AsyncStorage.getItem('metro_host').then((saved) => {
-      if (saved) {
-        setMetroHost(saved);
+    // Configure Metro host immediately - this is critical for the app to load
+    const configureMetroHost = async (host: string) => {
+      if (isDevSettingsAvailable && DevSettings.setDebugServerHost) {
+        try {
+          DevSettings.setDebugServerHost(host);
+          console.log('[metro-test] Configured Metro host:', host);
+          return true;
+        } catch (error) {
+          console.error('[metro-test] Failed to configure Metro host:', error);
+          return false;
+        }
+      }
+      return false;
+    };
+
+    // Try to load Metro host from multiple sources and configure immediately
+    Promise.all([
+      // First, try AsyncStorage (user-saved)
+      AsyncStorage.getItem('metro_host'),
+      // Also try reading from native SharedPreferences (set by MainApplication)
+      new Promise<string | null>((resolve) => {
+        // We'll use AsyncStorage as a proxy - MainApplication stores it there too
+        // Actually, MainApplication uses SharedPreferences, but we can't access that from JS
+        // So we'll rely on AsyncStorage and BuildConfig
+        resolve(null);
+      }),
+    ]).then(([savedHost]) => {
+      if (savedHost) {
+        setMetroHost(savedHost);
+        configureMetroHost(savedHost);
+      } else {
+        // No saved host - user needs to enter it
+        // But first, try to configure with a default if Metro is running
+        console.log('[metro-test] No saved Metro host - user needs to configure');
       }
     });
 
@@ -104,6 +134,16 @@ export default function App() {
         
         // Save successful host
         await AsyncStorage.setItem('metro_host', metroHost.trim());
+        
+        // Configure React Native to use this Metro host
+        if (DevSettings && typeof DevSettings.setDebugServerHost === 'function') {
+          try {
+            DevSettings.setDebugServerHost(metroHost.trim());
+            console.log('[metro-test] Configured Metro host:', metroHost.trim());
+          } catch (error) {
+            console.error('[metro-test] Failed to configure Metro host:', error);
+          }
+        }
       } else {
         throw new Error(`Metro returned status ${response.status}`);
       }
