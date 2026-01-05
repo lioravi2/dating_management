@@ -659,4 +659,3 @@ Update the following documentation files:
 - Registration method tracked via UTM parameters in registration flow page views (automatic capture)
 - **Mobile Sessions:**
 - Amplitude automatically tracks sessions in mobile apps
-- `session_id` is automatically included in all mobile events
