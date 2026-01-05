@@ -1,4 +1,4 @@
-import { init, NodeClient, BaseEvent } from '@amplitude/node';
+import { init, NodeClient } from '@amplitude/node';
 import { Identify } from '@amplitude/identify';
 
 // Initialize Amplitude SDK
@@ -54,8 +54,9 @@ export function track(
   }
 
   try {
-    // Build event object
-    const event: BaseEvent = {
+    // Build event object - use object literal instead of BaseEvent type
+    // BaseEvent is not exported from @amplitude/node, but logEvent accepts the same structure
+    const event = {
       event_type: eventName,
       user_id: userId, // Supabase user ID - user properties (including UTM) automatically inherited
       event_properties: eventProperties || {},

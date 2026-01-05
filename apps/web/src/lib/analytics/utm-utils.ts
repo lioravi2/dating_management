@@ -97,11 +97,16 @@ export function extractUtmParamsFromWindow(): UtmParams {
     
     return extractUtmParams(currentUrl);
   } catch (error) {
-    // Fallback to window.location if environment helper is not available
+    // Fallback: try environment helper again (it might have been a transient error)
     // This should not happen in normal operation, but provides a safety net
-    console.warn('Failed to use environment helper, falling back to window.location:', error);
-    if (typeof window !== 'undefined') {
-      return extractUtmParams(window.location.href);
+    console.warn('Failed to use environment helper, retrying:', error);
+    try {
+      const currentUrl = environment.getCurrentUrl();
+      if (currentUrl) {
+        return extractUtmParams(currentUrl);
+      }
+    } catch (retryError) {
+      console.error('Environment helper failed on retry, returning empty UTM params:', retryError);
     }
     return {};
   }

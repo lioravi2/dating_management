@@ -35,8 +35,15 @@ export default function PageViewTracker() {
     // Poll for initialization (check every 50ms for up to 5 seconds)
     let attempts = 0;
     const maxAttempts = 100; // 5 seconds max wait (100 * 50ms)
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isMounted = true;
     
     const checkAmplitude = () => {
+      // Don't continue if component unmounted
+      if (!isMounted) {
+        return;
+      }
+
       if (isAmplitudeInitialized()) {
         setAmplitudeReady(true);
         return;
@@ -44,17 +51,21 @@ export default function PageViewTracker() {
       
       attempts++;
       if (attempts < maxAttempts) {
-        setTimeout(checkAmplitude, 50);
+        // Store timeout ID so we can clean it up
+        timeoutId = setTimeout(checkAmplitude, 50);
       } else {
         console.warn('[PageViewTracker] Amplitude not initialized after 5 seconds - page views may not be tracked');
       }
     };
     
     // Start checking after a small delay to allow AmplitudeInit to run
-    const timeoutId = setTimeout(checkAmplitude, 50);
+    timeoutId = setTimeout(checkAmplitude, 50);
     
     return () => {
-      clearTimeout(timeoutId);
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, []);
 
