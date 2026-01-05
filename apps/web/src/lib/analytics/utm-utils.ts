@@ -3,6 +3,8 @@
  * Used for multi-touch attribution tracking in Amplitude analytics
  */
 
+import { environment } from '@/lib/environment';
+
 export interface UtmParams {
   utm_source?: string;
   utm_medium?: string;
@@ -74,16 +76,34 @@ export function extractUtmParams(url: string): UtmParams {
 }
 
 /**
- * Extract UTM parameters from window.location (client-side only)
- * Convenience function for extracting UTM params from current page URL
+ * Extract UTM parameters from current page URL (client-side only)
+ * Uses environment helper to maintain cross-platform compatibility
  * 
  * @returns Object with UTM parameters or empty object if not available
  */
 export function extractUtmParamsFromWindow(): UtmParams {
+  // Use environment helper instead of direct window.location access
+  // This maintains compatibility with Android migration abstraction
   if (typeof window === 'undefined') {
     return {};
   }
 
-  return extractUtmParams(window.location.href);
+  try {
+    const currentUrl = environment.getCurrentUrl();
+    
+    if (!currentUrl) {
+      return {};
+    }
+    
+    return extractUtmParams(currentUrl);
+  } catch (error) {
+    // Fallback to window.location if environment helper is not available
+    // This should not happen in normal operation, but provides a safety net
+    console.warn('Failed to use environment helper, falling back to window.location:', error);
+    if (typeof window !== 'undefined') {
+      return extractUtmParams(window.location.href);
+    }
+    return {};
+  }
 }
 
