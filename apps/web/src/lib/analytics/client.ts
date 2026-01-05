@@ -23,19 +23,15 @@ export function initAmplitude() {
   }
 
   try {
-    // Initialize Amplitude with UTM and referrer tracking
+    // Initialize Amplitude with basic tracking
+    // Note: UTM parameters are automatically captured by Amplitude SDK
+    // when events are tracked (they're extracted from the URL)
     amplitude.init(apiKey, {
       defaultTracking: {
         sessions: true,
         pageViews: false, // We'll track page views manually via PageViewTracker
         formInteractions: false,
         fileDownloads: false,
-        // Automatic UTM tracking - creates initial_utm_* (first-touch) and utm_* (last-touch) user properties
-        includeUtm: true,
-        // Automatic referrer tracking
-        includeReferrer: true,
-        // Update UTM parameters once per session (not on every page view)
-        saveParamsReferrerOncePerSession: true,
       },
     });
 
@@ -172,5 +168,15 @@ export function clearUser() {
   } catch (error) {
     console.error('Failed to clear user in Amplitude:', error);
   }
+}
+
+/**
+ * Check if Amplitude is initialized
+ * Used to prevent race conditions where tracking is attempted before initialization
+ * 
+ * @returns true if Amplitude is initialized, false otherwise
+ */
+export function isAmplitudeInitialized(): boolean {
+  return isInitialized;
 }
 
