@@ -3,6 +3,8 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import VersionFooter from '@/components/VersionFooter';
 import { NavigationProviderWrapper } from '@/lib/navigation/navigation-provider-wrapper';
+import AmplitudeInit from '@/components/analytics/AmplitudeInit';
+import PageViewTracker from '@/components/analytics/PageViewTracker';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -22,7 +24,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
+        <AmplitudeInit />
         <NavigationProviderWrapper>
+          <PageViewTracker />
           {children}
         </NavigationProviderWrapper>
         <VersionFooter />
