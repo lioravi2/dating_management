@@ -27,6 +27,14 @@ const getStripeInstance = () => {
 };
 
 export async function POST(request: NextRequest) {
+  // Debug logging for environment check (only in development or when AMPLITUDE_DEBUG=true)
+  if (process.env.NODE_ENV === 'development' || process.env.AMPLITUDE_DEBUG === 'true') {
+    console.log('[DEBUG] Environment check:', {
+      hasAmplitudeKey: !!process.env.AMPLITUDE_API_KEY,
+      nodeEnv: process.env.NODE_ENV
+    });
+  }
+
   // Initialize Stripe and webhook secret only when the route is called
   const stripe = getStripeInstance();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;

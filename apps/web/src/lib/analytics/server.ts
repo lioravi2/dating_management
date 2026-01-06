@@ -5,6 +5,31 @@ import { Identify } from '@amplitude/identify';
 let client: NodeClient | null = null;
 
 /**
+ * Check if debug logging is enabled
+ * Debug logs are enabled in development or when AMPLITUDE_DEBUG env var is set
+ */
+function isDebugEnabled(): boolean {
+  return process.env.NODE_ENV === 'development' || process.env.AMPLITUDE_DEBUG === 'true';
+}
+
+/**
+ * Debug log helper - only logs when debug is enabled
+ */
+function debugLog(...args: any[]): void {
+  if (isDebugEnabled()) {
+    console.log('[DEBUG]', ...args);
+  }
+}
+
+/**
+ * Check if Amplitude client is initialized
+ * Useful for debugging initialization issues
+ */
+export function isAmplitudeInitialized(): boolean {
+  return client !== null;
+}
+
+/**
  * Initialize Amplitude analytics server SDK
  * Should be called once on server startup
  */
@@ -15,6 +40,14 @@ export function initAmplitude() {
 
   const apiKey = process.env.AMPLITUDE_API_KEY;
 
+  // Debug logging for environment variables
+  debugLog('AMPLITUDE_API_KEY exists:', !!apiKey);
+  debugLog('AMPLITUDE_API_KEY length:', apiKey?.length || 0);
+  debugLog('Environment check:', {
+    hasAmplitudeKey: !!apiKey,
+    nodeEnv: process.env.NODE_ENV
+  });
+
   if (!apiKey) {
     console.warn('Amplitude API key not found. Server-side analytics will not be initialized.');
     return;
@@ -22,7 +55,9 @@ export function initAmplitude() {
 
   try {
     // Initialize Amplitude Node SDK
+    debugLog('Initializing Amplitude server SDK...');
     client = init(apiKey);
+    debugLog('Amplitude server SDK initialized successfully');
   } catch (error) {
     console.error('Failed to initialize Amplitude server SDK:', error);
   }
@@ -45,8 +80,19 @@ export async function track(
   userId: string | undefined,
   eventProperties?: Record<string, any>
 ): Promise<void> {
+  // Debug logging for tracking function call
+  debugLog('Tracking event:', {
+    eventName,
+    userId,
+    hasUserId: !!userId,
+    userIdLength: userId?.length || 0,
+    hasEventProperties: !!eventProperties,
+    eventPropertiesKeys: eventProperties ? Object.keys(eventProperties) : []
+  });
+
   if (!client) {
     // Try to initialize if not already done
+    debugLog('Client not initialized, attempting initialization...');
     initAmplitude();
     if (!client) {
       console.warn('Amplitude not initialized. Server-side analytics will not track events.');
@@ -68,10 +114,18 @@ export async function track(
       event_properties: eventProperties || {},
     };
 
+    // Debug logging for event object
+    debugLog('Event object:', JSON.stringify(event, null, 2));
+
     // Track the event and await the result
+    debugLog('Calling client.logEvent()...');
     await client.logEvent(event);
+    debugLog('logEvent() completed successfully');
+    
     // Flush to ensure event is sent immediately (important for serverless environments)
+    debugLog('Calling client.flush()...');
     await client.flush();
+    debugLog('Flush completed successfully');
   } catch (error) {
     console.error(`[Amplitude] Failed to track event "${eventName}":`, error);
     // Don't throw - analytics failures shouldn't break application flow
@@ -134,6 +188,8 @@ export async function setUserProperties(
 // Auto-initialize on module load (for server-side usage)
 if (typeof window === 'undefined') {
   // Only initialize on server side
+  debugLog('Auto-initializing Amplitude server SDK...');
   initAmplitude();
+  debugLog('Amplitude initialized:', client !== null);
 }
 

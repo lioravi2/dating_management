@@ -20,6 +20,14 @@ const getStripeInstance = () => {
 
 export async function POST(request: NextRequest) {
   try {
+    // Debug logging for environment check (only in development or when AMPLITUDE_DEBUG=true)
+    if (process.env.NODE_ENV === 'development' || process.env.AMPLITUDE_DEBUG === 'true') {
+      console.log('[DEBUG] Environment check:', {
+        hasAmplitudeKey: !!process.env.AMPLITUDE_API_KEY,
+        nodeEnv: process.env.NODE_ENV
+      });
+    }
+
     const supabase = createSupabaseRouteHandlerClient();
     const supabaseAdmin = createSupabaseAdminClient();
     const {
