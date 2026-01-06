@@ -202,8 +202,9 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         const subscriptionId = subscription.id;
+        const previousAttributes = (event.data as any).previous_attributes || {};
 
-        // Get user and previous subscription state by subscription ID (use admin client to bypass RLS)
+        // Get user by subscription ID (use admin client to bypass RLS)
         const { data: subData } = await supabaseAdmin
           .from('subscriptions')
           .select('user_id, cancel_at_period_end')
@@ -215,15 +216,32 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        // Check if subscription was resumed (cancel_at_period_end changed from true to false)
-        const wasScheduledForCancellation = subData.cancel_at_period_end === true;
-        const isNowResumed = !subscription.cancel_at_period_end && subscription.status === 'active';
-        const subscriptionResumed = wasScheduledForCancellation && isNowResumed;
+        // Check if subscription was resumed using Stripe's previous_attributes
+        // This is more reliable than checking the database, which may have been updated already
+        const previousCancelAtPeriodEnd = previousAttributes.cancel_at_period_end;
+        const currentCancelAtPeriodEnd = subscription.cancel_at_period_end;
+        
+        // Subscription resumed: cancel_at_period_end changed from true to false
+        const subscriptionResumed = 
+          previousCancelAtPeriodEnd === true && 
+          currentCancelAtPeriodEnd === false && 
+          subscription.status === 'active';
 
-        // Check if subscription was cancelled (cancel_at_period_end changed from false to true)
-        const wasNotScheduledForCancellation = subData.cancel_at_period_end === false;
-        const isNowCancelled = subscription.cancel_at_period_end === true && subscription.status === 'active';
-        const subscriptionCancelled = wasNotScheduledForCancellation && isNowCancelled;
+        // Subscription cancelled: cancel_at_period_end changed from false to true
+        const subscriptionCancelled = 
+          (previousCancelAtPeriodEnd === false || previousCancelAtPeriodEnd === undefined) && 
+          currentCancelAtPeriodEnd === true && 
+          subscription.status === 'active';
+
+        // Debug logging for subscription state changes
+        console.log(`[Webhook] Subscription updated: ${subscriptionId}`, {
+          previousCancelAtPeriodEnd,
+          currentCancelAtPeriodEnd,
+          status: subscription.status,
+          subscriptionResumed,
+          subscriptionCancelled,
+          dbCancelAtPeriodEnd: subData.cancel_at_period_end
+        });
 
         const isCanceled = subscription.cancel_at_period_end || subscription.status === 'canceled';
         const isActive = subscription.status === 'active' && !subscription.cancel_at_period_end;
