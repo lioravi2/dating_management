@@ -3,6 +3,7 @@ import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import Stripe from 'stripe';
 import { extractSubscriptionPrice } from '@/lib/stripe-helpers';
+import { track, setUserProperties } from '@/lib/analytics/server';
 
 // Validate and initialize Stripe (lazy initialization to avoid build-time errors)
 const getStripeInstance = () => {
@@ -98,6 +99,31 @@ export async function POST(request: NextRequest) {
             .from('users')
             .update({ account_type: 'pro' })
             .eq('id', userId);
+
+          // Track [Subscription Purchased] event for Amplitude analytics
+          // This enables abandoned cart detection via funnel analysis
+          try {
+            track(
+              '[Subscription Purchased]',
+              userId,
+              {
+                subscription_id: subscriptionId,
+                plan_type: 'pro',
+                amount: price_amount || 0,
+                billing_interval: billing_interval || null,
+                timestamp: new Date().toISOString(),
+              }
+            );
+
+            // Update user properties: subscription_status and account_type
+            setUserProperties(userId, {
+              subscription_status: 'active',
+              account_type: 'pro',
+            });
+          } catch (analyticsError) {
+            // Log error but don't break webhook processing
+            console.error('[Webhook] Error tracking subscription purchase:', analyticsError);
+          }
 
           // Create payment record for the initial checkout payment
           // Get the invoice from the subscription
