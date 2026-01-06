@@ -102,28 +102,29 @@ export async function POST(request: NextRequest) {
 
           // Track [Subscription Purchased] event for Amplitude analytics
           // This enables abandoned cart detection via funnel analysis
-          try {
-            track(
-              '[Subscription Purchased]',
-              userId,
-              {
-                subscription_id: subscriptionId,
-                plan_type: 'pro',
-                amount: price_amount || 0,
-                billing_interval: billing_interval || null,
-                timestamp: new Date().toISOString(),
-              }
-            );
+          // Fire-and-forget: don't await to avoid blocking webhook response
+          track(
+            '[Subscription Purchased]',
+            userId,
+            {
+              subscription_id: subscriptionId,
+              plan_type: 'pro',
+              amount: price_amount || 0,
+              billing_interval: billing_interval || null,
+              timestamp: new Date().toISOString(),
+            }
+          ).catch((error) => {
+            console.error('[Webhook] Error tracking subscription purchase:', error);
+          });
 
-            // Update user properties: subscription_status and account_type
-            setUserProperties(userId, {
-              subscription_status: 'active',
-              account_type: 'pro',
-            });
-          } catch (analyticsError) {
-            // Log error but don't break webhook processing
-            console.error('[Webhook] Error tracking subscription purchase:', analyticsError);
-          }
+          // Update user properties: subscription_status and account_type
+          // Fire-and-forget: don't await to avoid blocking webhook response
+          setUserProperties(userId, {
+            subscription_status: 'active',
+            account_type: 'pro',
+          }).catch((error) => {
+            console.error('[Webhook] Error setting user properties for subscription purchase:', error);
+          });
 
           // Create payment record for the initial checkout payment
           // Get the invoice from the subscription
@@ -263,32 +264,31 @@ export async function POST(request: NextRequest) {
 
         // Track [Subscription Resumed] event if subscription was resumed
         if (subscriptionResumed) {
-          try {
-            console.log(`[Webhook] Tracking [Subscription Resumed] event for user: ${subData.user_id}, subscription: ${subscriptionId}`);
-            
-            track(
-              '[Subscription Resumed]',
-              subData.user_id,
-              {
-                subscription_id: subscriptionId,
-                plan_type: 'pro',
-                amount: price_amount || 0,
-                billing_interval: billing_interval || null,
-                timestamp: new Date().toISOString(),
-              }
-            );
+          console.log(`[Webhook] Tracking [Subscription Resumed] event for user: ${subData.user_id}, subscription: ${subscriptionId}`);
+          
+          // Fire-and-forget: don't await to avoid blocking webhook response
+          track(
+            '[Subscription Resumed]',
+            subData.user_id,
+            {
+              subscription_id: subscriptionId,
+              plan_type: 'pro',
+              amount: price_amount || 0,
+              billing_interval: billing_interval || null,
+              timestamp: new Date().toISOString(),
+            }
+          ).catch((error) => {
+            console.error('[Webhook] Error tracking subscription resumed:', error);
+          });
 
-            // Update user properties: subscription_status and account_type
-            setUserProperties(subData.user_id, {
-              subscription_status: 'active',
-              account_type: 'pro',
-            });
-            
-            console.log(`[Webhook] Successfully called Amplitude track for [Subscription Resumed]`);
-          } catch (analyticsError) {
-            // Log error but don't break webhook processing
-            console.error('[Webhook] Error tracking subscription resumed:', analyticsError);
-          }
+          // Update user properties: subscription_status and account_type
+          // Fire-and-forget: don't await to avoid blocking webhook response
+          setUserProperties(subData.user_id, {
+            subscription_status: 'active',
+            account_type: 'pro',
+          }).catch((error) => {
+            console.error('[Webhook] Error setting user properties for subscription resumed:', error);
+          });
         }
 
         break;

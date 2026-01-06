@@ -35,15 +35,16 @@ export function initAmplitude() {
  * @param eventName - Name of the event (e.g., "[User Registered]", "[Partner Added]")
  * @param userId - Supabase user ID (session.user.id) - required when user is authenticated
  * @param eventProperties - Optional event properties (DO NOT include PII or UTM params)
+ * @returns Promise that resolves when event is sent (or rejects if there's an error)
  * 
  * Note: UTM parameters are automatically inherited from user properties set client-side.
  * No need to include UTM params in event properties.
  */
-export function track(
+export async function track(
   eventName: string,
   userId: string | undefined,
   eventProperties?: Record<string, any>
-) {
+): Promise<void> {
   if (!client) {
     // Try to initialize if not already done
     initAmplitude();
@@ -51,6 +52,11 @@ export function track(
       console.warn('Amplitude not initialized. Server-side analytics will not track events.');
       return;
     }
+  }
+
+  if (!userId) {
+    console.warn(`[Amplitude] Cannot track event "${eventName}" without userId`);
+    return;
   }
 
   try {
@@ -62,12 +68,10 @@ export function track(
       event_properties: eventProperties || {},
     };
 
-    // Track the event (non-blocking - returns a Promise)
-    client.logEvent(event).catch((error) => {
-      console.error('Failed to track event in Amplitude:', error);
-    });
+    // Track the event and await the result
+    await client.logEvent(event);
   } catch (error) {
-    console.error('Failed to track event in Amplitude:', error);
+    console.error(`[Amplitude] Failed to track event "${eventName}":`, error);
     // Don't throw - analytics failures shouldn't break application flow
   }
 }
@@ -78,13 +82,14 @@ export function track(
  * @param eventName - Name of the event
  * @param userId - Supabase user ID (required when user is authenticated)
  * @param eventProperties - Optional event properties (DO NOT include PII or UTM params)
+ * @returns Promise that resolves when event is sent (or rejects if there's an error)
  */
-export function logEvent(
+export async function logEvent(
   eventName: string,
   userId: string | undefined,
   eventProperties?: Record<string, any>
-) {
-  track(eventName, userId, eventProperties);
+): Promise<void> {
+  return track(eventName, userId, eventProperties);
 }
 
 /**
@@ -93,11 +98,12 @@ export function logEvent(
  * 
  * @param userId - Supabase user ID (required)
  * @param userProperties - User properties to set (e.g., { account_type: "pro", subscription_status: "active" })
+ * @returns Promise that resolves when properties are set (or rejects if there's an error)
  */
-export function setUserProperties(
+export async function setUserProperties(
   userId: string,
   userProperties: Record<string, any>
-) {
+): Promise<void> {
   if (!client) {
     initAmplitude();
     if (!client) {
@@ -115,13 +121,10 @@ export function setUserProperties(
       identify.set(key, value);
     });
 
-    // Set user properties (deviceId is null for server-side)
-    // Non-blocking - returns a Promise
-    client.identify(userId, null, identify).catch((error) => {
-      console.error('Failed to set user properties in Amplitude:', error);
-    });
+    // Set user properties (deviceId is null for server-side) and await the result
+    await client.identify(userId, null, identify);
   } catch (error) {
-    console.error('Failed to set user properties in Amplitude:', error);
+    console.error(`[Amplitude] Failed to set user properties for user "${userId}":`, error);
     // Don't throw - analytics failures shouldn't break application flow
   }
 }

@@ -113,32 +113,31 @@ export async function POST(request: NextRequest) {
 
     // Track [Subscription Resumed] event for Amplitude analytics
     // Note: This is a backup - the webhook will also track this event when it receives customer.subscription.updated
-    try {
-      console.log(`[Resume Subscription] Tracking [Subscription Resumed] event for user: ${session.user.id}, subscription: ${subscription.stripe_subscription_id}`);
-      
-      track(
-        '[Subscription Resumed]',
-        session.user.id,
-        {
-          subscription_id: subscription.stripe_subscription_id,
-          plan_type: 'pro',
-          amount: price_amount || 0,
-          billing_interval: billing_interval || null,
-          timestamp: new Date().toISOString(),
-        }
-      );
+    // Fire-and-forget: don't await to avoid blocking API response
+    console.log(`[Resume Subscription] Tracking [Subscription Resumed] event for user: ${session.user.id}, subscription: ${subscription.stripe_subscription_id}`);
+    
+    track(
+      '[Subscription Resumed]',
+      session.user.id,
+      {
+        subscription_id: subscription.stripe_subscription_id,
+        plan_type: 'pro',
+        amount: price_amount || 0,
+        billing_interval: billing_interval || null,
+        timestamp: new Date().toISOString(),
+      }
+    ).catch((error) => {
+      console.error('[Resume Subscription] Error tracking subscription resumed:', error);
+    });
 
-      // Update user properties: subscription_status and account_type
-      setUserProperties(session.user.id, {
-        subscription_status: 'active',
-        account_type: 'pro',
-      });
-      
-      console.log(`[Resume Subscription] Successfully called Amplitude track for [Subscription Resumed]`);
-    } catch (analyticsError) {
-      // Log error but don't break subscription resumption
-      console.error('[Resume Subscription] Error tracking subscription resumed:', analyticsError);
-    }
+    // Update user properties: subscription_status and account_type
+    // Fire-and-forget: don't await to avoid blocking API response
+    setUserProperties(session.user.id, {
+      subscription_status: 'active',
+      account_type: 'pro',
+    }).catch((error) => {
+      console.error('[Resume Subscription] Error setting user properties for subscription resumed:', error);
+    });
 
     return NextResponse.json({
       message: 'Subscription has been resumed',
