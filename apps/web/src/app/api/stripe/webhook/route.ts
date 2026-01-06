@@ -194,10 +194,10 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const subscriptionId = subscription.id;
 
-        // Get user by subscription ID (use admin client to bypass RLS)
+        // Get user and previous subscription state by subscription ID (use admin client to bypass RLS)
         const { data: subData } = await supabaseAdmin
           .from('subscriptions')
-          .select('user_id')
+          .select('user_id, cancel_at_period_end')
           .eq('stripe_subscription_id', subscriptionId)
           .single();
 
@@ -205,6 +205,11 @@ export async function POST(request: NextRequest) {
           console.error('Subscription not found:', subscriptionId);
           break;
         }
+
+        // Check if subscription was resumed (cancel_at_period_end changed from true to false)
+        const wasScheduledForCancellation = subData.cancel_at_period_end === true;
+        const isNowResumed = !subscription.cancel_at_period_end && subscription.status === 'active';
+        const subscriptionResumed = wasScheduledForCancellation && isNowResumed;
 
         const isCanceled = subscription.cancel_at_period_end || subscription.status === 'canceled';
         const isActive = subscription.status === 'active' && !subscription.cancel_at_period_end;
@@ -255,6 +260,36 @@ export async function POST(request: NextRequest) {
             .eq('id', subData.user_id);
         }
         // If cancel_at_period_end is true but period hasn't ended, keep as 'pro'
+
+        // Track [Subscription Resumed] event if subscription was resumed
+        if (subscriptionResumed) {
+          try {
+            console.log(`[Webhook] Tracking [Subscription Resumed] event for user: ${subData.user_id}, subscription: ${subscriptionId}`);
+            
+            track(
+              '[Subscription Resumed]',
+              subData.user_id,
+              {
+                subscription_id: subscriptionId,
+                plan_type: 'pro',
+                amount: price_amount || 0,
+                billing_interval: billing_interval || null,
+                timestamp: new Date().toISOString(),
+              }
+            );
+
+            // Update user properties: subscription_status and account_type
+            setUserProperties(subData.user_id, {
+              subscription_status: 'active',
+              account_type: 'pro',
+            });
+            
+            console.log(`[Webhook] Successfully called Amplitude track for [Subscription Resumed]`);
+          } catch (analyticsError) {
+            // Log error but don't break webhook processing
+            console.error('[Webhook] Error tracking subscription resumed:', analyticsError);
+          }
+        }
 
         break;
       }

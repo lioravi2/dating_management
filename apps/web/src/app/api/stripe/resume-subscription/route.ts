@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import Stripe from 'stripe';
+import { track, setUserProperties } from '@/lib/analytics/server';
+import { extractSubscriptionPrice } from '@/lib/stripe-helpers';
 
 // Lazy initialization to avoid build-time errors
 const getStripeInstance = () => {
@@ -67,6 +69,9 @@ export async function POST(request: NextRequest) {
       }
     );
 
+    // Extract price information for analytics
+    const { price_amount, billing_interval } = extractSubscriptionPrice(resumedSubscription);
+
     // Update database (use admin client to bypass RLS and reset cancellation_reason)
     const { error: updateError } = await supabaseAdmin
       .from('subscriptions')
@@ -104,6 +109,35 @@ export async function POST(request: NextRequest) {
       if (userUpdateError) {
         console.error('Error updating user account type:', userUpdateError);
       }
+    }
+
+    // Track [Subscription Resumed] event for Amplitude analytics
+    // Note: This is a backup - the webhook will also track this event when it receives customer.subscription.updated
+    try {
+      console.log(`[Resume Subscription] Tracking [Subscription Resumed] event for user: ${session.user.id}, subscription: ${subscription.stripe_subscription_id}`);
+      
+      track(
+        '[Subscription Resumed]',
+        session.user.id,
+        {
+          subscription_id: subscription.stripe_subscription_id,
+          plan_type: 'pro',
+          amount: price_amount || 0,
+          billing_interval: billing_interval || null,
+          timestamp: new Date().toISOString(),
+        }
+      );
+
+      // Update user properties: subscription_status and account_type
+      setUserProperties(session.user.id, {
+        subscription_status: 'active',
+        account_type: 'pro',
+      });
+      
+      console.log(`[Resume Subscription] Successfully called Amplitude track for [Subscription Resumed]`);
+    } catch (analyticsError) {
+      // Log error but don't break subscription resumption
+      console.error('[Resume Subscription] Error tracking subscription resumed:', analyticsError);
     }
 
     return NextResponse.json({
