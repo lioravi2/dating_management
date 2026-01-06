@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import Stripe from 'stripe';
+import { track, setUserProperties } from '@/lib/analytics/server';
+import { extractSubscriptionPrice } from '@/lib/stripe-helpers';
 
 // Lazy initialization to avoid build-time errors
 const getStripeInstance = () => {
@@ -86,6 +88,9 @@ export async function POST(request: NextRequest) {
       }
     );
 
+    // Extract price information for analytics
+    const { price_amount, billing_interval } = extractSubscriptionPrice(canceledSubscription);
+
     // Update database (use admin client to bypass RLS)
     const { error: updateError } = await supabaseAdmin
       .from('subscriptions')
@@ -105,6 +110,36 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Track [Subscription Cancelled] event for Amplitude analytics
+    // Note: This is a backup - the webhook will also track this event when it receives customer.subscription.updated
+    // Fire-and-forget: don't await to avoid blocking API response
+    console.log(`[Cancel Subscription] Tracking [Subscription Cancelled] event for user: ${session.user.id}, subscription: ${subscription.stripe_subscription_id}`);
+    
+    track(
+      '[Subscription Cancelled]',
+      session.user.id,
+      {
+        subscription_id: subscription.stripe_subscription_id,
+        plan_type: 'pro',
+        amount: price_amount || 0,
+        billing_interval: billing_interval || null,
+        cancel_at_period_end: true,
+        cancellation_reason: cancellationReason || null,
+        timestamp: new Date().toISOString(),
+      }
+    ).catch((error) => {
+      console.error('[Cancel Subscription] Error tracking subscription cancelled:', error);
+    });
+
+    // Update user properties: subscription_status (account_type remains 'pro' until period ends)
+    // Fire-and-forget: don't await to avoid blocking API response
+    setUserProperties(session.user.id, {
+      subscription_status: 'canceled',
+      // Note: account_type remains 'pro' until period ends
+    }).catch((error) => {
+      console.error('[Cancel Subscription] Error setting user properties for subscription cancelled:', error);
+    });
 
     return NextResponse.json({
       message: 'Subscription will be canceled at the end of the billing period',

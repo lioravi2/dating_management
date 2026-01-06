@@ -70,6 +70,8 @@ export async function track(
 
     // Track the event and await the result
     await client.logEvent(event);
+    // Flush to ensure event is sent immediately (important for serverless environments)
+    await client.flush();
   } catch (error) {
     console.error(`[Amplitude] Failed to track event "${eventName}":`, error);
     // Don't throw - analytics failures shouldn't break application flow

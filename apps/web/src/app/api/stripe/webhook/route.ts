@@ -212,6 +212,11 @@ export async function POST(request: NextRequest) {
         const isNowResumed = !subscription.cancel_at_period_end && subscription.status === 'active';
         const subscriptionResumed = wasScheduledForCancellation && isNowResumed;
 
+        // Check if subscription was cancelled (cancel_at_period_end changed from false to true)
+        const wasNotScheduledForCancellation = subData.cancel_at_period_end === false;
+        const isNowCancelled = subscription.cancel_at_period_end === true && subscription.status === 'active';
+        const subscriptionCancelled = wasNotScheduledForCancellation && isNowCancelled;
+
         const isCanceled = subscription.cancel_at_period_end || subscription.status === 'canceled';
         const isActive = subscription.status === 'active' && !subscription.cancel_at_period_end;
 
@@ -291,6 +296,36 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        // Track [Subscription Cancelled] event if subscription was cancelled
+        if (subscriptionCancelled) {
+          console.log(`[Webhook] Tracking [Subscription Cancelled] event for user: ${subData.user_id}, subscription: ${subscriptionId}`);
+          
+          // Fire-and-forget: don't await to avoid blocking webhook response
+          track(
+            '[Subscription Cancelled]',
+            subData.user_id,
+            {
+              subscription_id: subscriptionId,
+              plan_type: 'pro',
+              amount: price_amount || 0,
+              billing_interval: billing_interval || null,
+              cancel_at_period_end: true,
+              timestamp: new Date().toISOString(),
+            }
+          ).catch((error) => {
+            console.error('[Webhook] Error tracking subscription cancelled:', error);
+          });
+
+          // Update user properties: subscription_status (account_type remains 'pro' until period ends)
+          // Fire-and-forget: don't await to avoid blocking webhook response
+          setUserProperties(subData.user_id, {
+            subscription_status: 'canceled',
+            // Note: account_type remains 'pro' until period ends
+          }).catch((error) => {
+            console.error('[Webhook] Error setting user properties for subscription cancelled:', error);
+          });
+        }
+
         break;
       }
 
@@ -298,10 +333,10 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const subscriptionId = subscription.id;
 
-        // Get user by subscription ID (use admin client to bypass RLS)
+        // Get user and subscription details by subscription ID (use admin client to bypass RLS)
         const { data: subData } = await supabaseAdmin
           .from('subscriptions')
-          .select('user_id')
+          .select('user_id, price_amount, billing_interval')
           .eq('stripe_subscription_id', subscriptionId)
           .single();
 
@@ -309,6 +344,9 @@ export async function POST(request: NextRequest) {
           console.error('Subscription not found:', subscriptionId);
           break;
         }
+
+        // Extract price information for analytics (use from database or extract from subscription)
+        const { price_amount, billing_interval } = extractSubscriptionPrice(subscription);
 
         // Update subscription to canceled (use admin client to bypass RLS)
         await supabaseAdmin
@@ -330,6 +368,35 @@ export async function POST(request: NextRequest) {
           .from('calendar_connections')
           .delete()
           .eq('user_id', subData.user_id);
+
+        // Track [Subscription Cancelled] event (subscription was deleted/ended)
+        console.log(`[Webhook] Tracking [Subscription Cancelled] event for user: ${subData.user_id}, subscription: ${subscriptionId}`);
+        
+        // Fire-and-forget: don't await to avoid blocking webhook response
+        track(
+          '[Subscription Cancelled]',
+          subData.user_id,
+          {
+            subscription_id: subscriptionId,
+            plan_type: 'pro',
+            amount: price_amount || 0,
+            billing_interval: billing_interval || null,
+            cancel_at_period_end: false,
+            status: 'deleted',
+            timestamp: new Date().toISOString(),
+          }
+        ).catch((error) => {
+          console.error('[Webhook] Error tracking subscription cancelled:', error);
+        });
+
+        // Update user properties: subscription_status and account_type
+        // Fire-and-forget: don't await to avoid blocking webhook response
+        setUserProperties(subData.user_id, {
+          subscription_status: 'canceled',
+          account_type: 'free',
+        }).catch((error) => {
+          console.error('[Webhook] Error setting user properties for subscription cancelled:', error);
+        });
 
         break;
       }
