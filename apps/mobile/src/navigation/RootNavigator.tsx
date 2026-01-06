@@ -11,6 +11,8 @@ import ShareNavigator from './ShareNavigator';
 import MetroConfigScreen from '../screens/dev/MetroConfigScreen';
 import { View, ActivityIndicator, Text } from 'react-native';
 import { getInitialShareIntent, setupShareIntentListener } from '../lib/share-handler';
+import { parseAttributionFromUrl, storeAttributionData, trackAppInstalled } from '../lib/attribution';
+import { setUserId, clearUser } from '../lib/analytics';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -18,10 +20,29 @@ export default function RootNavigator() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigationRef = useRef<any>(null);
+  const shareIntentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Handle deep links (magic link callbacks)
-  const handleDeepLink = (url: string) => {
+  // Handle deep links (magic link callbacks and attribution)
+  const handleDeepLink = async (url: string) => {
     console.log('[RootNavigator] Deep link received:', url);
+    
+    // Check if it's an attribution/install deep link
+    if (url && (url.startsWith('datingapp://install') || url.includes('visit_id'))) {
+      try {
+        const attributionData = parseAttributionFromUrl(url);
+        if (attributionData) {
+          // Store attribution data
+          await storeAttributionData(attributionData);
+          // Track app install if not already tracked
+          await trackAppInstalled(attributionData);
+          console.log('[RootNavigator] Attribution data processed from deep link');
+        }
+      } catch (error) {
+        console.error('[RootNavigator] Error processing attribution deep link:', error);
+      }
+      // Don't navigate for attribution links - just process the data
+      return;
+    }
     
     // Check if it's an auth callback
     if (url && url.startsWith('datingapp://auth/callback')) {
@@ -89,14 +110,24 @@ export default function RootNavigator() {
         // If there's an error (e.g., invalid refresh token), clear session
         console.log('Session error (will redirect to sign in):', error.message);
         setSession(null);
+        // Clear user identification in Amplitude
+        clearUser();
       } else {
         setSession(session);
+        
+        // Identify user in Amplitude when session exists (covers both sign in and sign up)
+        if (session) {
+          setUserId(session.user.id);
+        } else {
+          clearUser();
+        }
         
         // Check for share intent when session is available
         if (session && navigationRef.current) {
           const shareIntent = await getInitialShareIntent();
           if (shareIntent) {
-            // Navigate directly to PhotoUpload when share intent is received
+            // Reset navigation stack to Dashboard first, then navigate to PhotoUpload
+            // This ensures the user sees the Dashboard before the upload screen
             navigationRef.current.reset({
               index: 0,
               routes: [
@@ -104,6 +135,9 @@ export default function RootNavigator() {
                   name: 'Main',
                   state: {
                     routes: [
+                      {
+                        name: 'Dashboard',
+                      },
                       {
                         name: 'Partners',
                         state: {
@@ -120,11 +154,32 @@ export default function RootNavigator() {
                         },
                       },
                     ],
-                    index: 0, // Start at Partners tab (which contains PhotoUpload)
+                    index: 0, // Start at Dashboard tab
                   },
                 },
               ],
             });
+            
+            // Navigate to PhotoUpload after a short delay to show Dashboard first
+            // Clear any existing timeout before creating a new one
+            if (shareIntentTimeoutRef.current) {
+              clearTimeout(shareIntentTimeoutRef.current);
+            }
+            shareIntentTimeoutRef.current = setTimeout(() => {
+              if (navigationRef.current) {
+                navigationRef.current.navigate('Main', {
+                  screen: 'Partners',
+                  params: {
+                    screen: 'PhotoUpload',
+                    params: {
+                      imageUri: shareIntent.imageUri,
+                      source: 'Share',
+                    },
+                  },
+                });
+              }
+              shareIntentTimeoutRef.current = null;
+            }, 300);
           }
         }
       }
@@ -144,15 +199,23 @@ export default function RootNavigator() {
       // Handle SIGNED_OUT event or null session (includes invalid refresh token)
       if (event === 'SIGNED_OUT' || !session) {
         setSession(null);
+        // Clear user identification in Amplitude on logout
+        clearUser();
       } else {
         setSession(session);
+        // Identify user in Amplitude when session exists
+        // This covers SIGNED_IN, SIGNED_UP, and TOKEN_REFRESHED events
+        if (session) {
+          setUserId(session.user.id);
+        }
       }
     });
 
     // Listen for share intents when app is already running
     const removeShareListener = setupShareIntentListener((shareIntent) => {
       if (navigationRef.current && session) {
-        // Navigate directly to PhotoUpload when share intent is received
+        // When sharing again, navigate to Dashboard first, then to PhotoUpload
+        // This ensures the user sees the Dashboard before the upload screen
         navigationRef.current.reset({
           index: 0,
           routes: [
@@ -160,6 +223,9 @@ export default function RootNavigator() {
               name: 'Main',
               state: {
                 routes: [
+                  {
+                    name: 'Dashboard',
+                  },
                   {
                     name: 'Partners',
                     state: {
@@ -176,27 +242,55 @@ export default function RootNavigator() {
                     },
                   },
                 ],
-                index: 0, // Start at Partners tab (which contains PhotoUpload)
+                index: 0, // Start at Dashboard tab
               },
             },
           ],
         });
+        
+        // Navigate to PhotoUpload after a short delay to show Dashboard first
+        // Clear any existing timeout before creating a new one to prevent multiple navigation calls
+        if (shareIntentTimeoutRef.current) {
+          clearTimeout(shareIntentTimeoutRef.current);
+        }
+        shareIntentTimeoutRef.current = setTimeout(() => {
+          if (navigationRef.current) {
+            navigationRef.current.navigate('Main', {
+              screen: 'Partners',
+              params: {
+                screen: 'PhotoUpload',
+                params: {
+                  imageUri: shareIntent.imageUri,
+                  source: 'Share',
+                },
+              },
+            });
+          }
+          shareIntentTimeoutRef.current = null;
+        }, 300);
       }
     });
 
     return () => {
       subscription.unsubscribe();
       removeShareListener();
+      // Clean up any pending timeout on unmount
+      if (shareIntentTimeoutRef.current) {
+        clearTimeout(shareIntentTimeoutRef.current);
+        shareIntentTimeoutRef.current = null;
+      }
     };
   }, [session]);
 
-  // Handle deep links (magic link callbacks)
+  // Handle deep links (magic link callbacks and attribution)
   useEffect(() => {
     // Get initial URL when app opens from a deep link
     Linking.getInitialURL().then((url) => {
       if (url) {
         console.log('[RootNavigator] Initial URL:', url);
-        handleDeepLink(url);
+        handleDeepLink(url).catch((error) => {
+          console.error('[RootNavigator] Error handling initial deep link:', error);
+        });
       }
     }).catch((error) => {
       console.error('[RootNavigator] Error getting initial URL:', error);
@@ -205,7 +299,9 @@ export default function RootNavigator() {
     // Listen for deep links when app is already running
     const subscription = Linking.addEventListener('url', (event) => {
       console.log('[RootNavigator] Deep link event:', event.url);
-      handleDeepLink(event.url);
+      handleDeepLink(event.url).catch((error) => {
+        console.error('[RootNavigator] Error handling deep link event:', error);
+      });
     });
 
     return () => {

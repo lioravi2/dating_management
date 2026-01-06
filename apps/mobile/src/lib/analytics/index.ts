@@ -174,6 +174,37 @@ export async function updateAccountType() {
 }
 
 /**
+ * Track [App Open] event when app comes to foreground
+ * Updates account_type user property when user_id exists
+ * NO UTM parameters needed (inherited from user properties automatically)
+ */
+export async function trackAppOpen() {
+  if (!isInitialized) {
+    return;
+  }
+
+  try {
+    // Get current session to check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // Track [App Open] event
+    // session_id is automatically included by Amplitude SDK
+    // user_id is automatically included if setUserId was called previously
+    track('[App Open]', {
+      // user_id will be automatically included by SDK if setUserId was called
+      // session_id is automatically included by Amplitude SDK
+    });
+
+    // Update account_type user property when user_id exists
+    if (session) {
+      await updateAccountType();
+    }
+  } catch (error) {
+    console.error('Failed to track app open in Amplitude:', error);
+  }
+}
+
+/**
  * Clear user identification (call on logout)
  */
 export function clearUser() {
