@@ -13,6 +13,7 @@ import { View, ActivityIndicator, Text } from 'react-native';
 import { getInitialShareIntent, setupShareIntentListener } from '../lib/share-handler';
 import { parseAttributionFromUrl, storeAttributionData, trackAppInstalled } from '../lib/attribution';
 import { setUserId, clearUser } from '../lib/analytics';
+import { handleNavigationStateChange } from '../lib/analytics/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -309,6 +310,7 @@ export default function RootNavigator() {
     };
   }, []); // Empty deps - only run once on mount
 
+
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -319,7 +321,10 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer 
+      ref={navigationRef}
+      onStateChange={handleNavigationStateChange}
+    >
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
           <>

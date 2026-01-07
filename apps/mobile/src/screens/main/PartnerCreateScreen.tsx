@@ -16,6 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PartnersStackParamList } from '../../navigation/types';
 import { supabase } from '../../lib/supabase/client';
 import BlackFlagIcon from '../../components/BlackFlagIcon';
+import { trackButtonClick } from '../../lib/analytics/events';
 
 type PartnerCreateScreenNavigationProp = NativeStackNavigationProp<PartnersStackParamList, 'PartnerCreate'>;
 
@@ -116,6 +117,9 @@ export default function PartnerCreateScreen() {
 
   const handleCreate = async () => {
     if (isSubmitting.current || saving) return;
+
+    // Track button click
+    trackButtonClick('create_partner', 'Create Partner', 'PartnerCreate');
 
     // Clear previous field errors
     setFieldErrors({});
@@ -262,6 +266,7 @@ export default function PartnerCreateScreen() {
   };
 
   const handleCancel = () => {
+    trackButtonClick('cancel_create_partner', 'Cancel', 'PartnerCreate');
     navigation.goBack();
   };
 
@@ -300,6 +305,7 @@ export default function PartnerCreateScreen() {
               <TouchableOpacity
                 style={styles.upgradeButton}
                 onPress={() => {
+                  trackButtonClick('upgrade_to_pro', 'Upgrade to Pro', 'PartnerCreate');
                   const webAppUrl = process.env.EXPO_PUBLIC_WEB_APP_URL;
                   if (webAppUrl) {
                     Linking.openURL(`${webAppUrl}/upgrade`).catch((err) => {
@@ -313,7 +319,10 @@ export default function PartnerCreateScreen() {
             </View>
             <TouchableOpacity
               style={styles.backButton}
-              onPress={handleCancel}
+              onPress={() => {
+                trackButtonClick('back_to_partners', '← Back to Partners', 'PartnerCreate');
+                handleCancel();
+              }}
             >
               <Text style={styles.backButtonText}>← Back to Partners</Text>
             </TouchableOpacity>

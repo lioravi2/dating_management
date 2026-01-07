@@ -21,6 +21,7 @@ import FaceSelectionModal from './FaceSelectionModal';
 import NoFaceDetectedModal from './NoFaceDetectedModal';
 import SamePersonWarningModal from './SamePersonWarningModal';
 import { PartnersStackParamList } from '../navigation/types';
+import { trackButtonClick } from '../lib/analytics/events';
 
 type NavigationProp = NativeStackNavigationProp<PartnersStackParamList>;
 
@@ -280,6 +281,8 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
   };
 
   const cancelUpload = () => {
+    trackButtonClick('cancel_upload', 'Cancel', 'PartnerPhotos', { partner_id: partnerId });
+    
     // Abort any ongoing fetch requests
     // Note: Keep the reference so signal.aborted checks work in catch blocks
     // The abort controller will be reset when a new upload starts
@@ -308,6 +311,8 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
   };
 
   const handleUploadPhoto = async () => {
+    trackButtonClick('upload_photo', '+ Upload Photo', 'PartnerPhotos', { partner_id: partnerId });
+    
     const hasPermission = await requestImagePickerPermission();
     if (!hasPermission) return;
 
@@ -561,6 +566,7 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
                 {
                   text: 'Upload Anyway',
                   onPress: async () => {
+                    trackButtonClick('upload_anyway_timeout', 'Upload Anyway', 'PartnerPhotos', { partner_id: partnerId });
                     setShowProgressModal(false);
                     await performUpload(null);
                   },
@@ -890,6 +896,7 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
   };
 
   const handleNoFaceProceed = async () => {
+    trackButtonClick('upload_anyway_no_face', 'Upload Anyway', 'PartnerPhotos', { partner_id: partnerId });
     setShowNoFaceModal(false);
     setShowProgressModal(true);
     setUploadProgress('uploading');
@@ -897,6 +904,7 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
   };
 
   const handleSamePersonConfirm = async () => {
+    trackButtonClick('upload_anyway_same_person', 'Proceed Anyway', 'PartnerPhotos', { partner_id: partnerId });
     setShowSamePersonModal(false);
     setShowProgressModal(true);
     setUploadProgress('uploading');
@@ -991,15 +999,24 @@ export default function PartnerPhotos({ partnerId, onPhotoUploaded }: PartnerPho
   };
 
   const handleDeleteClick = (photoId: string) => {
+    trackButtonClick('delete_photo_click', 'Delete', 'PartnerPhotos', { partner_id: partnerId, photo_id: photoId });
+    
     Alert.alert(
       'Delete Photo',
       'Are you sure you want to delete this photo?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => trackButtonClick('delete_photo_cancel', 'Cancel', 'PartnerPhotos', { partner_id: partnerId, photo_id: photoId }),
+        },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => handleDeleteConfirm(photoId),
+          onPress: () => {
+            trackButtonClick('delete_photo_confirm', 'Delete', 'PartnerPhotos', { partner_id: partnerId, photo_id: photoId });
+            handleDeleteConfirm(photoId);
+          },
         },
       ]
     );
