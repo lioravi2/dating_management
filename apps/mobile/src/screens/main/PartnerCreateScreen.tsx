@@ -15,6 +15,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PartnersStackParamList } from '../../navigation/types';
 import { supabase } from '../../lib/supabase/client';
 import BlackFlagIcon from '../../components/BlackFlagIcon';
+import { trackButtonClick } from '../../lib/analytics/events';
 
 type PartnerCreateScreenNavigationProp = NativeStackNavigationProp<PartnersStackParamList, 'PartnerCreate'>;
 
@@ -71,6 +72,9 @@ export default function PartnerCreateScreen() {
 
   const handleCreate = async () => {
     if (isSubmitting.current || saving) return;
+
+    // Track button click
+    trackButtonClick('create_partner', 'Create Partner', 'PartnerCreate');
 
     // Clear previous field errors
     setFieldErrors({});
@@ -217,6 +221,7 @@ export default function PartnerCreateScreen() {
   };
 
   const handleCancel = () => {
+    trackButtonClick('cancel_create_partner', 'Cancel', 'PartnerCreate');
     navigation.goBack();
   };
 

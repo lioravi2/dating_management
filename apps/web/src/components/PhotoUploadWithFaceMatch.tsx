@@ -13,6 +13,7 @@ import AlertDialog from './AlertDialog';
 import { ImagePicker, ImagePickerRef } from './ImagePicker';
 import { fileUtils } from '@/lib/file-utils';
 import { imageProcessor } from '@/lib/image-processing';
+import { useTrackClick } from '@/hooks/useTrackClick';
 
 interface PhotoUploadWithFaceMatchProps {
   partnerId?: string; // If provided, upload to this partner. If not, analyze across all partners.
@@ -26,6 +27,7 @@ export function PhotoUploadWithFaceMatch({
   onCancel,
 }: PhotoUploadWithFaceMatchProps) {
   const navigation = useNavigation();
+  const trackClick = useTrackClick();
   const imagePickerRef = useRef<ImagePickerRef>(null);
   const { modelsLoaded, loading, error: detectionError, detectFace, detectAllFaces } = useFaceDetection();
 
@@ -1129,7 +1131,10 @@ export function PhotoUploadWithFaceMatch({
           You need to be logged in to upload photos. Please sign in first.
         </p>
         <button
-          onClick={() => navigation.push('/auth/signin')}
+          onClick={() => {
+            trackClick('sign-in-photo-upload', 'Sign In');
+            navigation.push('/auth/signin');
+          }}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
           Sign In
@@ -1201,6 +1206,7 @@ export function PhotoUploadWithFaceMatch({
               console.log('[PhotoUpload] Ignoring button click - already processing');
               return;
             }
+            trackClick('select-photo', 'Select Photo');
             imagePickerRef.current?.open();
           }}
           disabled={uploading || analyzing}
@@ -1274,6 +1280,8 @@ export function PhotoUploadWithFaceMatch({
               <button
                 onClick={async () => {
                   if (uploading) return; // Prevent double-clicks
+                  
+                  trackClick('upload-anyway-no-face', 'Upload Anyway');
                   
                   const fileToUpload = fileRef.current || selectedFile;
                   const dims = dimensionsRef.current || imageDimensions;
@@ -1398,6 +1406,7 @@ export function PhotoUploadWithFaceMatch({
               </button>
               <button
                 onClick={() => {
+                  trackClick('cancel-no-face-modal', 'Cancel');
                   setShowNoFaceModal(false);
                   setNoFaceErrorMessage(undefined);
                   resetState();
@@ -1447,6 +1456,7 @@ export function PhotoUploadWithFaceMatch({
             <div className="flex gap-4 justify-end">
               <button
                 onClick={() => {
+                  trackClick('cancel-same-person-modal', 'No, Cancel');
                   setShowSamePersonModal(false);
                   resetState();
                 }}
@@ -1456,7 +1466,10 @@ export function PhotoUploadWithFaceMatch({
                 No, Cancel
               </button>
               <button
-                onClick={handleProceedAnyway}
+                onClick={() => {
+                  trackClick('proceed-anyway-same-person', 'Yes, Upload the Photo');
+                  handleProceedAnyway();
+                }}
                 disabled={uploading}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
@@ -1485,6 +1498,7 @@ export function PhotoUploadWithFaceMatch({
             <div className="flex gap-4 justify-end">
               <button
                 onClick={() => {
+                  trackClick('cancel-create-partner-modal', 'Cancel');
                   setShowCreateNewPartnerModal(false);
                   resetState();
                 }}
@@ -1494,7 +1508,10 @@ export function PhotoUploadWithFaceMatch({
                 Cancel
               </button>
               <button
-                onClick={handleCreateNewPartner}
+                onClick={() => {
+                  trackClick('create-new-partner', 'Create New Partner');
+                  handleCreateNewPartner();
+                }}
                 disabled={uploading || analyzing}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >

@@ -7,6 +7,7 @@ import { environment } from '@/lib/environment';
 import Link from 'next/link';
 import type { Partner } from '@/shared';
 import BlackFlagIcon from '@/components/BlackFlagIcon';
+import { useTrackClick } from '@/hooks/useTrackClick';
 
 interface PartnerFormProps {
   partner?: Partner | null;
@@ -14,6 +15,7 @@ interface PartnerFormProps {
 
 export default function PartnerForm({ partner }: PartnerFormProps = {}) {
   const navigation = useNavigation();
+  const trackClick = useTrackClick();
   const getInitialFormData = () => ({
     first_name: partner?.first_name || '',
     last_name: partner?.last_name || '',
@@ -210,6 +212,9 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
 
     const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Track button click
+    trackClick(partner ? 'update-partner' : 'create-partner', partner ? 'Update Partner' : 'Create Partner');
     
     // Prevent double submission during navigation
     if (isNavigatingRef.current) {
@@ -582,6 +587,7 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
             <button
               type="button"
               onClick={() => {
+                trackClick('accept-suggestion', 'Accept Suggestion');
                 // If field is empty, accept full suggestion, otherwise append remaining part
                 const newDescription = formData.description 
                   ? formData.description + suggestionText 
@@ -775,7 +781,10 @@ export default function PartnerForm({ partner }: PartnerFormProps = {}) {
         </button>
         <button
           type="button"
-          onClick={() => navigation.goBack()}
+          onClick={() => {
+            trackClick('cancel-partner-form', 'Cancel');
+            navigation.goBack();
+          }}
           disabled={loading}
           className="flex-1 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >

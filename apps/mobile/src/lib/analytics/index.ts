@@ -1,8 +1,11 @@
 import * as amplitude from '@amplitude/analytics-react-native';
+import { sessionReplayPlugin } from '@amplitude/plugin-session-replay-react-native';
 import { supabase } from '../supabase/client';
 
 // Initialize Amplitude SDK
 let isInitialized = false;
+let apiKeyValue: string | undefined = undefined;
+
 
 /**
  * Initialize Amplitude analytics client
@@ -13,10 +16,16 @@ export function initAmplitude() {
     return;
   }
 
+  // Note: In Expo/React Native, EXPO_PUBLIC_* environment variables must be:
+  // 1. Set in the environment when building (or in .env file)
+  // 2. Available at build time - they are bundled into the JavaScript during build
+  // 3. For release builds, ensure the variable is set before running npm run build:apk:release
+  // The app.config.js file loads .env files and makes variables available via process.env
   const apiKey = process.env.EXPO_PUBLIC_AMPLITUDE_API_KEY;
+  apiKeyValue = apiKey;
 
   if (!apiKey) {
-    console.warn('Amplitude API key not found. Analytics will not be initialized.');
+    console.error('[Amplitude] ERROR: API key not found. Analytics will not be initialized.');
     return;
   }
 
@@ -32,9 +41,31 @@ export function initAmplitude() {
       },
     });
 
+    // Configure and add Session Replay plugin
+    // Session replay captures user interactions for debugging and analysis
+    const sessionReplayConfig = {
+      // Sample rate: 1.0 = 100% of sessions recorded, 0.1 = 10% of sessions
+      sampleRate: 1.0,
+      
+      // Automatically start recording sessions when initialized
+      autoStart: true,
+      
+      // Privacy masking level:
+      // - 'light': Masks passwords, emails, credit cards, phone numbers
+      // - 'medium': Masks all editable text views
+      // - 'conservative': Masks all text views
+      maskLevel: 'medium' as const,
+      
+      // Allow remote configuration to override local settings
+      enableRemoteConfig: true,
+    };
+
+    amplitude.add(sessionReplayPlugin(sessionReplayConfig));
+
     isInitialized = true;
   } catch (error) {
-    console.error('Failed to initialize Amplitude:', error);
+    console.error('[Amplitude] ERROR: Failed to initialize Amplitude:', error);
+    isInitialized = false;
   }
 }
 
@@ -95,14 +126,14 @@ export function setUserId(userId: string | undefined) {
  */
 export function track(eventName: string, eventProperties?: Record<string, any>) {
   if (!isInitialized) {
-    console.warn('Amplitude not initialized. Call initAmplitude() first.');
+    console.warn('[Amplitude] Cannot track event - Amplitude not initialized. Call initAmplitude() first.');
     return;
   }
 
   try {
     amplitude.track(eventName, eventProperties);
   } catch (error) {
-    console.error('Failed to track event in Amplitude:', error);
+    console.error(`[Amplitude] ERROR: Failed to track event "${eventName}":`, error);
   }
 }
 
@@ -200,7 +231,7 @@ export async function trackAppOpen() {
       await updateAccountType();
     }
   } catch (error) {
-    console.error('Failed to track app open in Amplitude:', error);
+    console.error('[Amplitude] ERROR: Failed to track app open:', error);
   }
 }
 
@@ -217,7 +248,28 @@ export function clearUser() {
     // Optionally clear user properties
     // amplitude.clearUserProperties();
   } catch (error) {
-    console.error('Failed to clear user in Amplitude:', error);
+    console.error('[Amplitude] ERROR: Failed to clear user:', error);
   }
 }
+
+/**
+ * Check if Amplitude is initialized
+ */
+export function isAmplitudeInitialized(): boolean {
+  return isInitialized;
+}
+
+/**
+ * Get Amplitude initialization status
+ */
+export function getAmplitudeStatus(): {
+  initialized: boolean;
+  apiKeyPresent: boolean;
+} {
+  return {
+    initialized: isInitialized,
+    apiKeyPresent: !!apiKeyValue,
+  };
+}
+
 

@@ -12,6 +12,8 @@ export default function App() {
   const appState = useRef<AppStateStatus>(AppState.currentState);
 
   useEffect(() => {
+    console.log('[App] Initializing app...');
+    
     // Initialize Metro configuration for WiFi debugging
     initMetroConfig().catch(console.error);
 
@@ -27,25 +29,33 @@ export default function App() {
         // Track app install event (will only track once)
         await trackAppInstalled(attributionData);
       } catch (error) {
-        console.error('Failed to handle attribution:', error);
+        console.error('[App] Failed to handle attribution:', error);
       }
     };
 
     handleAttribution();
 
     // Track initial app open (when app first loads)
-    trackAppOpen().catch(console.error);
+    console.log('[App] Calling trackAppOpen() for initial app load...');
+    trackAppOpen().catch((error) => {
+      console.error('[App] Failed to track initial app open:', error);
+    });
   }, []);
 
   useEffect(() => {
     // Listen for app state changes to track [App Open] when app comes to foreground
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      console.log(`[App] AppState changed: ${appState.current} -> ${nextAppState}`);
+      
       // Track [App Open] when app comes to foreground (from background or inactive)
       if (
         appState.current.match(/inactive|background/) &&
         nextAppState === 'active'
       ) {
-        trackAppOpen().catch(console.error);
+        console.log('[App] App came to foreground, calling trackAppOpen()...');
+        trackAppOpen().catch((error) => {
+          console.error('[App] Failed to track app open on foreground:', error);
+        });
       }
 
       appState.current = nextAppState;

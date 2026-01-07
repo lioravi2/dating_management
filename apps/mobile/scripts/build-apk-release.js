@@ -47,6 +47,54 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Load environment variables from .env file if it exists
+function loadEnvFile() {
+  const envPath = path.join(PROJECT_ROOT, '.env');
+  const envLocalPath = path.join(PROJECT_ROOT, '.env.local');
+  
+  // Try .env.local first, then .env
+  const envFile = fileExists(envLocalPath) ? envLocalPath : 
+                  fileExists(envPath) ? envPath : null;
+  
+  if (!envFile) {
+    return {};
+  }
+  
+  try {
+    const envContent = fs.readFileSync(envFile, 'utf8');
+    const envVars = {};
+    
+    // Simple .env parser (handles basic KEY=VALUE format)
+    envContent.split('\n').forEach(line => {
+      line = line.trim();
+      // Skip comments and empty lines
+      if (!line || line.startsWith('#')) {
+        return;
+      }
+      
+      const match = line.match(/^([^=]+)=(.*)$/);
+      if (match) {
+        const key = match[1].trim();
+        let value = match[2].trim();
+        
+        // Remove quotes if present
+        if ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+        
+        envVars[key] = value;
+      }
+    });
+    
+    console.log(`  ✓ Loaded environment variables from ${path.basename(envFile)}`);
+    return envVars;
+  } catch (error) {
+    console.log(`  ⚠ Could not load .env file: ${error.message}`);
+    return {};
+  }
+}
+
 // Generate a unique build number (6-digit random number)
 function generateBuildNumber() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -69,6 +117,35 @@ export const BUILD_DATE: string | undefined = '${buildDate}';
 }
 
 (async () => {
+  // Phase 0: Load Environment Variables
+  console.log('🔧 Phase 0: Environment Configuration');
+  console.log('───────────────────────────────────────────────────────────');
+  const envVars = loadEnvFile();
+  
+  // Merge .env variables into process.env (don't override existing)
+  Object.keys(envVars).forEach(key => {
+    if (!process.env[key]) {
+      process.env[key] = envVars[key];
+    }
+  });
+  
+  // Check for required Amplitude API key
+  const amplitudeApiKey = process.env.EXPO_PUBLIC_AMPLITUDE_API_KEY;
+  if (!amplitudeApiKey) {
+    console.log('  ⚠ WARNING: EXPO_PUBLIC_AMPLITUDE_API_KEY is not set!');
+    console.log('     Amplitude analytics will NOT work in this build.');
+    console.log('     To fix:');
+    console.log('     1. Create a .env file in apps/mobile/');
+    console.log('     2. Add: EXPO_PUBLIC_AMPLITUDE_API_KEY=your_api_key_here');
+    console.log('     3. Or set it as an environment variable before building');
+    console.log('     4. Rebuild the APK\n');
+  } else {
+    const maskedKey = amplitudeApiKey.length > 8 
+      ? `${amplitudeApiKey.substring(0, 4)}...${amplitudeApiKey.substring(amplitudeApiKey.length - 4)}`
+      : '****';
+    console.log(`  ✓ EXPO_PUBLIC_AMPLITUDE_API_KEY found: ${maskedKey}\n`);
+  }
+
   // Phase 1: Cleanup (optional)
   console.log('📦 Phase 1: Cleanup');
   console.log('───────────────────────────────────────────────────────────');

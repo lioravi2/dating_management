@@ -5,6 +5,7 @@ import { getStripe } from '@/lib/stripe';
 import { getDailyPriceDisplay } from '@/lib/pricing';
 import { User } from '@/shared';
 import AlertDialog from './AlertDialog';
+import { useTrackClick } from '@/hooks/useTrackClick';
 
 interface UpgradeFormProps {
   user: User | { id: string; account_type?: string | null };
@@ -13,8 +14,10 @@ interface UpgradeFormProps {
 export default function UpgradeForm({ user }: UpgradeFormProps) {
   const [loading, setLoading] = useState(false);
   const [alertDialog, setAlertDialog] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: '', message: '' });
+  const trackClick = useTrackClick();
 
   const handleCheckout = async () => {
+    trackClick('subscribe-to-pro', 'Subscribe to Pro');
     setLoading(true);
 
     try {
