@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   TextInput,
   ActivityIndicator,
   Switch,
-  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -16,7 +15,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PartnersStackParamList } from '../../navigation/types';
 import { supabase } from '../../lib/supabase/client';
 import BlackFlagIcon from '../../components/BlackFlagIcon';
-import { trackButtonClick } from '../../lib/analytics/events';
 
 type PartnerCreateScreenNavigationProp = NativeStackNavigationProp<PartnersStackParamList, 'PartnerCreate'>;
 
@@ -26,8 +24,6 @@ export default function PartnerCreateScreen() {
   const [message, setMessage] = useState<string>('');
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
   const [isLimitReached, setIsLimitReached] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [partnerCount, setPartnerCount] = useState<number | null>(null);
   const isSubmitting = useRef(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const fieldRefs = useRef<{ [key: string]: View | null }>({});
@@ -45,48 +41,6 @@ export default function PartnerCreateScreen() {
     instagram_profile: '',
     black_flag: false,
   });
-
-  // Check partner limit on mount (before showing form)
-  useEffect(() => {
-    const checkLimit = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setLoading(false);
-          return;
-        }
-
-        const FREE_TIER_PARTNER_LIMIT = 10;
-        const { data: userData } = await supabase
-          .from('users')
-          .select('account_type')
-          .eq('id', session.user.id)
-          .single();
-
-        // Check partner limit for free users before showing form
-        if (userData?.account_type === 'free') {
-          const { count, error: countError } = await supabase
-            .from('partners')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', session.user.id);
-
-          if (!countError && count !== null) {
-            setPartnerCount(count);
-            if (count >= FREE_TIER_PARTNER_LIMIT) {
-              setIsLimitReached(true);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error checking partner limit:', error);
-        // On error, allow user to proceed (fail open)
-        // They'll get an error from the API if limit is actually reached
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkLimit();
-  }, []);
 
   // Validation functions
   const isValidEmail = (email: string): boolean => {
@@ -117,9 +71,6 @@ export default function PartnerCreateScreen() {
 
   const handleCreate = async () => {
     if (isSubmitting.current || saving) return;
-
-    // Track button click
-    trackButtonClick('create_partner', 'Create Partner', 'PartnerCreate');
 
     // Clear previous field errors
     setFieldErrors({});
@@ -266,71 +217,8 @@ export default function PartnerCreateScreen() {
   };
 
   const handleCancel = () => {
-    trackButtonClick('cancel_create_partner', 'Cancel', 'PartnerCreate');
     navigation.goBack();
   };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#dc2626" />
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (isLimitReached) {
-    const FREE_TIER_PARTNER_LIMIT = 10;
-    return (
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <ScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={styles.contentContainer}
-        >
-          <View style={styles.headerCard}>
-            <Text style={styles.title}>Add New Partner</Text>
-          </View>
-          <View style={styles.limitReachedCard}>
-            <View style={styles.yellowAlertBox}>
-              <Text style={styles.alertTitle}>Partner Limit Reached</Text>
-              <Text style={styles.alertText}>
-                {partnerCount !== null && partnerCount >= FREE_TIER_PARTNER_LIMIT
-                  ? partnerCount > FREE_TIER_PARTNER_LIMIT
-                    ? `To add more partners, please upgrade to Pro.`
-                    : `Your free subscription is limited to ${FREE_TIER_PARTNER_LIMIT} partners. You currently have ${partnerCount} partners.`
-                  : `Your free subscription is limited to ${FREE_TIER_PARTNER_LIMIT} partners.`}
-              </Text>
-              <TouchableOpacity
-                style={styles.upgradeButton}
-                onPress={() => {
-                  trackButtonClick('upgrade_to_pro', 'Upgrade to Pro', 'PartnerCreate');
-                  const webAppUrl = process.env.EXPO_PUBLIC_WEB_APP_URL;
-                  if (webAppUrl) {
-                    Linking.openURL(`${webAppUrl}/upgrade`).catch((err) => {
-                      console.error('Error opening upgrade page:', err);
-                    });
-                  }
-                }}
-              >
-                <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => {
-                trackButtonClick('back_to_partners', '← Back to Partners', 'PartnerCreate');
-                handleCancel();
-              }}
-            >
-              <Text style={styles.backButtonText}>← Back to Partners</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -787,66 +675,4 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.5,
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 12,
-    color: '#6b7280',
-    fontSize: 14,
-  },
-  limitReachedCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  yellowAlertBox: {
-    backgroundColor: '#fef9c3', // yellow-50 equivalent
-    borderWidth: 1,
-    borderColor: '#fde047', // yellow-200 equivalent
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-  },
-  alertTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#78350f', // yellow-800 equivalent
-    marginBottom: 8,
-  },
-  alertText: {
-    fontSize: 14,
-    color: '#854d0e', // yellow-700 equivalent
-    marginBottom: 16,
-  },
-  upgradeButton: {
-    backgroundColor: '#eab308', // yellow-500 equivalent
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  upgradeButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  backButton: {
-    marginTop: 8,
-  },
-  backButtonText: {
-    color: '#dc2626',
-    fontSize: 14,
-    fontWeight: '500',
-  },
 });
-
