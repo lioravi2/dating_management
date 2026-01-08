@@ -152,46 +152,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Profile exists - this is an existing user signing in
-    // FIXED: Remove isFirstLogin check based on last_login (database trigger sets it before this check)
-    // Track [User Signed In] for ALL existing profile updates
+    // NOTE: [User Signed In] event tracking is now handled by middleware (apps/web/src/middleware.ts)
+    // The middleware automatically detects fresh sign-ins and tracks the event, so we don't track here
+    // to avoid duplicate events. The middleware will track when the user makes their first authenticated
+    // request after the profile update completes.
     console.log('[Auth] Decision logic: Profile exists - existing user sign-in');
-    console.log('[Auth] Decision logic: Will track [User Signed In] (not [User Registered])');
-    
-    // Track [User Signed In] event BEFORE database update (to ensure it always runs)
-    // Only user_id is included (NO UTM params, NO registration_method - tracked via UTM)
-    // Await track() to ensure event is sent before route handler returns (important for serverless)
-    console.log('[Auth] ========== Tracking [User Signed In] event ==========');
-    const trackTimestamp = Date.now(); // Use Date.now() to match [User Signed Out] pattern
-    const isInitialized = isAmplitudeInitialized();
-    const hasApiKey = !!process.env.AMPLITUDE_API_KEY;
-    
-    console.log('[Auth] Before track() call:', {
-      eventName: '[User Signed In]',
-      userId: user.id,
-      isInitialized,
-      hasApiKey,
-      timestamp: trackTimestamp
-    });
-    
-    if (!hasApiKey) {
-      console.warn('[Auth] AMPLITUDE_API_KEY not set - event will not be tracked');
-    } else if (!isInitialized) {
-      console.warn('[Auth] Amplitude not initialized - event may not be tracked');
-    }
-    
-    // Track [User Signed In] for all existing profile updates
-    // Await to ensure event is sent before route handler returns
-    // Moved BEFORE database update to ensure it always executes
-    try {
-      await track('[User Signed In]', user.id, {
-        timestamp: trackTimestamp,
-      });
-      console.log('[Auth] After track() call: [User Signed In] event tracked successfully');
-    } catch (error) {
-      // Don't fail the request if analytics fails
-      console.error('[Auth] Error tracking [User Signed In] event:', error);
-    }
-    console.log('[Auth] ========== [User Signed In] tracking complete ==========');
+    console.log('[Auth] Decision logic: [User Signed In] tracking handled by middleware (not tracked here to avoid duplicates)');
     
     const now = new Date().toISOString();
 

@@ -31,7 +31,7 @@ export async function middleware(request: NextRequest) {
   const skipRoutes = [
     '/api/auth/track-signin',      // Don't track when calling track-signin itself
     '/api/auth/dev-signin',        // Dev sign-in creates session, but we track after
-    '/api/auth/update-profile',    // Update-profile already has its own tracking logic
+    '/api/auth/update-profile',    // Skip update-profile - it updates last_login, we track on next request
     '/auth/signout',               // Sign out route
     '/auth/callback',              // Auth callback page (handles its own flow)
     '/_next',                      // Next.js internal routes
@@ -82,10 +82,18 @@ export async function middleware(request: NextRequest) {
     }
     
     // Check if we've already tracked this sign-in recently (prevent duplicates)
+    // NOTE: In serverless environments, each request may run in a different instance,
+    // so this in-memory cache only prevents duplicates within the same instance.
+    // However, by checking and setting the cache immediately, we minimize the window
+    // for duplicate tracking across instances.
     const lastTracked = trackedSignIns.get(user.id);
     const now = Date.now();
     if (lastTracked && (now - lastTracked) < TRACKING_WINDOW_MS) {
-      // Already tracked recently, skip
+      // Already tracked recently in this instance, skip
+      console.log('[Middleware] Already tracked sign-in recently in this instance, skipping:', {
+        userId: user.id,
+        timeSinceLastTrack: `${Math.round((now - lastTracked) / 1000)}s`,
+      });
       return NextResponse.next();
     }
     
@@ -103,7 +111,9 @@ export async function middleware(request: NextRequest) {
       
       // If last_login was updated in the last 30 seconds, this is a fresh sign-in
       if (timeSinceLogin < 30000 && timeSinceLogin >= 0) {
-        // Mark as tracked to prevent duplicates
+        // CRITICAL: Mark as tracked IMMEDIATELY before making the async call
+        // This prevents duplicate tracking within the same instance
+        // (In serverless, each instance has its own cache, but this minimizes the window)
         trackedSignIns.set(user.id, now);
         
         // Clean up old entries from cache (keep only recent entries)
@@ -125,6 +135,7 @@ export async function middleware(request: NextRequest) {
             'Content-Type': 'application/json',
             ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
           },
+          body: JSON.stringify({}), // Include empty body for POST request compatibility
           // Don't await - this is fire and forget to avoid blocking the request
         }).catch((error) => {
           // Silently fail - tracking shouldn't block user requests
@@ -134,8 +145,20 @@ export async function middleware(request: NextRequest) {
         console.log('[Middleware] Detected fresh sign-in, triggering [User Signed In] tracking:', {
           userId: user.id,
           timeSinceLogin: `${Math.round(timeSinceLogin / 1000)}s`,
+          pathname: pathname,
+        });
+      } else {
+        console.log('[Middleware] Sign-in is not fresh, skipping tracking:', {
+          userId: user.id,
+          timeSinceLogin: `${Math.round(timeSinceLogin / 1000)}s`,
+          pathname: pathname,
         });
       }
+    } else {
+      console.log('[Middleware] No last_login found, skipping tracking:', {
+        userId: user.id,
+        pathname: pathname,
+      });
     }
   } catch (error) {
     // Silently fail - middleware errors shouldn't break the app

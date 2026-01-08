@@ -122,11 +122,18 @@ export async function track(
   try {
     // Build event object - use object literal instead of BaseEvent type
     // BaseEvent is not exported from @amplitude/node, but logEvent accepts the same structure
-    const event = {
+    // Extract insert_id from eventProperties if present (for deduplication)
+    const { insert_id, ...propertiesWithoutInsertId } = eventProperties || {};
+    const event: any = {
       event_type: eventName,
       user_id: userId, // Supabase user ID - user properties (including UTM) automatically inherited
-      event_properties: eventProperties || {},
+      event_properties: propertiesWithoutInsertId,
     };
+    
+    // Add insert_id as top-level property if provided (for Amplitude deduplication)
+    if (insert_id) {
+      event.insert_id = insert_id;
+    }
 
     // Always log event object
     console.log(`[Amplitude] Event object:`, JSON.stringify(event, null, 2));
