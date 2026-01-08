@@ -150,6 +150,35 @@ export default function ProfileScreen() {
 
   const handleSignOut = async () => {
     try {
+      // Get session before signing out (needed for server-side tracking)
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.access_token) {
+        // Call server endpoint to trigger server-side [User Signed Out] tracking
+        // This ensures the event is tracked server-side (consistent with web app)
+        const webAppUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL;
+        if (webAppUrl) {
+          try {
+            await fetch(`${webAppUrl}/auth/signout`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+            }).catch((error) => {
+              // Ignore errors - tracking is best effort, don't block sign out
+              console.log('[ProfileScreen] Server signout tracking failed (non-blocking):', error);
+            });
+          } catch (error) {
+            // Ignore errors - tracking is best effort
+            console.log('[ProfileScreen] Error calling server signout endpoint (non-blocking):', error);
+          }
+        } else {
+          console.warn('[ProfileScreen] EXPO_PUBLIC_WEB_APP_URL not set - skipping server-side tracking');
+        }
+      }
+      
+      // Now do client-side sign out
       await supabase.auth.signOut();
     } catch (error) {
       console.error('Error signing out:', error);
@@ -333,6 +362,17 @@ export default function ProfileScreen() {
               </View>
             ))}
           </View>
+        </View>
+
+        {/* Debug Section */}
+        <View style={styles.profileCard}>
+          <Text style={styles.sectionTitle}>Debug</Text>
+          <TouchableOpacity
+            style={styles.debugButton}
+            onPress={() => navigation.navigate('AmplitudeDebug' as any)}
+          >
+            <Text style={styles.debugButtonText}>Debug Amplitude</Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
@@ -572,6 +612,18 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   signOutButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  debugButton: {
+    backgroundColor: '#2196f3',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  debugButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
