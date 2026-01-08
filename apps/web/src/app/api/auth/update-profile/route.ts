@@ -157,33 +157,7 @@ export async function POST(request: NextRequest) {
     console.log('[Auth] Decision logic: Profile exists - existing user sign-in');
     console.log('[Auth] Decision logic: Will track [User Signed In] (not [User Registered])');
     
-    const now = new Date().toISOString();
-
-    // Update last_login and email_verified_at
-    const updateData: any = {
-      last_login: now,
-    };
-
-    // Only set email_verified_at if it's currently null and email is now confirmed
-    if (!currentUser.email_verified_at && user.email_confirmed_at) {
-      updateData.email_verified_at = user.email_confirmed_at;
-      console.log('[Auth] Database update: Setting email_verified_at:', user.email_confirmed_at);
-    }
-
-    console.log('[Auth] Database update: Updating profile with:', updateData);
-    const { error: updateError } = await supabase
-      .from('users')
-      .update(updateData)
-      .eq('id', user.id);
-
-    if (updateError) {
-      console.error('[Auth] Error updating user profile:', updateError);
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
-    }
-
-    console.log('[Auth] Profile updated successfully');
-
-    // Track [User Signed In] event for existing user
+    // Track [User Signed In] event BEFORE database update (to ensure it always runs)
     // Only user_id is included (NO UTM params, NO registration_method - tracked via UTM)
     // Await track() to ensure event is sent before route handler returns (important for serverless)
     console.log('[Auth] ========== Tracking [User Signed In] event ==========');
@@ -207,6 +181,7 @@ export async function POST(request: NextRequest) {
     
     // Track [User Signed In] for all existing profile updates
     // Await to ensure event is sent before route handler returns
+    // Moved BEFORE database update to ensure it always executes
     try {
       await track('[User Signed In]', user.id, {
         timestamp: trackTimestamp,
@@ -217,6 +192,33 @@ export async function POST(request: NextRequest) {
       console.error('[Auth] Error tracking [User Signed In] event:', error);
     }
     console.log('[Auth] ========== [User Signed In] tracking complete ==========');
+    
+    const now = new Date().toISOString();
+
+    // Update last_login and email_verified_at
+    const updateData: any = {
+      last_login: now,
+    };
+
+    // Only set email_verified_at if it's currently null and email is now confirmed
+    if (!currentUser.email_verified_at && user.email_confirmed_at) {
+      updateData.email_verified_at = user.email_confirmed_at;
+      console.log('[Auth] Database update: Setting email_verified_at:', user.email_confirmed_at);
+    }
+
+    console.log('[Auth] Database update: Updating profile with:', updateData);
+    const { error: updateError } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('id', user.id);
+
+    if (updateError) {
+      console.error('[Auth] Error updating user profile:', updateError);
+      // Don't return error - tracking already happened, just log the error
+      console.warn('[Auth] Continuing despite database update error (tracking already completed)');
+    } else {
+      console.log('[Auth] Profile updated successfully');
+    }
 
     const routeDuration = Date.now() - routeStartTime;
     console.log('[Auth] ========== update-profile route completed (existing user) ==========', { duration: `${routeDuration}ms` });
