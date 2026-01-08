@@ -187,29 +187,30 @@ export async function POST(request: NextRequest) {
     // Only user_id is included (NO UTM params, NO registration_method - tracked via UTM)
     // Await track() to ensure event is sent before route handler returns (important for serverless)
     console.log('[Auth] ========== Tracking [User Signed In] event ==========');
+    const trackTimestamp = Date.now(); // Use Date.now() to match [User Signed Out] pattern
     const isInitialized = isAmplitudeInitialized();
     const hasApiKey = !!process.env.AMPLITUDE_API_KEY;
     
-      console.log('[Auth] Before track() call:', {
-        eventName: '[User Signed In]',
-        userId: user.id,
-        isInitialized,
-        hasApiKey,
-        timestamp: now
+    console.log('[Auth] Before track() call:', {
+      eventName: '[User Signed In]',
+      userId: user.id,
+      isInitialized,
+      hasApiKey,
+      timestamp: trackTimestamp
+    });
+    
+    if (!hasApiKey) {
+      console.warn('[Auth] AMPLITUDE_API_KEY not set - event will not be tracked');
+    } else if (!isInitialized) {
+      console.warn('[Auth] Amplitude not initialized - event may not be tracked');
+    }
+    
+    // Track [User Signed In] for all existing profile updates
+    // Await to ensure event is sent before route handler returns
+    try {
+      await track('[User Signed In]', user.id, {
+        timestamp: trackTimestamp,
       });
-      
-      if (!hasApiKey) {
-        console.warn('[Auth] AMPLITUDE_API_KEY not set - event will not be tracked');
-      } else if (!isInitialized) {
-        console.warn('[Auth] Amplitude not initialized - event may not be tracked');
-      }
-      
-      // Track [User Signed In] for all existing profile updates
-      // Await to ensure event is sent before route handler returns
-      try {
-        await track('[User Signed In]', user.id, {
-          timestamp: now,
-        });
       console.log('[Auth] After track() call: [User Signed In] event tracked successfully');
     } catch (error) {
       // Don't fail the request if analytics fails
