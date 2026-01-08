@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { findFaceMatches } from '@/lib/face-matching';
 import { analyzePhotoUploadForPartner } from '@/lib/photo-upload-decision';
 import { FaceMatch } from '@/shared';
+import { track } from '@/lib/analytics/server';
 
 /**
  * Analyze a photo upload for a specific partner
@@ -204,6 +205,51 @@ export async function POST(
     );
 
     console.log('[API] Analysis complete, decision:', analysis.decision.type);
+
+    // Determine outcome for analytics
+    let outcome: 'matches_found' | 'no_matches' | 'same_person_warning' | 'other_partners_warning';
+    if (analysis.decision.type === 'proceed') {
+      // Check if there are any matches
+      const hasMatches = partnerMatches.length > 0 || enrichedOtherMatches.length > 0;
+      outcome = hasMatches ? 'matches_found' : 'no_matches';
+    } else if (analysis.decision.type === 'warn_same_person') {
+      outcome = 'same_person_warning';
+    } else if (analysis.decision.type === 'warn_other_partners') {
+      outcome = 'other_partners_warning';
+    } else {
+      // Fallback - should not happen
+      outcome = 'no_matches';
+    }
+
+    // Collect all matches for analytics
+    const allMatches = [...partnerMatches, ...enrichedOtherMatches];
+    const matchCount = allMatches.length;
+    const similarityScores = allMatches.map(match => match.similarity);
+
+    // Track partner analysis event
+    try {
+      const eventProperties: Record<string, any> = {
+        outcome,
+        partner_id: partnerId,
+        match_count: matchCount,
+        decision_type: analysis.decision.type,
+      };
+      
+      // Only include similarity_scores if there are matches
+      if (similarityScores.length > 0) {
+        eventProperties.similarity_scores = similarityScores;
+      }
+      
+      await track(
+        '[Photo Upload - Partner Analysis]',
+        userId,
+        eventProperties
+      );
+    } catch (error) {
+      // Log error but don't break the request flow
+      console.error('[API] Failed to track analytics event:', error);
+    }
+
     return NextResponse.json(analysis);
   } catch (error) {
     console.error('Error analyzing photo:', error);

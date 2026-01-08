@@ -10,6 +10,7 @@ import {
   getDefaultConfig,
   type LandmarkPosition 
 } from '@dating-app/shared';
+import { track } from '@/lib/analytics/server';
 
 // face-api.js bundles its own TensorFlow.js, but we need to ensure TensorFlow is initialized
 // with the CPU backend before face-api.js tries to use it
@@ -260,6 +261,57 @@ export async function POST(request: NextRequest) {
     }
 
     const filteredCount = detections.length - validatedDetections.length;
+
+    // Collect all validation reasons from invalid detections
+    const validationReasons = Array.from(new Set(
+      invalidDetections.flatMap(item => item.validationResult.reasons)
+    ));
+
+    // Determine outcome for analytics
+    let outcome: 'no_face' | 'multiple_faces' | 'face_too_small' | 'success';
+    if (validatedDetections.length === 0) {
+      if (detections.length === 0) {
+        outcome = 'no_face';
+      } else {
+        // Check if the reason is face too small
+        const hasFaceTooSmall = validationReasons.some(reason => 
+          reason.toLowerCase().includes('face') && reason.toLowerCase().includes('small')
+        );
+        outcome = hasFaceTooSmall ? 'face_too_small' : 'no_face';
+      }
+    } else if (validatedDetections.length > 1) {
+      outcome = 'multiple_faces';
+    } else {
+      outcome = 'success';
+    }
+
+    // Calculate face size percentage if applicable (for the first valid detection)
+    let faceSizePercentage: number | undefined;
+    if (validatedDetections.length > 0) {
+      const firstDetection = validatedDetections[0];
+      const faceArea = firstDetection.boundingBox.width * firstDetection.boundingBox.height;
+      const imageArea = originalWidth * originalHeight;
+      faceSizePercentage = (faceArea / imageArea) * 100;
+    }
+
+    // Track face detection event
+    try {
+      await track(
+        '[Photo Upload - Face Detection]',
+        user.id,
+        {
+          outcome,
+          image_width: originalWidth,
+          image_height: originalHeight,
+          detection_count: detections.length,
+          validation_reasons: validationReasons.length > 0 ? validationReasons : undefined,
+          face_size_percentage: faceSizePercentage,
+        }
+      );
+    } catch (error) {
+      // Log error but don't break the request flow
+      console.error('[Face Detection] Failed to track analytics event:', error);
+    }
 
     if (validatedDetections.length === 0) {
       // Build detailed diagnostic information

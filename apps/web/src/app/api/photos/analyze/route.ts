@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { findFaceMatches } from '@/lib/face-matching';
 import { analyzePhotoUploadWithoutPartner } from '@/lib/photo-upload-decision';
 import { FaceMatch } from '@/shared';
+import { track } from '@/lib/analytics/server';
 
 /**
  * Analyze a photo upload without a selected partner
@@ -136,6 +137,44 @@ export async function POST(request: NextRequest) {
 
     // Analyze and get decision
     const result = analyzePhotoUploadWithoutPartner(enrichedMatches);
+
+    // Determine outcome for analytics
+    let outcome: 'matches_found' | 'no_matches' | 'same_person_warning' | 'other_partners_warning';
+    if (result.decision === 'create_new') {
+      outcome = 'no_matches';
+    } else if (result.decision === 'warn_matches') {
+      outcome = 'matches_found';
+    } else {
+      // Fallback - should not happen
+      outcome = 'no_matches';
+    }
+
+    // Collect matches for analytics
+    const matchCount = result.matches.length;
+    const similarityScores = result.matches.map(match => match.similarity);
+
+    // Track partner analysis event
+    try {
+      const eventProperties: Record<string, any> = {
+        outcome,
+        match_count: matchCount,
+        decision_type: result.decision,
+      };
+      
+      // Only include similarity_scores if there are matches
+      if (similarityScores.length > 0) {
+        eventProperties.similarity_scores = similarityScores;
+      }
+      
+      await track(
+        '[Photo Upload - Partner Analysis]',
+        userId,
+        eventProperties
+      );
+    } catch (error) {
+      // Log error but don't break the request flow
+      console.error('[API] Failed to track analytics event:', error);
+    }
 
     return NextResponse.json({
       decision: result.decision,
