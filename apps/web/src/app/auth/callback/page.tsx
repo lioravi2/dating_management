@@ -63,21 +63,26 @@ export default function AuthCallbackPage() {
           return;
         }
 
+        // Wait for session to sync to cookies before calling update-profile
+        // This ensures the server-side route can read the session from cookies
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
         // Update profile
+        console.log('[Auth Callback] Calling /api/auth/update-profile...');
         try {
           const profileResponse = await fetch('/api/auth/update-profile', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
           });
+          const responseData = await profileResponse.json().catch(() => ({}));
           if (!profileResponse.ok) {
-            console.error('Profile update failed, but continuing with login');
+            console.error('[Auth Callback] Profile update failed:', responseData);
+          } else {
+            console.log('[Auth Callback] Profile update successful:', responseData);
           }
         } catch (error) {
-          console.error('Error updating profile:', error);
+          console.error('[Auth Callback] Error updating profile:', error);
         }
-
-        // Wait for session to sync to cookies, then navigate
-        await new Promise(resolve => setTimeout(resolve, 500));
         // Use Next.js navigation instead of full page reload to preserve session
         navigation.push('/dashboard');
         return;
@@ -97,20 +102,25 @@ export default function AuthCallbackPage() {
             // Verify session is set
             const { data: { session: verifiedSession } } = await supabase.auth.getSession();
             if (verifiedSession) {
+              // Wait for session to sync to cookies before calling update-profile
+              await new Promise(resolve => setTimeout(resolve, 1000));
+
               // Update profile
+              console.log('[Auth Callback] Calling /api/auth/update-profile...');
               try {
                 const profileResponse = await fetch('/api/auth/update-profile', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                 });
+                const responseData = await profileResponse.json().catch(() => ({}));
                 if (!profileResponse.ok) {
-                  console.error('Profile update failed, but continuing with login');
+                  console.error('[Auth Callback] Profile update failed:', responseData);
+                } else {
+                  console.log('[Auth Callback] Profile update successful:', responseData);
                 }
               } catch (error) {
-                console.error('Error updating profile:', error);
+                console.error('[Auth Callback] Error updating profile:', error);
               }
-              // Wait for session to sync to cookies, then navigate
-              await new Promise(resolve => setTimeout(resolve, 500));
               // Use Next.js navigation instead of full page reload to preserve session
               navigation.push('/dashboard');
               return;
@@ -152,21 +162,26 @@ export default function AuthCallbackPage() {
           return;
         }
 
+        // Wait for session to sync to cookies before calling update-profile
+        // This ensures the server-side route can read the session from cookies
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
         // Update profile
+        console.log('[Auth Callback] Calling /api/auth/update-profile...');
         try {
           const profileResponse = await fetch('/api/auth/update-profile', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
           });
+          const responseData = await profileResponse.json().catch(() => ({}));
           if (!profileResponse.ok) {
-            console.error('Profile update failed, but continuing with login');
+            console.error('[Auth Callback] Profile update failed:', responseData);
+          } else {
+            console.log('[Auth Callback] Profile update successful:', responseData);
           }
         } catch (error) {
-          console.error('Error updating profile:', error);
+          console.error('[Auth Callback] Error updating profile:', error);
         }
-
-        // Wait for session to sync to cookies, then navigate
-        await new Promise(resolve => setTimeout(resolve, 500));
         // Use Next.js navigation instead of full page reload to preserve session
         navigation.push('/dashboard');
         return;
