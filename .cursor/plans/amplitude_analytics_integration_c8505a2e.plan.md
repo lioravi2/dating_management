@@ -71,7 +71,7 @@ todos:
     dependencies:
       - create-web-server-analytics
   - id: todo-1767714029740-gawe3sgzn
-    content: Add [User Signed In] event tracking to sign in flow (database trigger or API route) with user_id only (NO UTM params, NO registration_method - tracked via UTM)
+    content: Add [User Signed In] event tracking via Next.js middleware - automatically detects fresh sign-ins on first authenticated request, works for ALL sign-in methods (magic link, dev, OAuth, etc.)
     status: completed
   - id: server-user-signed-out-tracking
     content: Add [User Signed Out] event tracking to sign out flow (apps/web/src/app/auth/signout/route.ts) with user_id only (NO UTM params needed)
@@ -446,7 +446,33 @@ This plan integrates Amplitude analytics across the web app (Next.js), mobile ap
 
 ### 13. Server-Side Event Tracking
 
-**Critical: User Identity Continuity**Ensure the same `user_id` (Supabase user ID) is used on both client and server. User properties set client-side (including UTM parameters) are automatically available on server events.**Registration Tracking:**Track `[User Registered]` event when user completes registration:
+**Critical: User Identity Continuity**Ensure the same `user_id` (Supabase user ID) is used on both client and server. User properties set client-side (including UTM parameters) are automatically available on server events.
+
+**Sign-In Tracking (Middleware Approach):**Track `[User Signed In]` event automatically via Next.js middleware:
+
+- **Automatic Detection**: Middleware detects fresh sign-ins by checking if `last_login` was updated recently (within 30 seconds)
+- **Universal Coverage**: Works for ALL sign-in methods automatically (magic link, dev sign-in, OAuth/Facebook, etc.)
+- **First Authenticated Request**: Event is tracked when user makes their first authenticated request after signing in
+- **Deduplication**: In-memory cache prevents duplicate tracking within a 30-second window
+- **Non-Blocking**: Tracking happens asynchronously (fire and forget) - doesn't slow down user requests
+- Include user_id (Supabase user ID), timestamp
+- DO NOT include email, registration_method, or other PII
+- **NO UTM parameters needed** (inherited from user properties automatically)
+- Sign-in method tracked via UTM parameters in `[Page Viewed]` events (automatic capture via SDK)
+
+**Implementation:**
+- Middleware (`apps/web/src/middleware.ts`) intercepts authenticated requests
+- Checks `users.last_login` timestamp to detect fresh sign-ins
+- Calls `/api/auth/track-signin` endpoint asynchronously to track the event
+- Works for both web (cookies) and mobile (Bearer token) authentication
+
+**Files created:**
+- `apps/web/src/middleware.ts` - Main middleware that detects fresh sign-ins
+- `apps/web/src/app/api/auth/track-signin/route.ts` - Dedicated endpoint for tracking sign-in events
+
+**Note**: The `/api/auth/update-profile` route also has sign-in tracking as a fallback, but the middleware approach is primary and ensures universal coverage.
+
+**Registration Tracking:**Track `[User Registered]` event when user completes registration:
 
 - Include user_id (Supabase user ID), timestamp
 - DO NOT include email, registration_method, or other PII
@@ -599,7 +625,7 @@ These events are automatically tracked by Amplitude SDKs:| Event Name | Source |
 
 ### Server-Side Events
 
-**Critical:** All server-side events use the same `user_id` as client-side events. UTM user properties set client-side are automatically available on server events. **NO UTM parameters should be included in server-side event properties.**| Event Name | Source | Description | Event Properties | User Properties Updated ||------------|--------|-------------|------------------|------------------------|| `[User Registered]` | Server | User completes registration | `user_id`, `timestamp` | None (registration method tracked via UTM params in page views) || `[User Signed In]` | Server | User signs in (existing user) | `user_id`, `timestamp` | None (sign-in method tracked via UTM params in page views) || `[User Signed Out]` | Server | User signs out | `user_id`, `timestamp` | None || `[Partner Added]` | Server | Partner successfully created | `user_id`, `partner_id`, `account_type` (free/pro) | None || `[Partner Deleted]` | Server | Partner successfully deleted | `user_id`, `partner_id` | None || `[Photo Added]` | Server | Photo successfully uploaded | `user_id`, `partner_id`, `photo_id`, `has_face_descriptor` (boolean) | None || `[Photo Deleted]` | Server | Photo successfully deleted | `user_id`, `partner_id`, `photo_id` | None || `[Subscription Purchased]` | Server | Subscription checkout completed (webhook) | `user_id`, `subscription_id`, `plan_type`, `amount` (in cents), `billing_interval` (day/month), `timestamp` | `subscription_status`="active", `account_type`="pro" || `[Subscription Updated]` | Server | Subscription updated (webhook) | `user_id`, `subscription_id`, `plan_type`, `amount`, `billing_interval`, `status`, `cancel_at_period_end` (boolean) | `subscription_status`, `account_type` (if status changed) || `[Subscription Cancelled]` | Server | Subscription cancelled (webhook) | `user_id`, `subscription_id`, `plan_type`, `status` | `subscription_status`="canceled", `account_type`="pro" (remains pro until period ends, then updated to "free" after 7-day grace period) || `[Photo Upload - Face Detection]` | Server | Face detection result during photo upload | `user_id`, `outcome` ("no_face" / "multiple_faces" / "face_too_small" / "success"), `image_width`, `image_height`, `detection_count`, `validation_reasons` (array), `face_size_percentage` (if applicable) | None || `[Photo Upload - Partner Analysis]` | Server | Partner analysis result during photo upload | `user_id`, `outcome` ("matches_found" / "no_matches" / "same_person_warning" / "other_partners_warning"), `partner_id`, `match_count`, `similarity_scores` (array), `decision_type` | None |
+**Critical:** All server-side events use the same `user_id` as client-side events. UTM user properties set client-side are automatically available on server events. **NO UTM parameters should be included in server-side event properties.**| Event Name | Source | Description | Event Properties | User Properties Updated ||------------|--------|-------------|------------------|------------------------|| `[User Registered]` | Server | User completes registration | `user_id`, `timestamp` | None (registration method tracked via UTM params in page views) || `[User Signed In]` | Server (Middleware) | User signs in (existing user) - automatically detected on first authenticated request after sign-in | `user_id`, `timestamp` | None (sign-in method tracked via UTM params in page views). Tracked automatically via Next.js middleware for ALL sign-in methods (magic link, dev, OAuth, etc.) || `[User Signed Out]` | Server | User signs out | `user_id`, `timestamp` | None || `[Partner Added]` | Server | Partner successfully created | `user_id`, `partner_id`, `account_type` (free/pro) | None || `[Partner Deleted]` | Server | Partner successfully deleted | `user_id`, `partner_id` | None || `[Photo Added]` | Server | Photo successfully uploaded | `user_id`, `partner_id`, `photo_id`, `has_face_descriptor` (boolean) | None || `[Photo Deleted]` | Server | Photo successfully deleted | `user_id`, `partner_id`, `photo_id` | None || `[Subscription Purchased]` | Server | Subscription checkout completed (webhook) | `user_id`, `subscription_id`, `plan_type`, `amount` (in cents), `billing_interval` (day/month), `timestamp` | `subscription_status`="active", `account_type`="pro" || `[Subscription Updated]` | Server | Subscription updated (webhook) | `user_id`, `subscription_id`, `plan_type`, `amount`, `billing_interval`, `status`, `cancel_at_period_end` (boolean) | `subscription_status`, `account_type` (if status changed) || `[Subscription Cancelled]` | Server | Subscription cancelled (webhook) | `user_id`, `subscription_id`, `plan_type`, `status` | `subscription_status`="canceled", `account_type`="pro" (remains pro until period ends, then updated to "free" after 7-day grace period) || `[Photo Upload - Face Detection]` | Server | Face detection result during photo upload | `user_id`, `outcome` ("no_face" / "multiple_faces" / "face_too_small" / "success"), `image_width`, `image_height`, `detection_count`, `validation_reasons` (array), `face_size_percentage` (if applicable) | None || `[Photo Upload - Partner Analysis]` | Server | Partner analysis result during photo upload | `user_id`, `outcome` ("matches_found" / "no_matches" / "same_person_warning" / "other_partners_warning"), `partner_id`, `match_count`, `similarity_scores` (array), `decision_type` | None |
 
 ### User Properties
 
