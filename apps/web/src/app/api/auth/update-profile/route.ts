@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 
       // Track [User Registered] event - new user profile created
       // Only user_id is included (NO UTM params, NO registration_method - tracked via UTM)
-      // Fire-and-forget: don't await to match working subscription events pattern
+      // Await track() to ensure event is sent before route handler returns (important for serverless)
       console.log('[Auth] ========== Tracking [User Registered] event ==========');
       const isInitialized = isAmplitudeInitialized();
       const hasApiKey = !!process.env.AMPLITUDE_API_KEY;
@@ -89,12 +89,16 @@ export async function POST(request: Request) {
         console.warn('[Auth] Amplitude not initialized - event may not be tracked');
       }
       
-      track('[User Registered]', session.user.id, {
-        timestamp: now,
-      }).catch((error) => {
+      // Await to ensure event is sent before route handler returns
+      try {
+        await track('[User Registered]', session.user.id, {
+          timestamp: now,
+        });
+        console.log('[Auth] After track() call: [User Registered] event tracked successfully');
+      } catch (error) {
+        // Don't fail the request if analytics fails
         console.error('[Auth] Error tracking [User Registered] event:', error);
-      });
-      console.log('[Auth] After track() call: [User Registered] event tracking initiated (fire-and-forget)');
+      }
       console.log('[Auth] ========== [User Registered] tracking complete ==========');
 
       const routeDuration = Date.now() - routeStartTime;
@@ -136,7 +140,7 @@ export async function POST(request: Request) {
 
     // Track [User Signed In] event for existing user
     // Only user_id is included (NO UTM params, NO registration_method - tracked via UTM)
-    // Fire-and-forget: don't await to match working subscription events pattern
+    // Await track() to ensure event is sent before route handler returns (important for serverless)
     console.log('[Auth] ========== Tracking [User Signed In] event ==========');
     const isInitialized = isAmplitudeInitialized();
     const hasApiKey = !!process.env.AMPLITUDE_API_KEY;
@@ -156,12 +160,16 @@ export async function POST(request: Request) {
     }
     
     // Track [User Signed In] for all existing profile updates
-    track('[User Signed In]', session.user.id, {
-      timestamp: now,
-    }).catch((error) => {
+    // Await to ensure event is sent before route handler returns
+    try {
+      await track('[User Signed In]', session.user.id, {
+        timestamp: now,
+      });
+      console.log('[Auth] After track() call: [User Signed In] event tracked successfully');
+    } catch (error) {
+      // Don't fail the request if analytics fails
       console.error('[Auth] Error tracking [User Signed In] event:', error);
-    });
-    console.log('[Auth] After track() call: [User Signed In] event tracking initiated (fire-and-forget)');
+    }
     console.log('[Auth] ========== [User Signed In] tracking complete ==========');
 
     const routeDuration = Date.now() - routeStartTime;

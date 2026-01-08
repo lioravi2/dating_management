@@ -80,6 +80,16 @@ export async function track(
   userId: string | undefined,
   eventProperties?: Record<string, any>
 ): Promise<void> {
+  // Always log tracking attempts (not just in debug mode)
+  console.log(`[Amplitude] track() called:`, {
+    eventName,
+    userId,
+    hasUserId: !!userId,
+    userIdLength: userId?.length || 0,
+    hasEventProperties: !!eventProperties,
+    eventPropertiesKeys: eventProperties ? Object.keys(eventProperties) : []
+  });
+
   // Debug logging for tracking function call
   debugLog('Tracking event:', {
     eventName,
@@ -92,12 +102,14 @@ export async function track(
 
   if (!client) {
     // Try to initialize if not already done
+    console.log('[Amplitude] Client not initialized, attempting initialization...');
     debugLog('Client not initialized, attempting initialization...');
     initAmplitude();
     if (!client) {
-      console.warn('Amplitude not initialized. Server-side analytics will not track events.');
+      console.warn('[Amplitude] Amplitude not initialized. Server-side analytics will not track events.');
       return;
     }
+    console.log('[Amplitude] Client initialized successfully');
   }
 
   if (!userId) {
@@ -114,20 +126,30 @@ export async function track(
       event_properties: eventProperties || {},
     };
 
+    // Always log event object
+    console.log(`[Amplitude] Event object:`, JSON.stringify(event, null, 2));
     // Debug logging for event object
     debugLog('Event object:', JSON.stringify(event, null, 2));
 
     // Track the event and await the result
+    console.log(`[Amplitude] Calling client.logEvent() for "${eventName}"...`);
     debugLog('Calling client.logEvent()...');
     await client.logEvent(event);
+    console.log(`[Amplitude] logEvent() completed successfully for "${eventName}"`);
     debugLog('logEvent() completed successfully');
     
     // Flush to ensure event is sent immediately (important for serverless environments)
+    console.log(`[Amplitude] Calling client.flush() for "${eventName}"...`);
     debugLog('Calling client.flush()...');
     await client.flush();
+    console.log(`[Amplitude] Flush completed successfully for "${eventName}"`);
     debugLog('Flush completed successfully');
   } catch (error) {
     console.error(`[Amplitude] Failed to track event "${eventName}":`, error);
+    // Log stack trace for debugging
+    if (error instanceof Error) {
+      console.error(`[Amplitude] Error stack:`, error.stack);
+    }
     // Don't throw - analytics failures shouldn't break application flow
   }
 }
