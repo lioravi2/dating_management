@@ -2,16 +2,58 @@ import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { track, isAmplitudeInitialized } from '@/lib/analytics/server';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: Request) {
-  const supabase = createSupabaseRouteHandlerClient();
+  // Check for Bearer token in headers (for mobile app support)
+  const authHeader = request.headers.get('authorization');
+  let supabase = createSupabaseRouteHandlerClient();
+  let session;
+  let user;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    // Access token passed directly in header (mobile app or fallback)
+    const accessToken = authHeader.substring(7);
+    console.log('[Sign Out] Using Bearer token from header');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    });
+    
+    const { data: { user: tokenUser }, error: userError } = await supabase.auth.getUser(accessToken);
+    if (userError || !tokenUser) {
+      console.log('[Sign Out] Bearer token authentication failed', { 
+        hasUserError: !!userError, 
+        hasUser: !!tokenUser,
+        userError: userError?.message 
+      });
+      // For mobile, return JSON instead of redirect
+      if (authHeader) {
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL('/', new URL(request.url).origin));
+    }
+    user = tokenUser;
+    // Create a session-like object for compatibility
+    session = { user: tokenUser };
+  } else {
+    // Use cookies (normal web flow)
+    console.log('[Sign Out] Using cookies for authentication');
+    const { data: { session: cookieSession } } = await supabase.auth.getSession();
+    session = cookieSession;
+    user = session?.user;
+  }
   
   // Get user session BEFORE signing out (needed for analytics tracking)
   let userId: string | undefined;
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      userId = session.user.id;
+    if (session?.user || user) {
+      userId = (session?.user || user)?.id;
       console.log('[Sign Out] ========== Tracking [User Signed Out] event ==========');
       const now = Date.now();
       const isInitialized = isAmplitudeInitialized();
@@ -74,6 +116,18 @@ export async function POST(request: Request) {
   });
   
   const requestUrl = new URL(request.url);
+  
+  // For mobile app (Bearer token), return JSON instead of redirect
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const response = NextResponse.json({ success: true });
+    // Clear cookies in response (even though mobile doesn't use them)
+    cookieNames.forEach((name) => {
+      response.cookies.delete(name);
+    });
+    return response;
+  }
+  
+  // For web app (cookies), return redirect
   const response = NextResponse.redirect(new URL('/', requestUrl.origin));
   
   // Also clear cookies in the response
