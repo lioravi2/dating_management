@@ -106,15 +106,17 @@ export async function track(
     debugLog('Client not initialized, attempting initialization...');
     initAmplitude();
     if (!client) {
-      console.warn('[Amplitude] Amplitude not initialized. Server-side analytics will not track events.');
-      return;
+      const error = new Error(`[Amplitude] Amplitude not initialized. Server-side analytics will not track events.`);
+      console.warn(error.message);
+      throw error;
     }
     console.log('[Amplitude] Client initialized successfully');
   }
 
   if (!userId) {
-    console.warn(`[Amplitude] Cannot track event "${eventName}" without userId`);
-    return;
+    const error = new Error(`[Amplitude] Cannot track event "${eventName}" without userId`);
+    console.warn(error.message);
+    throw error;
   }
 
   try {
@@ -150,7 +152,9 @@ export async function track(
     if (error instanceof Error) {
       console.error(`[Amplitude] Error stack:`, error.stack);
     }
-    // Don't throw - analytics failures shouldn't break application flow
+    // Re-throw error so calling code can handle it properly
+    // The calling code has try/catch blocks to handle errors gracefully without breaking application flow
+    throw error;
   }
 }
 
