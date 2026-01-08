@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { createClient } from '@supabase/supabase-js';
+import { track } from '@/lib/analytics/server';
 
 /**
  * Delete a partner and all associated data (photos, activities)
@@ -139,6 +140,16 @@ export async function DELETE(
         { error: 'Failed to delete partner', details: partnerDeleteError.message },
         { status: 500 }
       );
+    }
+
+    // Track [Partner Deleted] event
+    try {
+      await track('[Partner Deleted]', userId, {
+        partner_id: partnerId,
+      });
+    } catch (analyticsError) {
+      // Log error but don't break the request
+      console.error('Failed to track [Partner Deleted] event:', analyticsError);
     }
 
     return NextResponse.json({ success: true });

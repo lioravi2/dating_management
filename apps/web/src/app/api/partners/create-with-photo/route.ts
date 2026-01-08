@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { createClient } from '@supabase/supabase-js';
 import { FREE_TIER_PARTNER_LIMIT } from '@/lib/pricing';
 import { v4 as uuidv4 } from 'uuid';
+import { track } from '@/lib/analytics/server';
 
 /**
  * Create a partner and upload a photo in one request
@@ -231,6 +232,17 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString()
       })
       .eq('id', partnerId);
+
+    // Track [Partner Added] event
+    try {
+      await track('[Partner Added]', userId, {
+        partner_id: partner.id,
+        account_type: userData.account_type,
+      });
+    } catch (analyticsError) {
+      // Log error but don't break the request
+      console.error('Failed to track [Partner Added] event:', analyticsError);
+    }
 
     return NextResponse.json({ 
       partner,

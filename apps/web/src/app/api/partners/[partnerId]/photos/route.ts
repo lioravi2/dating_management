@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
+import { track } from '@/lib/analytics/server';
 
 /**
  * Upload a photo to a specific partner
@@ -205,6 +206,19 @@ export async function POST(
     }
 
     console.log('[API] Photo uploaded successfully:', photo.id);
+    
+    // Track [Photo Added] event
+    try {
+      await track('[Photo Added]', userId, {
+        partner_id: partnerId,
+        photo_id: photo.id,
+        has_face_descriptor: parsedFaceDescriptor !== null,
+      });
+    } catch (analyticsError) {
+      // Log error but don't break the request
+      console.error('Failed to track [Photo Added] event:', analyticsError);
+    }
+
     return NextResponse.json({ photo });
   } catch (error) {
     console.error('Error uploading photo:', error);

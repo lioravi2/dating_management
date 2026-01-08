@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { createClient } from '@supabase/supabase-js';
+import { track } from '@/lib/analytics/server';
 
 /**
  * Delete a partner photo
@@ -138,6 +139,17 @@ export async function DELETE(
         .from('partners')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', partnerId);
+    }
+
+    // Track [Photo Deleted] event
+    try {
+      await track('[Photo Deleted]', user.id, {
+        partner_id: partnerId,
+        photo_id: photoId,
+      });
+    } catch (analyticsError) {
+      // Log error but don't break the request
+      console.error('Failed to track [Photo Deleted] event:', analyticsError);
     }
 
     return NextResponse.json({ success: true });

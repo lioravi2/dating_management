@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/client';
 import { FREE_TIER_PARTNER_LIMIT } from '@/lib/pricing';
+import { track } from '@/lib/analytics/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -81,6 +82,17 @@ export async function POST(request: NextRequest) {
         { error: partnerError.message },
         { status: 500 }
       );
+    }
+
+    // Track [Partner Added] event
+    try {
+      await track('[Partner Added]', userId, {
+        partner_id: partner.id,
+        account_type: user.account_type,
+      });
+    } catch (analyticsError) {
+      // Log error but don't break the request
+      console.error('Failed to track [Partner Added] event:', analyticsError);
     }
 
     return NextResponse.json({ data: partner }, { status: 201 });
