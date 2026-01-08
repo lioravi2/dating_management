@@ -1,40 +1,85 @@
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { track, isAmplitudeInitialized } from '@/lib/analytics/server';
+import { createClient } from '@supabase/supabase-js';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   // Comprehensive logging: Route entry point
   console.log('[Auth] ========== update-profile route called ==========');
   const routeStartTime = Date.now();
   
   try {
-    const supabase = createSupabaseRouteHandlerClient();
+    // Check for Bearer token in headers (fallback if cookies aren't synced yet)
+    const authHeader = request.headers.get('authorization');
+    let supabase = createSupabaseRouteHandlerClient();
+    let session;
+    let user;
     
-    // Get current session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError || !session) {
-      console.log('[Auth] Route entry: Authentication failed', { 
-        hasSessionError: !!sessionError, 
-        hasSession: !!session,
-        sessionError: sessionError?.message 
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Access token passed directly in header (fallback for timing issues)
+      const accessToken = authHeader.substring(7);
+      console.log('[Auth] Using Bearer token from header');
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+      supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
       });
+      
+      const { data: { user: tokenUser }, error: userError } = await supabase.auth.getUser(accessToken);
+      if (userError || !tokenUser) {
+        console.log('[Auth] Route entry: Bearer token authentication failed', { 
+          hasUserError: !!userError, 
+          hasUser: !!tokenUser,
+          userError: userError?.message 
+        });
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      }
+      user = tokenUser;
+      // Create a session-like object for compatibility
+      session = { user: tokenUser };
+    } else {
+      // Use cookies (normal flow)
+      console.log('[Auth] Using cookies for authentication');
+      // Use getUser() instead of getSession() - more reliable for API routes
+      const { data: { user: cookieUser }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !cookieUser) {
+        console.log('[Auth] Route entry: Cookie authentication failed', { 
+          hasUserError: !!userError, 
+          hasUser: !!cookieUser,
+          userError: userError?.message 
+        });
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      }
+      user = cookieUser;
+      // Get session for compatibility
+      const { data: { session: cookieSession } } = await supabase.auth.getSession();
+      session = cookieSession;
+    }
+    
+    if (!user || !session) {
+      console.log('[Auth] Route entry: No user or session after authentication');
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
     // Log session user ID
     console.log('[Auth] Route entry: Authenticated user', { 
-      userId: session.user.id,
-      email: session.user.email,
-      emailConfirmed: !!session.user.email_confirmed_at
+      userId: user.id,
+      email: user.email,
+      emailConfirmed: !!user.email_confirmed_at,
+      authMethod: authHeader ? 'Bearer token' : 'cookies'
     });
 
     // Check if user profile exists
-    console.log('[Auth] Database query: Checking if profile exists for user:', session.user.id);
+    console.log('[Auth] Database query: Checking if profile exists for user:', user.id);
     const { data: currentUser, error: fetchError } = await supabase
       .from('users')
       .select('email_verified_at, last_login')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .maybeSingle();
 
     // Log database query results
@@ -55,10 +100,10 @@ export async function POST(request: Request) {
       const { error: insertError } = await supabase
         .from('users')
         .insert({
-          id: session.user.id,
-          email: session.user.email || null,
-          full_name: session.user.user_metadata?.full_name || null,
-          email_verified_at: session.user.email_confirmed_at || null,
+          id: user.id,
+          email: user.email || null,
+          full_name: user.user_metadata?.full_name || null,
+          email_verified_at: user.email_confirmed_at || null,
           last_login: now,
         });
 
@@ -75,25 +120,25 @@ export async function POST(request: Request) {
       console.log('[Auth] ========== Tracking [User Registered] event ==========');
       const isInitialized = isAmplitudeInitialized();
       const hasApiKey = !!process.env.AMPLITUDE_API_KEY;
-      console.log('[Auth] Before track() call:', {
-        eventName: '[User Registered]',
-        userId: session.user.id,
-        isInitialized,
-        hasApiKey,
-        timestamp: now
-      });
-      
-      if (!hasApiKey) {
-        console.warn('[Auth] AMPLITUDE_API_KEY not set - event will not be tracked');
-      } else if (!isInitialized) {
-        console.warn('[Auth] Amplitude not initialized - event may not be tracked');
-      }
-      
-      // Await to ensure event is sent before route handler returns
-      try {
-        await track('[User Registered]', session.user.id, {
-          timestamp: now,
+        console.log('[Auth] Before track() call:', {
+          eventName: '[User Registered]',
+          userId: user.id,
+          isInitialized,
+          hasApiKey,
+          timestamp: now
         });
+        
+        if (!hasApiKey) {
+          console.warn('[Auth] AMPLITUDE_API_KEY not set - event will not be tracked');
+        } else if (!isInitialized) {
+          console.warn('[Auth] Amplitude not initialized - event may not be tracked');
+        }
+        
+        // Await to ensure event is sent before route handler returns
+        try {
+          await track('[User Registered]', user.id, {
+            timestamp: now,
+          });
         console.log('[Auth] After track() call: [User Registered] event tracked successfully');
       } catch (error) {
         // Don't fail the request if analytics fails
@@ -120,16 +165,16 @@ export async function POST(request: Request) {
     };
 
     // Only set email_verified_at if it's currently null and email is now confirmed
-    if (!currentUser.email_verified_at && session.user.email_confirmed_at) {
-      updateData.email_verified_at = session.user.email_confirmed_at;
-      console.log('[Auth] Database update: Setting email_verified_at:', session.user.email_confirmed_at);
+    if (!currentUser.email_verified_at && user.email_confirmed_at) {
+      updateData.email_verified_at = user.email_confirmed_at;
+      console.log('[Auth] Database update: Setting email_verified_at:', user.email_confirmed_at);
     }
 
     console.log('[Auth] Database update: Updating profile with:', updateData);
     const { error: updateError } = await supabase
       .from('users')
       .update(updateData)
-      .eq('id', session.user.id);
+      .eq('id', user.id);
 
     if (updateError) {
       console.error('[Auth] Error updating user profile:', updateError);
@@ -145,26 +190,26 @@ export async function POST(request: Request) {
     const isInitialized = isAmplitudeInitialized();
     const hasApiKey = !!process.env.AMPLITUDE_API_KEY;
     
-    console.log('[Auth] Before track() call:', {
-      eventName: '[User Signed In]',
-      userId: session.user.id,
-      isInitialized,
-      hasApiKey,
-      timestamp: now
-    });
-    
-    if (!hasApiKey) {
-      console.warn('[Auth] AMPLITUDE_API_KEY not set - event will not be tracked');
-    } else if (!isInitialized) {
-      console.warn('[Auth] Amplitude not initialized - event may not be tracked');
-    }
-    
-    // Track [User Signed In] for all existing profile updates
-    // Await to ensure event is sent before route handler returns
-    try {
-      await track('[User Signed In]', session.user.id, {
-        timestamp: now,
+      console.log('[Auth] Before track() call:', {
+        eventName: '[User Signed In]',
+        userId: user.id,
+        isInitialized,
+        hasApiKey,
+        timestamp: now
       });
+      
+      if (!hasApiKey) {
+        console.warn('[Auth] AMPLITUDE_API_KEY not set - event will not be tracked');
+      } else if (!isInitialized) {
+        console.warn('[Auth] Amplitude not initialized - event may not be tracked');
+      }
+      
+      // Track [User Signed In] for all existing profile updates
+      // Await to ensure event is sent before route handler returns
+      try {
+        await track('[User Signed In]', user.id, {
+          timestamp: now,
+        });
       console.log('[Auth] After track() call: [User Signed In] event tracked successfully');
     } catch (error) {
       // Don't fail the request if analytics fails

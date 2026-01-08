@@ -69,14 +69,32 @@ export default function AuthCallbackPage() {
 
         // Update profile
         console.log('[Auth Callback] Calling /api/auth/update-profile...');
+        console.log('[Auth Callback] Session before fetch:', {
+          userId: verifiedSession?.user?.id,
+          email: verifiedSession?.user?.email,
+          hasAccessToken: !!verifiedSession?.access_token,
+        });
         try {
           const profileResponse = await fetch('/api/auth/update-profile', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              // Pass access token in header as fallback if cookies aren't synced yet
+              ...(verifiedSession?.access_token ? {
+                'Authorization': `Bearer ${verifiedSession.access_token}`
+              } : {}),
+            },
+            credentials: 'include', // Ensure cookies are sent
           });
           const responseData = await profileResponse.json().catch(() => ({}));
+          console.log('[Auth Callback] Profile response status:', profileResponse.status);
+          console.log('[Auth Callback] Profile response data:', responseData);
           if (!profileResponse.ok) {
-            console.error('[Auth Callback] Profile update failed:', responseData);
+            console.error('[Auth Callback] Profile update failed:', {
+              status: profileResponse.status,
+              statusText: profileResponse.statusText,
+              data: responseData,
+            });
           } else {
             console.log('[Auth Callback] Profile update successful:', responseData);
           }
@@ -107,14 +125,32 @@ export default function AuthCallbackPage() {
 
               // Update profile
               console.log('[Auth Callback] Calling /api/auth/update-profile...');
+              console.log('[Auth Callback] Session before fetch:', {
+                userId: verifiedSession?.user?.id,
+                email: verifiedSession?.user?.email,
+                hasAccessToken: !!verifiedSession?.access_token,
+              });
               try {
                 const profileResponse = await fetch('/api/auth/update-profile', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: { 
+                    'Content-Type': 'application/json',
+                    // Pass access token in header as fallback if cookies aren't synced yet
+                    ...(verifiedSession?.access_token ? {
+                      'Authorization': `Bearer ${verifiedSession.access_token}`
+                    } : {}),
+                  },
+                  credentials: 'include', // Ensure cookies are sent
                 });
                 const responseData = await profileResponse.json().catch(() => ({}));
+                console.log('[Auth Callback] Profile response status:', profileResponse.status);
+                console.log('[Auth Callback] Profile response data:', responseData);
                 if (!profileResponse.ok) {
-                  console.error('[Auth Callback] Profile update failed:', responseData);
+                  console.error('[Auth Callback] Profile update failed:', {
+                    status: profileResponse.status,
+                    statusText: profileResponse.statusText,
+                    data: responseData,
+                  });
                 } else {
                   console.log('[Auth Callback] Profile update successful:', responseData);
                 }
@@ -168,14 +204,32 @@ export default function AuthCallbackPage() {
 
         // Update profile
         console.log('[Auth Callback] Calling /api/auth/update-profile...');
+        console.log('[Auth Callback] Session before fetch:', {
+          userId: verifiedSession?.user?.id,
+          email: verifiedSession?.user?.email,
+          hasAccessToken: !!verifiedSession?.access_token,
+        });
         try {
           const profileResponse = await fetch('/api/auth/update-profile', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              // Pass access token in header as fallback if cookies aren't synced yet
+              ...(verifiedSession?.access_token ? {
+                'Authorization': `Bearer ${verifiedSession.access_token}`
+              } : {}),
+            },
+            credentials: 'include', // Ensure cookies are sent
           });
           const responseData = await profileResponse.json().catch(() => ({}));
+          console.log('[Auth Callback] Profile response status:', profileResponse.status);
+          console.log('[Auth Callback] Profile response data:', responseData);
           if (!profileResponse.ok) {
-            console.error('[Auth Callback] Profile update failed:', responseData);
+            console.error('[Auth Callback] Profile update failed:', {
+              status: profileResponse.status,
+              statusText: profileResponse.statusText,
+              data: responseData,
+            });
           } else {
             console.log('[Auth Callback] Profile update successful:', responseData);
           }
