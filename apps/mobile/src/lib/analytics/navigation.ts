@@ -17,11 +17,22 @@ export function trackScreenView(
       screen_name: screenName,
     };
 
+    // Extract partner_id if present in screenParams and remove it from screen_params
+    if (screenParams?.partnerId) {
+      eventProperties.partner_id = screenParams.partnerId;
+    }
+
     // Include screen params if provided (stringified as JSON for consistency)
+    // Exclude partnerId from screen_params since we extract it as partner_id above
     if (screenParams && Object.keys(screenParams).length > 0) {
       // Filter out sensitive data and large objects
       const sanitizedParams: Record<string, any> = {};
       Object.entries(screenParams).forEach(([key, value]) => {
+        // Skip partnerId - it's extracted as partner_id above
+        if (key === 'partnerId') {
+          return;
+        }
+        
         // Store values as-is (not stringified) - final stringify will handle serialization
         if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
           sanitizedParams[key] = value;

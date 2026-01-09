@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import RootNavigator from './src/navigation/RootNavigator';
 import { initMetroConfig } from './src/lib/metro-config';
-import { initAmplitude, trackAppOpen } from './src/lib/analytics';
+import { initAmplitude, trackAppOpen, flush } from './src/lib/analytics';
 import { checkInitialAttribution, trackAppInstalled } from './src/lib/attribution';
 
 export default function App() {
@@ -44,8 +44,18 @@ export default function App() {
 
   useEffect(() => {
     // Listen for app state changes to track [App Open] when app comes to foreground
+    // and flush events when app goes to background
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       console.log(`[App] AppState changed: ${appState.current} -> ${nextAppState}`);
+      
+      // Flush events when app goes to background to ensure they're sent
+      if (
+        appState.current === 'active' &&
+        nextAppState.match(/inactive|background/)
+      ) {
+        console.log('[App] App going to background, flushing Amplitude events...');
+        flush();
+      }
       
       // Track [App Open] when app comes to foreground (from background or inactive)
       if (

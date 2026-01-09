@@ -71,12 +71,78 @@ All tables have RLS enabled with policies ensuring users can only access their o
 
 ## Analytics
 
-Amplitude tracks:
-- User authentication events
-- Partner creation/updates
-- Note creation
-- Subscription upgrades
-- Feature usage
+### Amplitude Integration
+
+Amplitude analytics is integrated across web, mobile, and server to track user behavior, business metrics, and technical events.
+
+#### Architecture
+
+- **Web App**: Client-side tracking using `@amplitude/analytics-browser` SDK
+- **Mobile App**: Client-side tracking using `@amplitude/analytics-react-native` SDK
+- **Server**: Server-side tracking using `@amplitude/node` SDK for API routes
+
+#### User Identification
+
+**CRITICAL: Privacy Compliance**
+- Only Supabase user ID (`session.user.id`) is used for identification
+- **NO PII** (email, full_name, personal details) is sent to Amplitude
+- User identification happens automatically in authentication callbacks
+- Same `user_id` is used on both client and server for identity continuity
+
+#### Event Tracking
+
+**Web App Events:**
+- `[Page Viewed]` - Tracked on every page navigation with UTM parameters
+- `[Button Clicked]` - Tracked on key user interactions
+- Session replay enabled (requires Amplitude paid plan)
+
+**Mobile App Events:**
+- `[App Open]` - Tracked when app comes to foreground
+- `[Screen Viewed]` - Tracked on every screen navigation
+- `[Button Clicked]` - Tracked on key user interactions
+
+**Server-Side Events:**
+- `[User Registered]` - User completes registration
+- `[User Signed In]` - User signs in (detected via middleware)
+- `[Partner Added]` / `[Partner Deleted]` - Partner management
+- `[Photo Added]` / `[Photo Deleted]` - Photo management
+- `[Subscription Purchased]` / `[Subscription Updated]` / `[Subscription Cancelled]` - Subscription lifecycle
+- `[Photo Upload - Face Detection]` - Face detection results
+- `[Photo Upload - Partner Analysis]` - Partner matching analysis
+
+#### UTM Tracking Strategy
+
+**Hybrid Approach:**
+1. **Automatic UTM Capture** (via SDK configuration):
+   - Creates `initial_utm_*` user properties (first-touch attribution, set once)
+   - Creates `utm_*` user properties (last-touch attribution, updated each session)
+   - Automatically captured when UTM parameters are present in URL
+
+2. **Manual UTM Tracking** (on `[Page Viewed]` events):
+   - UTM parameters extracted from URL and included as event properties
+   - Enables multi-touch attribution analysis in Amplitude
+
+3. **Server-Side Events**:
+   - UTM data automatically inherited from user properties set client-side
+   - No UTM parameters needed in server event properties
+
+#### Cross-Subdomain Device ID Sharing
+
+For landing pages and main app on subdomains of the same root domain (e.g., `lp.dating-management.vercel.app` and `app.dating-management.vercel.app`), Amplitude SDK automatically handles device ID sharing via cookies. Cookies set with the root domain (`.dating-management.vercel.app`) are accessible to all subdomains, so no manual device ID passing is required.
+
+#### User Properties
+
+- `account_type` - "free" or "pro" (updated on app open, page view, and subscription changes)
+- `subscription_status` - Subscription status (active, canceled, etc.)
+- `initial_utm_*` - First-touch attribution UTM parameters
+- `utm_*` - Last-touch attribution UTM parameters
+
+#### Implementation Details
+
+- All analytics calls are non-blocking (fire-and-forget)
+- Error handling ensures analytics failures don't break application flow
+- Session replay configured with privacy settings (masks sensitive fields)
+- User properties automatically updated on authentication and subscription changes
 
 ## Security
 

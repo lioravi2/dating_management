@@ -80,22 +80,22 @@ todos:
       - create-web-server-analytics
   - id: server-partner-tracking
     content: Add [Partner Added] event tracking to partners/route.ts and create-with-photo/route.ts with user_id (NO UTM params needed)
-    status: pending
+    status: completed
     dependencies:
       - create-web-server-analytics
   - id: server-partner-deleted-tracking
     content: Add [Partner Deleted] event tracking to partner deletion endpoint with user_id (NO UTM params needed)
-    status: pending
+    status: completed
     dependencies:
       - create-web-server-analytics
   - id: server-photo-tracking
     content: Add [Photo Added] event tracking to partners/[partnerId]/photos/route.ts with user_id (NO UTM params needed)
-    status: pending
+    status: completed
     dependencies:
       - create-web-server-analytics
   - id: server-photo-deleted-tracking
     content: Add [Photo Deleted] event tracking to photo deletion endpoint with user_id (NO UTM params needed)
-    status: pending
+    status: completed
     dependencies:
       - create-web-server-analytics
   - id: server-subscription-tracking
@@ -105,23 +105,23 @@ todos:
       - create-web-server-analytics
   - id: server-face-detection-tracking
     content: Add consolidated [Photo Upload - Face Detection] event tracking to face-detection/detect/route.ts with outcome property (no_face/multiple_faces/face_too_small/success) and user_id, NO UTM params needed
-    status: pending
+    status: completed
     dependencies:
       - create-web-server-analytics
   - id: server-partner-analysis-tracking
     content: Add consolidated [Photo Upload - Partner Analysis] event tracking to partners/[partnerId]/photos/analyze/route.ts and photos/analyze/route.ts with outcome property (matches_found/no_matches/same_person_warning/other_partners_warning) and user_id, NO UTM params needed
-    status: pending
+    status: completed
     dependencies:
       - create-web-server-analytics
   - id: user-identification
     content: Integrate user identification in authentication callbacks for web and mobile apps using Supabase user ID (no PII), update account_type user property on app open and page view, ensure user_id continuity between client and server
-    status: pending
+    status: completed
     dependencies:
       - create-web-client-analytics
       - create-mobile-analytics
   - id: documentation-updates
     content: Update ARCHITECTURE.md, ENV_TEMPLATE.md, and SETUP.md with Amplitude integration details including UTM tracking strategy
-    status: pending
+    status: completed
 ---
 
 # Amplitude Analytics Integration Plan

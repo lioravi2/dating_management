@@ -180,3 +180,34 @@ export function isAmplitudeInitialized(): boolean {
   return isInitialized;
 }
 
+/**
+ * Update account_type user property
+ * Fetches current account_type from user data and updates Amplitude
+ * Should be called after user identification when user_id exists
+ * 
+ * @param supabase - Supabase client instance
+ * @param userId - Supabase user ID (session.user.id)
+ */
+export async function updateAccountType(
+  supabase: ReturnType<typeof import('@/lib/supabase/client').createSupabaseClient>,
+  userId: string
+): Promise<void> {
+  if (!isInitialized) {
+    return;
+  }
+
+  try {
+    // Fetch current account_type from user data
+    const { data: userData } = await supabase
+      .from('users')
+      .select('account_type')
+      .eq('id', userId)
+      .single();
+
+    if (userData?.account_type) {
+      setUserProperties({ account_type: userData.account_type });
+    }
+  } catch (error) {
+    console.error('Failed to update account_type in Amplitude:', error);
+  }
+}

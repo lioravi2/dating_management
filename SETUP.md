@@ -50,6 +50,7 @@ npm install
 1. Create account at https://amplitude.com
 2. Create a new project
 3. Get your API key from Settings → Projects
+4. **Note**: The same API key is used for web (client and server) and mobile apps
 
 ## Step 5: Configure Environment Variables
 
@@ -67,7 +68,13 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
 # Amplitude
+# Client-side API key (web app - exposed to browser)
 NEXT_PUBLIC_AMPLITUDE_API_KEY=your_amplitude_key
+# Server-side API key (API routes - server-only)
+AMPLITUDE_API_KEY=your_amplitude_key
+# Mobile app API key (React Native/Expo)
+# Set this in apps/mobile/.env or Expo environment configuration
+EXPO_PUBLIC_AMPLITUDE_API_KEY=your_amplitude_key
 ```
 
 ## Step 6: Run the App
@@ -133,3 +140,9 @@ See `apps/web/src/app/api/calendar/sync/route.ts` for the placeholder implementa
 - Check redirect URLs are whitelisted
 - Ensure environment variables are set correctly
 
+### Amplitude Analytics Issues
+- Verify API keys are set correctly (client-side, server-side, and mobile)
+- Check browser console for Amplitude initialization errors
+- Ensure Amplitude SDK is initialized before tracking events
+- Verify user identification is working (check Amplitude dashboard for user_id in events)
+- For mobile: Check Expo environment variables are properly configured

@@ -14,7 +14,12 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
 
 # Amplitude
+# Client-side API key (web app - exposed to browser)
 NEXT_PUBLIC_AMPLITUDE_API_KEY=your_amplitude_api_key
+# Server-side API key (API routes - server-only, not prefixed with NEXT_PUBLIC)
+AMPLITUDE_API_KEY=your_amplitude_api_key
+# Mobile app API key (React Native/Expo)
+EXPO_PUBLIC_AMPLITUDE_API_KEY=your_amplitude_api_key
 
 # Google Calendar (for future implementation)
 GOOGLE_CLIENT_ID=your_google_client_id
@@ -36,9 +41,20 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 4. For webhook secret: Developers → Webhooks → Add endpoint → Copy signing secret
 
 ### Amplitude
+
+**Web App (Client-side):**
 1. Go to https://amplitude.com
 2. Settings → Projects → Select project
 3. Copy API Key
+4. Set as `NEXT_PUBLIC_AMPLITUDE_API_KEY` in `apps/web/.env.local`
+
+**Web App (Server-side):**
+- Use the same API key as client-side
+- Set as `AMPLITUDE_API_KEY` in `apps/web/.env.local` (no `NEXT_PUBLIC_` prefix - server-only)
+
+**Mobile App:**
+- Use the same API key as web app
+- Set as `EXPO_PUBLIC_AMPLITUDE_API_KEY` in `apps/mobile/.env` or Expo environment configuration
 
 ### Google Calendar
 1. Go to https://console.cloud.google.com

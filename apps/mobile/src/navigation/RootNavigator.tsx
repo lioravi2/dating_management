@@ -9,6 +9,7 @@ import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import ShareNavigator from './ShareNavigator';
 import MetroConfigScreen from '../screens/dev/MetroConfigScreen';
+import AmplitudeDebugScreen from '../screens/dev/AmplitudeDebugScreen';
 import { View, ActivityIndicator, Text } from 'react-native';
 import { getInitialShareIntent, setupShareIntentListener } from '../lib/share-handler';
 import { parseAttributionFromUrl, storeAttributionData, trackAppInstalled } from '../lib/attribution';
@@ -73,11 +74,69 @@ export default function RootNavigator() {
           supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
-          }).then(({ data, error }) => {
+          }).then(async ({ data, error }) => {
             if (error) {
               console.error('[RootNavigator] Error setting session from deep link:', error);
             } else {
               console.log('[RootNavigator] Session set successfully from deep link');
+              
+              // Call update-profile endpoint to handle both registration and sign-in tracking
+              // This tracks [User Registered] for new users and updates last_login for existing users
+              // Then call track-signin to explicitly track [User Signed In] for existing users
+              // (similar to web app flow where middleware tracks sign-in after profile update)
+              try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.access_token) {
+                  const webAppUrl = process.env.EXPO_PUBLIC_WEB_APP_URL || process.env.EXPO_PUBLIC_API_URL;
+                  if (webAppUrl) {
+                    // Update profile first (tracks [User Registered] for new users)
+                    const profileResponse = await fetch(`${webAppUrl}/api/auth/update-profile`, {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({}),
+                    }).catch((error) => {
+                      // Ignore errors - tracking is best effort, don't block sign in
+                      console.log('[RootNavigator] Server update-profile call failed (non-blocking):', error);
+                      return null;
+                    });
+                    
+                    // Check if user is new (created: true) or existing (updated: true)
+                    // For existing users, explicitly track [User Signed In] since middleware won't run on mobile
+                    if (profileResponse) {
+                      try {
+                        const profileData = await profileResponse.json();
+                        // If profile was updated (not created), track sign-in explicitly
+                        // (for new users, [User Registered] was already tracked by update-profile)
+                        if (profileData.updated) {
+                          await fetch(`${webAppUrl}/api/auth/track-signin`, {
+                            method: 'POST',
+                            headers: {
+                              'Authorization': `Bearer ${session.access_token}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({}),
+                          }).catch((error) => {
+                            // Ignore errors - tracking is best effort, don't block sign in
+                            console.log('[RootNavigator] Server sign-in tracking failed (non-blocking):', error);
+                          });
+                        }
+                      } catch (error) {
+                        // If we can't parse the response, still try to track sign-in (non-blocking)
+                        console.log('[RootNavigator] Error parsing update-profile response (non-blocking):', error);
+                      }
+                    }
+                  } else {
+                    console.warn('[RootNavigator] EXPO_PUBLIC_WEB_APP_URL not set - skipping server-side tracking');
+                  }
+                }
+              } catch (error) {
+                // Ignore errors - tracking is best effort
+                console.log('[RootNavigator] Error calling update-profile endpoint (non-blocking):', error);
+              }
+              
               // Session state will update via onAuthStateChange listener
             }
           });
@@ -336,6 +395,15 @@ export default function RootNavigator() {
               options={{
                 headerShown: true,
                 title: 'Metro Configuration',
+                presentation: 'modal',
+              }}
+            />
+            <Stack.Screen 
+              name="AmplitudeDebug" 
+              component={AmplitudeDebugScreen}
+              options={{
+                headerShown: true,
+                title: 'Amplitude Debug',
                 presentation: 'modal',
               }}
             />

@@ -20,7 +20,9 @@ import {
   getRecentLogs, 
   formatAmplitudeDebugInfo,
   trackTestEvent,
-  isAmplitudeInitialized
+  isAmplitudeInitialized,
+  testNetworkConnectivity,
+  testApiKey
 } from '../../lib/analytics';
 
 export default function AmplitudeDebugScreen() {
@@ -64,6 +66,46 @@ export default function AmplitudeDebugScreen() {
     } catch (error) {
       console.error('[AmplitudeDebug] Error tracking test event:', error);
       Alert.alert('Error', `Failed to track test event: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTestNetwork = async () => {
+    setLoading(true);
+    try {
+      const result = await testNetworkConnectivity();
+      loadDebugInfo(); // Refresh logs
+      Alert.alert(
+        result.success ? 'Network Test Passed' : 'Network Test Failed',
+        result.success 
+          ? 'Successfully connected to Amplitude servers.'
+          : `Failed to connect: ${result.error || 'Unknown error'}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('[AmplitudeDebug] Error testing network:', error);
+      Alert.alert('Error', `Failed to test network: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTestApiKey = async () => {
+    setLoading(true);
+    try {
+      const result = await testApiKey();
+      loadDebugInfo(); // Refresh logs
+      Alert.alert(
+        result.success ? 'API Key Test Passed' : 'API Key Test Failed',
+        result.success 
+          ? 'API key is valid and can send events to Amplitude.'
+          : `API key test failed: ${result.error || 'Unknown error'}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('[AmplitudeDebug] Error testing API key:', error);
+      Alert.alert('Error', `Failed to test API key: ${error}`);
     } finally {
       setLoading(false);
     }
@@ -148,6 +190,49 @@ export default function AmplitudeDebugScreen() {
                 <Text style={styles.apiKeyPreview}>{status.apiKeyPreview}</Text>
               </View>
             )}
+
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Session Replay Available:</Text>
+              <View style={styles.statusValueContainer}>
+                <View 
+                  style={[
+                    styles.statusIndicator, 
+                    { backgroundColor: status ? getStatusColor(status.sessionReplayAvailable) : '#ccc' }
+                  ]} 
+                />
+                <Text style={[
+                  styles.statusValue,
+                  { color: status ? getStatusColor(status.sessionReplayAvailable) : '#666' }
+                ]}>
+                  {status ? getStatusText(status.sessionReplayAvailable) : 'Loading...'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Session Replay Initialized:</Text>
+              <View style={styles.statusValueContainer}>
+                <View 
+                  style={[
+                    styles.statusIndicator, 
+                    { backgroundColor: status ? getStatusColor(status.sessionReplayInitialized) : '#ccc' }
+                  ]} 
+                />
+                <Text style={[
+                  styles.statusValue,
+                  { color: status ? getStatusColor(status.sessionReplayInitialized) : '#666' }
+                ]}>
+                  {status ? getStatusText(status.sessionReplayInitialized) : 'Loading...'}
+                </Text>
+              </View>
+            </View>
+
+            {status?.sessionReplayError && (
+              <View style={styles.statusRow}>
+                <Text style={styles.statusLabel}>Session Replay Error:</Text>
+                <Text style={styles.errorText}>{status.sessionReplayError}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -166,6 +251,36 @@ export default function AmplitudeDebugScreen() {
               </>
             ) : (
               <Text style={styles.buttonText}>Send Test Event</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.networkButton, loading && styles.buttonDisabled]}
+            onPress={handleTestNetwork}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <ActivityIndicator size="small" color="#fff" style={styles.buttonSpinner} />
+                <Text style={styles.buttonText}>Testing Network...</Text>
+              </>
+            ) : (
+              <Text style={styles.buttonText}>Test Network Connectivity</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.apiKeyButton, loading && styles.buttonDisabled]}
+            onPress={handleTestApiKey}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <ActivityIndicator size="small" color="#fff" style={styles.buttonSpinner} />
+                <Text style={styles.buttonText}>Testing API Key...</Text>
+              </>
+            ) : (
+              <Text style={styles.buttonText}>Test API Key</Text>
             )}
           </TouchableOpacity>
 
@@ -247,6 +362,12 @@ export default function AmplitudeDebugScreen() {
           <Text style={styles.infoText}>
             • Use "Share Debug Info" to send debug data for troubleshooting
           </Text>
+          <Text style={styles.infoText}>
+            • Session Replay is optional - if it fails, analytics events will still work
+          </Text>
+          <Text style={styles.infoText}>
+            • Check "Session Replay Error" field for details if initialization failed
+          </Text>
         </View>
       </View>
     </ScrollView>
@@ -319,6 +440,13 @@ const styles = StyleSheet.create({
     color: '#2196f3',
     fontWeight: '600',
   },
+  errorText: {
+    fontSize: 14,
+    fontFamily: 'monospace',
+    color: '#f44336',
+    flex: 1,
+    marginLeft: 12,
+  },
   button: {
     padding: 16,
     borderRadius: 8,
@@ -329,6 +457,12 @@ const styles = StyleSheet.create({
   },
   testButton: {
     backgroundColor: '#4caf50',
+  },
+  networkButton: {
+    backgroundColor: '#ff9800',
+  },
+  apiKeyButton: {
+    backgroundColor: '#9c27b0',
   },
   shareButton: {
     backgroundColor: '#2196f3',

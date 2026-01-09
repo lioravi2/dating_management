@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { createSupabaseClient } from '@/lib/supabase/client';
 import { environment } from '@/lib/environment';
 import { useNavigation } from '@/lib/navigation';
+import { identify, updateAccountType, isAmplitudeInitialized } from '@/lib/analytics/client';
 
 export default function AuthCallbackPage() {
   const navigation = useNavigation();
@@ -67,6 +68,18 @@ export default function AuthCallbackPage() {
         // This ensures the server-side route can read the session from cookies
         await new Promise(resolve => setTimeout(resolve, 1000));
 
+        // Identify user in Amplitude (non-blocking)
+        if (verifiedSession?.user?.id && isAmplitudeInitialized()) {
+          try {
+            identify(verifiedSession.user.id);
+            // Update account_type user property
+            await updateAccountType(supabase, verifiedSession.user.id);
+          } catch (error) {
+            console.error('[Auth Callback] Error identifying user in Amplitude:', error);
+            // Don't block auth flow if analytics fails
+          }
+        }
+
         // Update profile
         console.log('[Auth Callback] Calling /api/auth/update-profile...');
         console.log('[Auth Callback] Session before fetch:', {
@@ -122,6 +135,18 @@ export default function AuthCallbackPage() {
             if (verifiedSession) {
               // Wait for session to sync to cookies before calling update-profile
               await new Promise(resolve => setTimeout(resolve, 1000));
+
+              // Identify user in Amplitude (non-blocking)
+              if (verifiedSession?.user?.id && isAmplitudeInitialized()) {
+                try {
+                  identify(verifiedSession.user.id);
+                  // Update account_type user property
+                  await updateAccountType(supabase, verifiedSession.user.id);
+                } catch (error) {
+                  console.error('[Auth Callback] Error identifying user in Amplitude:', error);
+                  // Don't block auth flow if analytics fails
+                }
+              }
 
               // Update profile
               console.log('[Auth Callback] Calling /api/auth/update-profile...');
@@ -201,6 +226,18 @@ export default function AuthCallbackPage() {
         // Wait for session to sync to cookies before calling update-profile
         // This ensures the server-side route can read the session from cookies
         await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Identify user in Amplitude (non-blocking)
+        if (verifiedSession?.user?.id && isAmplitudeInitialized()) {
+          try {
+            identify(verifiedSession.user.id);
+            // Update account_type user property
+            await updateAccountType(supabase, verifiedSession.user.id);
+          } catch (error) {
+            console.error('[Auth Callback] Error identifying user in Amplitude:', error);
+            // Don't block auth flow if analytics fails
+          }
+        }
 
         // Update profile
         console.log('[Auth Callback] Calling /api/auth/update-profile...');

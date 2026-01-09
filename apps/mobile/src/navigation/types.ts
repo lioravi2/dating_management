@@ -3,6 +3,7 @@ export type RootStackParamList = {
   Main: undefined;
   Share: undefined;
   MetroConfig: undefined;
+  AmplitudeDebug: undefined;
 };
 
 export type AuthStackParamList = {
