@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { getVariant, fetchVariants, exposure, isExperimentInitialized } from './client';
 
 /**
@@ -16,22 +16,41 @@ export function useExperiment(flagKey: string) {
   const [initialized, setInitialized] = useState(false);
 
   // Check initialization status and update state when it changes
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     const checkInitialized = () => {
       const isInit = isExperimentInitialized();
-      if (isInit !== initialized) {
-        setInitialized(isInit);
-      }
+      setInitialized((prev) => {
+        // Only update if state actually changed
+        if (isInit !== prev) {
+          // Clear interval once initialization succeeds
+          if (isInit && intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          return isInit;
+        }
+        return prev;
+      });
     };
 
     // Check immediately
     checkInitialized();
 
-    // Poll for initialization status (in case SDK initializes after mount)
-    const interval = setInterval(checkInitialized, 100);
+    // Only start polling if not already initialized
+    if (!isExperimentInitialized()) {
+      // Poll for initialization status (in case SDK initializes after mount)
+      intervalRef.current = setInterval(checkInitialized, 100);
+    }
 
-    return () => clearInterval(interval);
-  }, [initialized]);
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []); // Empty dependency array - only set up polling once
 
   useEffect(() => {
     if (!initialized) {
@@ -150,22 +169,41 @@ export function useAllExperiments() {
   const [initialized, setInitialized] = useState(false);
 
   // Check initialization status and update state when it changes
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     const checkInitialized = () => {
       const isInit = isExperimentInitialized();
-      if (isInit !== initialized) {
-        setInitialized(isInit);
-      }
+      setInitialized((prev) => {
+        // Only update if state actually changed
+        if (isInit !== prev) {
+          // Clear interval once initialization succeeds
+          if (isInit && intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          return isInit;
+        }
+        return prev;
+      });
     };
 
     // Check immediately
     checkInitialized();
 
-    // Poll for initialization status (in case SDK initializes after mount)
-    const interval = setInterval(checkInitialized, 100);
+    // Only start polling if not already initialized
+    if (!isExperimentInitialized()) {
+      // Poll for initialization status (in case SDK initializes after mount)
+      intervalRef.current = setInterval(checkInitialized, 100);
+    }
 
-    return () => clearInterval(interval);
-  }, [initialized]);
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []); // Empty dependency array - only set up polling once
 
   useEffect(() => {
     if (!initialized) {
