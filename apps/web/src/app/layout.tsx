@@ -5,6 +5,7 @@ import VersionFooter from '@/components/VersionFooter';
 import { NavigationProviderWrapper } from '@/lib/navigation/navigation-provider-wrapper';
 import AmplitudeInit from '@/components/analytics/AmplitudeInit';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
+import ExperimentInit from '@/components/experiment/ExperimentInit';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -25,6 +26,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AmplitudeInit />
+        <ExperimentInit />
         <NavigationProviderWrapper>
           <PageViewTracker />
           {children}

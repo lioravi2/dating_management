@@ -13,11 +13,29 @@ export function useExperiment(flagKey: string) {
   const [variant, setVariant] = useState<{ key: string; value: any } | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [initialized, setInitialized] = useState(false);
+
+  // Check initialization status and update state when it changes
+  useEffect(() => {
+    const checkInitialized = () => {
+      const isInit = isExperimentInitialized();
+      if (isInit !== initialized) {
+        setInitialized(isInit);
+      }
+    };
+
+    // Check immediately
+    checkInitialized();
+
+    // Poll for initialization status (in case SDK initializes after mount)
+    const interval = setInterval(checkInitialized, 100);
+
+    return () => clearInterval(interval);
+  }, [initialized]);
 
   useEffect(() => {
-    if (!isExperimentInitialized()) {
-      console.warn('Experiment SDK not initialized. Call initExperiment() first.');
-      setLoading(false);
+    if (!initialized) {
+      // Don't set loading to false immediately - wait for initialization
       return;
     }
 
@@ -56,7 +74,7 @@ export function useExperiment(flagKey: string) {
     return () => {
       mounted = false;
     };
-  }, [flagKey]);
+  }, [flagKey, initialized]);
 
   return { variant, loading, error };
 }
@@ -129,11 +147,29 @@ export function useAllExperiments() {
   const [variants, setVariants] = useState<Record<string, { key: string; value: any }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [initialized, setInitialized] = useState(false);
+
+  // Check initialization status and update state when it changes
+  useEffect(() => {
+    const checkInitialized = () => {
+      const isInit = isExperimentInitialized();
+      if (isInit !== initialized) {
+        setInitialized(isInit);
+      }
+    };
+
+    // Check immediately
+    checkInitialized();
+
+    // Poll for initialization status (in case SDK initializes after mount)
+    const interval = setInterval(checkInitialized, 100);
+
+    return () => clearInterval(interval);
+  }, [initialized]);
 
   useEffect(() => {
-    if (!isExperimentInitialized()) {
-      console.warn('Experiment SDK not initialized. Call initExperiment() first.');
-      setLoading(false);
+    if (!initialized) {
+      // Don't set loading to false immediately - wait for initialization
       return;
     }
 
@@ -171,7 +207,7 @@ export function useAllExperiments() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [initialized]);
 
   return { variants, loading, error };
 }
