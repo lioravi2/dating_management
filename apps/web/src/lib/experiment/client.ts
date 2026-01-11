@@ -9,9 +9,11 @@ let isInitialized = false;
 /**
  * Initialize Amplitude Experiment SDK
  * Should be called after Analytics SDK initialization
- * Uses the same API key as Analytics SDK
+ * Must be awaited to ensure SDK is fully initialized before use
+ * 
+ * @returns Promise that resolves when SDK is fully initialized
  */
-export function initExperiment() {
+export async function initExperiment(): Promise<void> {
   if (isInitialized) {
     return;
   }
@@ -35,9 +37,16 @@ export function initExperiment() {
       // User context will be set via setUserId()
     });
 
+    // CRITICAL: Must call start() to initialize the SDK and fetch variants
+    // start() returns a Promise that resolves when initialization is complete
+    await experimentClient.start();
+
     isInitialized = true;
   } catch (error) {
     console.error('Failed to initialize Amplitude Experiment SDK:', error);
+    // Reset state on failure
+    experimentClient = null;
+    isInitialized = false;
   }
 }
 
