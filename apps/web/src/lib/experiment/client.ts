@@ -16,10 +16,14 @@ export function initExperiment() {
     return;
   }
 
-  const apiKey = process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY;
+  // Use client deployment key (prefixed with "client-")
+  // This is different from the Analytics API key
+  // Deployment keys are obtained from Amplitude Experiment > Deployments section
+  const apiKey = process.env.NEXT_PUBLIC_AMPLITUDE_EXPERIMENT_CLIENT_KEY || process.env.NEXT_PUBLIC_AMPLITUDE_EXPERIMENT_API_KEY;
 
   if (!apiKey) {
-    console.warn('Amplitude API key not found. Experiment SDK will not be initialized.');
+    console.warn('Amplitude Experiment deployment key not found. Experiment SDK will not be initialized.');
+    console.warn('Please set NEXT_PUBLIC_AMPLITUDE_EXPERIMENT_CLIENT_KEY with a client- prefixed deployment key.');
     return;
   }
 

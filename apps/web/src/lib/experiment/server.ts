@@ -25,27 +25,35 @@ export async function getVariant(
   userId: string,
   userProperties?: Record<string, any>
 ): Promise<Variant | undefined> {
-  const apiKey = process.env.AMPLITUDE_API_KEY || process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY;
+  // Use server deployment key (prefixed with "server-")
+  // This is different from the Analytics API key
+  const apiKey = process.env.AMPLITUDE_EXPERIMENT_SERVER_KEY || process.env.AMPLITUDE_EXPERIMENT_API_KEY;
 
   if (!apiKey) {
-    console.warn('Amplitude API key not found. Cannot fetch experiment variant.');
+    console.warn('Amplitude Experiment server deployment key not found. Cannot fetch experiment variant.');
+    console.warn('Please set AMPLITUDE_EXPERIMENT_SERVER_KEY with a server- prefixed deployment key.');
     return undefined;
   }
 
   try {
     // Use Amplitude Experiment API (vardata endpoint)
     // Documentation: https://amplitude.com/docs/experiment-home
-    const response = await fetch('https://api2.amplitude.com/v1/vardata', {
-      method: 'POST',
+    // API uses GET with query parameters
+    const params = new URLSearchParams({
+      user_id: userId,
+      flag_keys: flagKey,
+    });
+
+    // Add user properties to context if provided
+    if (userProperties && Object.keys(userProperties).length > 0) {
+      params.append('context', JSON.stringify({ user_properties: userProperties }));
+    }
+
+    const response = await fetch(`https://api2.amplitude.com/v1/vardata?${params.toString()}`, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Api-Key ${apiKey}`,
       },
-      body: JSON.stringify({
-        user_id: userId,
-        user_properties: userProperties || {},
-        flag_keys: [flagKey],
-      }),
     });
 
     if (!response.ok) {
@@ -55,15 +63,16 @@ export async function getVariant(
 
     const data = await response.json();
 
-    // Extract variant from response
-    const flag = data.flags?.[flagKey];
-    if (!flag || flag.value === undefined) {
+    // Variants are returned at root level: {flagKey: {key, payload}}
+    const variant = data[flagKey];
+    if (!variant || !variant.key) {
       return undefined;
     }
 
+    // API returns key (variant key) and payload (variant data)
     return {
-      key: flag.key || flagKey,
-      value: flag.value,
+      key: variant.key,
+      value: variant.payload !== undefined ? variant.payload : variant.key,
     };
   } catch (error) {
     console.error(`Failed to get variant for flag "${flagKey}":`, error);
@@ -84,10 +93,13 @@ export async function getVariants(
   userId: string,
   userProperties?: Record<string, any>
 ): Promise<Record<string, Variant>> {
-  const apiKey = process.env.AMPLITUDE_API_KEY || process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY;
+  // Use server deployment key (prefixed with "server-")
+  // This is different from the Analytics API key
+  const apiKey = process.env.AMPLITUDE_EXPERIMENT_SERVER_KEY || process.env.AMPLITUDE_EXPERIMENT_API_KEY;
 
   if (!apiKey) {
-    console.warn('Amplitude API key not found. Cannot fetch experiment variants.');
+    console.warn('Amplitude Experiment server deployment key not found. Cannot fetch experiment variants.');
+    console.warn('Please set AMPLITUDE_EXPERIMENT_SERVER_KEY with a server- prefixed deployment key.');
     return {};
   }
 
@@ -97,17 +109,22 @@ export async function getVariants(
 
   try {
     // Use Amplitude Experiment API (vardata endpoint)
-    const response = await fetch('https://api2.amplitude.com/v1/vardata', {
-      method: 'POST',
+    // API uses GET with query parameters
+    const params = new URLSearchParams({
+      user_id: userId,
+      flag_keys: flagKeys.join(','),
+    });
+
+    // Add user properties to context if provided
+    if (userProperties && Object.keys(userProperties).length > 0) {
+      params.append('context', JSON.stringify({ user_properties: userProperties }));
+    }
+
+    const response = await fetch(`https://api2.amplitude.com/v1/vardata?${params.toString()}`, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Api-Key ${apiKey}`,
       },
-      body: JSON.stringify({
-        user_id: userId,
-        user_properties: userProperties || {},
-        flag_keys: flagKeys,
-      }),
     });
 
     if (!response.ok) {
@@ -117,16 +134,16 @@ export async function getVariants(
 
     const data = await response.json();
 
-    // Transform response to our format
+    // Variants are returned at root level: {flagKey: {key, payload}}
     const result: Record<string, Variant> = {};
-    const flags = data.flags || {};
 
     flagKeys.forEach((flagKey) => {
-      const flag = flags[flagKey];
-      if (flag && flag.value !== undefined) {
+      const variant = data[flagKey];
+      if (variant && variant.key) {
+        // API returns key (variant key) and payload (variant data)
         result[flagKey] = {
-          key: flag.key || flagKey,
-          value: flag.value,
+          key: variant.key,
+          value: variant.payload !== undefined ? variant.payload : variant.key,
         };
       }
     });
