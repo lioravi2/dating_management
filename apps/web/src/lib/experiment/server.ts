@@ -57,7 +57,7 @@ export async function getVariant(
 
     // Extract variant from response
     const flag = data.flags?.[flagKey];
-    if (!flag) {
+    if (!flag || flag.value === undefined) {
       return undefined;
     }
 
@@ -123,7 +123,7 @@ export async function getVariants(
 
     flagKeys.forEach((flagKey) => {
       const flag = flags[flagKey];
-      if (flag) {
+      if (flag && flag.value !== undefined) {
         result[flagKey] = {
           key: flag.key || flagKey,
           value: flag.value,
