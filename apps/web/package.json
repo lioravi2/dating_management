@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@amplitude/analytics-browser": "^2.33.1",
+    "@amplitude/experiment-js-client": "^1.20.1",
     "@amplitude/node": "^1.10.2",
     "@amplitude/plugin-session-replay-browser": "^1.25.5",
     "@react-google-maps/api": "^2.20.7",
