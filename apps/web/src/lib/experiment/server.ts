@@ -49,7 +49,7 @@ export async function getVariant(
       params.append('context', JSON.stringify({ user_properties: userProperties }));
     }
 
-    const response = await fetch(`https://api2.amplitude.com/v1/vardata?${params.toString()}`, {
+    const response = await fetch(`https://api.lab.amplitude.com/v1/vardata?${params.toString()}`, {
       method: 'GET',
       headers: {
         'Authorization': `Api-Key ${apiKey}`,
@@ -120,7 +120,7 @@ export async function getVariants(
       params.append('context', JSON.stringify({ user_properties: userProperties }));
     }
 
-    const response = await fetch(`https://api2.amplitude.com/v1/vardata?${params.toString()}`, {
+    const response = await fetch(`https://api.lab.amplitude.com/v1/vardata?${params.toString()}`, {
       method: 'GET',
       headers: {
         'Authorization': `Api-Key ${apiKey}`,
