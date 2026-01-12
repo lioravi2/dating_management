@@ -2,6 +2,7 @@
 
 import * as amplitude from '@amplitude/analytics-browser';
 import { sessionReplayPlugin } from '@amplitude/plugin-session-replay-browser';
+import { initExperiment } from '@/lib/experiment/client';
 
 // Initialize Amplitude SDK
 let isInitialized = false;
@@ -43,6 +44,13 @@ export function initAmplitude() {
     amplitude.add(sessionReplay);
 
     isInitialized = true;
+
+    // Initialize Experiment SDK after Analytics SDK initialization
+    // This ensures user ID is set before fetching variants
+    // Errors are handled gracefully - Experiment SDK failure won't break Analytics
+    initExperiment().catch((error) => {
+      console.error('Failed to initialize Experiment SDK:', error);
+    });
   } catch (error) {
     console.error('Failed to initialize Amplitude:', error);
   }
