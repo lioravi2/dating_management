@@ -140,13 +140,21 @@ STRIPE_WEBHOOK_SECRET
 - Will be set after creating webhook (see Step 6)
 - Add for: **Production** only (initially)
 
-### 4.3 Optional Variables
+### 4.3 Amplitude Variables
 
 ```
 NEXT_PUBLIC_AMPLITUDE_API_KEY
 ```
 - Only if using Amplitude analytics
 - Add for: **Production**, **Preview**, **Development**
+
+```
+NEXT_PUBLIC_AMPLITUDE_EXPERIMENT_CLIENT_KEY
+```
+- Required for Amplitude Experiment SDK and Web Experiments
+- Get this from Amplitude Experiment → Deployments → Client deployment key (starts with `client-`)
+- This is DIFFERENT from the Analytics API key
+- Add for: **Production**, **Preview**, **Development** (if using experiments)
 
 ```
 NEXT_PUBLIC_FACE_DETECTION_PROVIDER

@@ -21,6 +21,11 @@ AMPLITUDE_API_KEY=your_amplitude_api_key
 # Mobile app API key (React Native/Expo)
 EXPO_PUBLIC_AMPLITUDE_API_KEY=your_amplitude_api_key
 
+# Amplitude Experiment
+# Client deployment key for Experiment SDK (prefixed with "client-")
+# This is DIFFERENT from the Analytics API key - get it from Amplitude Experiment > Deployments
+NEXT_PUBLIC_AMPLITUDE_EXPERIMENT_CLIENT_KEY=client-your_deployment_key_here
+
 # Google Calendar (for future implementation)
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
@@ -55,6 +60,14 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 **Mobile App:**
 - Use the same API key as web app
 - Set as `EXPO_PUBLIC_AMPLITUDE_API_KEY` in `apps/mobile/.env` or Expo environment configuration
+
+**Amplitude Experiment (Web App):**
+1. Go to https://amplitude.com
+2. Navigate to **Experiment** → **Deployments**
+3. Find or create a **Client** deployment (this is different from Server deployment)
+4. Copy the deployment key (it should start with `client-`)
+5. Set as `NEXT_PUBLIC_AMPLITUDE_EXPERIMENT_CLIENT_KEY` in `apps/web/.env.local`
+6. **Important:** This key is different from the Analytics API key - it's specifically for Experiment SDK and Web Experiments
 
 ### Google Calendar
 1. Go to https://console.cloud.google.com
