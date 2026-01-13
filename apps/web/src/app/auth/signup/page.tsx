@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { useNavigation } from '@/lib/navigation';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0; // Prevent static generation
+export const fetchCache = 'force-no-store'; // Always fetch fresh
 
 export default function SignUpPage() {
   useEffect(() => {
