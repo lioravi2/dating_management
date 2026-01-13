@@ -119,22 +119,40 @@ export function useNavigation(): INavigation {
   return navigation;
 }
 
-export function NavigationLink({ href, params, children, className, replace, onClick }: ILinkProps) {
+export function NavigationLink({ href, params, children, className, replace, onClick, ...dataProps }: ILinkProps) {
   const navigation = useNavigation();
   
   const handlePress = (e: React.MouseEvent) => {
-    e.preventDefault();
-    // Call custom onClick handler if provided (e.g., for stopPropagation)
+    // Call custom onClick handler first (e.g., for stopPropagation)
     onClick?.(e);
-    if (replace) {
-      navigation.replace(href, params);
-    } else {
-      navigation.push(href, params);
+    
+    // Allow Amplitude experiments to intercept and handle redirection
+    // Amplitude will prevent default if it wants to redirect to a different URL
+    // If Amplitude doesn't prevent default, we do our normal navigation
+    if (!e.defaultPrevented) {
+      e.preventDefault();
+      if (replace) {
+        navigation.replace(href, params);
+      } else {
+        navigation.push(href, params);
+      }
     }
+    // If e.defaultPrevented is true, Amplitude handled the navigation, so we do nothing
   };
 
+  // Extract data attributes from props
+  const dataAttributes: Record<string, string> = {};
+  Object.keys(dataProps).forEach(key => {
+    if (key.startsWith('data-')) {
+      const value = dataProps[key as keyof typeof dataProps];
+      if (value !== undefined) {
+        dataAttributes[key] = value;
+      }
+    }
+  });
+
   return (
-    <Link href={href} className={className} onClick={handlePress}>
+    <Link href={href} className={className} onClick={handlePress} {...dataAttributes}>
       {children}
     </Link>
   );

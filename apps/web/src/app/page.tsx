@@ -1,8 +1,8 @@
-import Link from 'next/link';
 import { createSupabaseServerComponentClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import AttributionTracker from '@/components/attribution/AttributionTracker';
+import { NavigationLink } from '@/lib/navigation';
 
 export const metadata: Metadata = {
   title: 'Dating Assistant',
@@ -33,20 +33,20 @@ export default async function HomePage() {
             What your dating apps are missing...
           </p>
           <div className="space-y-4">
-            <a
+            <NavigationLink
               href="/auth/signin"
               data-amplitude-target="homepage-signin-button"
               className="block w-full bg-primary-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-primary-700 transition-colors text-center"
             >
               Sign In
-            </a>
-            <a
+            </NavigationLink>
+            <NavigationLink
               href="/auth/signup"
               data-amplitude-target="homepage-signup-button"
               className="block w-full border-2 border-primary-600 text-primary-600 py-3 px-6 rounded-lg font-semibold hover:bg-primary-50 transition-colors text-center"
             >
               Sign Up
-            </a>
+            </NavigationLink>
           </div>
         </div>
       </div>
