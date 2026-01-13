@@ -35,12 +35,14 @@ export default async function HomePage() {
           <div className="space-y-4">
             <Link
               href="/auth/signin"
+              data-amplitude-target="homepage-signin-button"
               className="block w-full bg-primary-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-primary-700 transition-colors"
             >
               Sign In
             </Link>
             <Link
               href="/auth/signup"
+              data-amplitude-target="homepage-signup-button"
               className="block w-full border-2 border-primary-600 text-primary-600 py-3 px-6 rounded-lg font-semibold hover:bg-primary-50 transition-colors"
             >
               Sign Up

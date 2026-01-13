@@ -192,6 +192,7 @@ export default function SignInPage() {
           <button
             onClick={handleGoogleSignIn}
             disabled={loading}
+            data-amplitude-target="signin-google-button"
             className="w-full bg-white border-2 border-gray-300 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center space-x-2"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -218,6 +219,7 @@ export default function SignInPage() {
           <button
             onClick={handleFacebookSignIn}
             disabled={loading}
+            data-amplitude-target="signin-facebook-button"
             className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -256,6 +258,7 @@ export default function SignInPage() {
             <button
               type="submit"
               disabled={loading}
+              data-amplitude-target="signin-magic-link-button"
               className="w-full bg-primary-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50"
             >
               {loading ? 'Sending...' : 'Send Magic Link'}
@@ -267,7 +270,11 @@ export default function SignInPage() {
 
         <p className="mt-6 text-center text-sm text-gray-600">
           Don't have an account?{' '}
-          <Link href="/auth/signup" className="text-primary-600 hover:underline">
+          <Link
+            href="/auth/signup"
+            data-amplitude-target="signin-signup-link"
+            className="text-primary-600 hover:underline"
+          >
             Sign up
           </Link>
         </p>

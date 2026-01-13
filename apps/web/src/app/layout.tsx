@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import Script from 'next/script';
 import './globals.css';
 import VersionFooter from '@/components/VersionFooter';
 import { NavigationProviderWrapper } from '@/lib/navigation/navigation-provider-wrapper';
@@ -29,18 +28,59 @@ export default function RootLayout({
 
   return (
     <html lang="en">
-      <body className={inter.className}>
-        {/* Amplitude Web Experiments Script - Required for Visual Editor */}
-        {/* Using beforeInteractive strategy injects it into <head> as early as possible */}
-        {/* This prevents flickering and ensures the script loads before page content */}
-        {/* Script with beforeInteractive must be inside body (Next.js moves it to head automatically) */}
+      <head>
+        {/* Amplitude Web Experiments Anti-Flicker Snippet */}
+        {/* This snippet prevents flickering by hiding content until the experiment script loads */}
+        {/* It must be in <head> and execute before any page content renders */}
         {amplitudeApiKey && (
-          <Script
-            id="amplitude-web-experiments"
-            src={`https://cdn.amplitude.com/script/${amplitudeApiKey}.experiment.js`}
-            strategy="beforeInteractive"
-          />
+          <>
+            <style
+              id="amplitude-anti-flicker"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  * {
+                    visibility: hidden !important;
+                  }
+                `,
+              }}
+            />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `
+                  (function() {
+                    var amplitudeApiKey = '${amplitudeApiKey}';
+                    var script = document.createElement('script');
+                    script.src = 'https://cdn.amplitude.com/script/' + amplitudeApiKey + '.experiment.js';
+                    script.async = true;
+                    script.onload = function() {
+                      var style = document.getElementById('amplitude-anti-flicker');
+                      if (style) {
+                        style.remove();
+                      }
+                    };
+                    script.onerror = function() {
+                      // Remove anti-flicker mask even if script fails to load
+                      var style = document.getElementById('amplitude-anti-flicker');
+                      if (style) {
+                        style.remove();
+                      }
+                    };
+                    // Timeout fallback: remove mask after 1 second if script hasn't loaded
+                    setTimeout(function() {
+                      var style = document.getElementById('amplitude-anti-flicker');
+                      if (style) {
+                        style.remove();
+                      }
+                    }, 1000);
+                    document.head.appendChild(script);
+                  })();
+                `,
+              }}
+            />
+          </>
         )}
+      </head>
+      <body className={inter.className}>
         <AmplitudeInit />
         <ExperimentInit />
         <NavigationProviderWrapper>
