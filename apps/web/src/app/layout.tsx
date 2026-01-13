@@ -48,31 +48,72 @@ export default function RootLayout({
               dangerouslySetInnerHTML={{
                 __html: `
                   (function() {
+                    // Function to remove anti-flicker mask - multiple fallback strategies
+                    function removeAntiFlicker() {
+                      try {
+                        var style = document.getElementById('amplitude-anti-flicker');
+                        if (style && style.parentNode) {
+                          style.parentNode.removeChild(style);
+                        } else if (style) {
+                          style.remove();
+                        }
+                      } catch (e) {
+                        // If removal fails, try to override with visible style
+                        try {
+                          var style = document.getElementById('amplitude-anti-flicker');
+                          if (style) {
+                            style.innerHTML = '* { visibility: visible !important; }';
+                          }
+                        } catch (e2) {
+                          // Last resort: remove via style tag manipulation
+                          try {
+                            var styles = document.getElementsByTagName('style');
+                            for (var i = 0; i < styles.length; i++) {
+                              if (styles[i].id === 'amplitude-anti-flicker') {
+                                styles[i].parentNode.removeChild(styles[i]);
+                                break;
+                              }
+                            }
+                          } catch (e3) {
+                            console.error('Failed to remove anti-flicker:', e3);
+                          }
+                        }
+                      }
+                    }
+                    
                     var amplitudeApiKey = '${amplitudeApiKey}';
-                    var script = document.createElement('script');
-                    script.src = 'https://cdn.amplitude.com/script/' + amplitudeApiKey + '.experiment.js';
-                    script.async = true;
-                    script.onload = function() {
-                      var style = document.getElementById('amplitude-anti-flicker');
-                      if (style) {
-                        style.remove();
-                      }
-                    };
-                    script.onerror = function() {
-                      // Remove anti-flicker mask even if script fails to load
-                      var style = document.getElementById('amplitude-anti-flicker');
-                      if (style) {
-                        style.remove();
-                      }
-                    };
-                    // Timeout fallback: remove mask after 1 second if script hasn't loaded
-                    setTimeout(function() {
-                      var style = document.getElementById('amplitude-anti-flicker');
-                      if (style) {
-                        style.remove();
-                      }
-                    }, 1000);
-                    document.head.appendChild(script);
+                    if (!amplitudeApiKey) {
+                      removeAntiFlicker();
+                      return;
+                    }
+                    
+                    // Multiple fallback timers to ensure removal
+                    setTimeout(removeAntiFlicker, 300);  // Fast fallback
+                    setTimeout(removeAntiFlicker, 1000); // Original timeout
+                    
+                    // Remove on DOMContentLoaded if not already removed
+                    if (document.readyState === 'loading') {
+                      document.addEventListener('DOMContentLoaded', removeAntiFlicker, { once: true });
+                    } else {
+                      // DOM already loaded
+                      removeAntiFlicker();
+                    }
+                    
+                    // Remove on window load as final fallback
+                    window.addEventListener('load', removeAntiFlicker, { once: true });
+                    
+                    // Load experiment script
+                    try {
+                      var script = document.createElement('script');
+                      script.src = 'https://cdn.amplitude.com/script/' + amplitudeApiKey + '.experiment.js';
+                      script.async = true;
+                      script.onload = removeAntiFlicker;
+                      script.onerror = removeAntiFlicker;
+                      document.head.appendChild(script);
+                    } catch (e) {
+                      // If script creation fails, ensure mask is removed
+                      removeAntiFlicker();
+                    }
                   })();
                 `,
               }}
