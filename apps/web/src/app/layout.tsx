@@ -29,17 +29,18 @@ export default function RootLayout({
 
   return (
     <html lang="en">
-      {/* Amplitude Web Experiments Script - Required for Visual Editor */}
-      {/* Using beforeInteractive strategy injects it into <head> as early as possible */}
-      {/* This prevents flickering and ensures the script loads before page content */}
-      {amplitudeApiKey && (
-        <Script
-          id="amplitude-web-experiments"
-          src={`https://cdn.amplitude.com/script/${amplitudeApiKey}.experiment.js`}
-          strategy="beforeInteractive"
-        />
-      )}
       <body className={inter.className}>
+        {/* Amplitude Web Experiments Script - Required for Visual Editor */}
+        {/* Using beforeInteractive strategy injects it into <head> as early as possible */}
+        {/* This prevents flickering and ensures the script loads before page content */}
+        {/* Script with beforeInteractive must be inside body (Next.js moves it to head automatically) */}
+        {amplitudeApiKey && (
+          <Script
+            id="amplitude-web-experiments"
+            src={`https://cdn.amplitude.com/script/${amplitudeApiKey}.experiment.js`}
+            strategy="beforeInteractive"
+          />
+        )}
         <AmplitudeInit />
         <ExperimentInit />
         <NavigationProviderWrapper>
