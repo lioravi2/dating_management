@@ -49,13 +49,17 @@ export default function RootLayout({
                 __html: `
                   (function() {
                     // Function to remove anti-flicker mask - multiple fallback strategies
+                    var removed = false;
                     function removeAntiFlicker() {
+                      if (removed) return;
                       try {
                         var style = document.getElementById('amplitude-anti-flicker');
                         if (style && style.parentNode) {
                           style.parentNode.removeChild(style);
+                          removed = true;
                         } else if (style) {
                           style.remove();
+                          removed = true;
                         }
                       } catch (e) {
                         // If removal fails, try to override with visible style
@@ -63,6 +67,7 @@ export default function RootLayout({
                           var style = document.getElementById('amplitude-anti-flicker');
                           if (style) {
                             style.innerHTML = '* { visibility: visible !important; }';
+                            removed = true;
                           }
                         } catch (e2) {
                           // Last resort: remove via style tag manipulation
@@ -71,23 +76,34 @@ export default function RootLayout({
                             for (var i = 0; i < styles.length; i++) {
                               if (styles[i].id === 'amplitude-anti-flicker') {
                                 styles[i].parentNode.removeChild(styles[i]);
+                                removed = true;
                                 break;
                               }
                             }
                           } catch (e3) {
-                            console.error('Failed to remove anti-flicker:', e3);
+                            // Force visibility as absolute last resort
+                            try {
+                              document.documentElement.style.setProperty('visibility', 'visible', 'important');
+                              removed = true;
+                            } catch (e4) {
+                              console.error('Failed to remove anti-flicker:', e4);
+                            }
                           }
                         }
                       }
                     }
                     
+                    // Remove immediately on script execution (before any async operations)
+                    // This ensures page is visible even if there are errors
+                    removeAntiFlicker();
+                    
                     var amplitudeApiKey = '${amplitudeApiKey}';
                     if (!amplitudeApiKey) {
-                      removeAntiFlicker();
                       return;
                     }
                     
-                    // Multiple fallback timers to ensure removal
+                    // Multiple fallback timers to ensure removal (in case first attempt failed)
+                    setTimeout(removeAntiFlicker, 100);  // Very fast fallback
                     setTimeout(removeAntiFlicker, 300);  // Fast fallback
                     setTimeout(removeAntiFlicker, 1000); // Original timeout
                     
@@ -101,6 +117,10 @@ export default function RootLayout({
                     
                     // Remove on window load as final fallback
                     window.addEventListener('load', removeAntiFlicker, { once: true });
+                    
+                    // Remove on any error (including React errors)
+                    window.addEventListener('error', removeAntiFlicker, { once: true });
+                    window.addEventListener('unhandledrejection', removeAntiFlicker, { once: true });
                     
                     // Load experiment script
                     try {
