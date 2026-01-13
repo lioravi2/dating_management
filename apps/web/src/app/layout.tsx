@@ -23,14 +23,15 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Get Amplitude API key for Web Experiments script
+  // Get Amplitude API key at build time (available in server components)
+  // Using NEXT_PUBLIC_ prefix makes it available in both server and client
   const amplitudeApiKey = process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY;
-  
+
   return (
     <html lang="en">
       {/* Amplitude Web Experiments Script - Required for Visual Editor */}
-      {/* This script enables Web Experiments and the Visual Editor (VISUAL_EDITOR=true parameter) */}
       {/* Using beforeInteractive strategy injects it into <head> as early as possible */}
+      {/* This prevents flickering and ensures the script loads before page content */}
       {amplitudeApiKey && (
         <Script
           id="amplitude-web-experiments"
