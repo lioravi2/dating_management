@@ -8,6 +8,8 @@ import { environment } from '@/lib/environment';
 import DevSignInButton from '@/components/DevSignInButton';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0; // Prevent static generation
+export const fetchCache = 'force-no-store'; // Always fetch fresh
 
 export default function SignInPage() {
   useEffect(() => {

@@ -33,20 +33,20 @@ export default async function HomePage() {
             What your dating apps are missing...
           </p>
           <div className="space-y-4">
-            <Link
+            <a
               href="/auth/signin"
               data-amplitude-target="homepage-signin-button"
-              className="block w-full bg-primary-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+              className="block w-full bg-primary-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-primary-700 transition-colors text-center"
             >
               Sign In
-            </Link>
-            <Link
+            </a>
+            <a
               href="/auth/signup"
               data-amplitude-target="homepage-signup-button"
-              className="block w-full border-2 border-primary-600 text-primary-600 py-3 px-6 rounded-lg font-semibold hover:bg-primary-50 transition-colors"
+              className="block w-full border-2 border-primary-600 text-primary-600 py-3 px-6 rounded-lg font-semibold hover:bg-primary-50 transition-colors text-center"
             >
               Sign Up
-            </Link>
+            </a>
           </div>
         </div>
       </div>
