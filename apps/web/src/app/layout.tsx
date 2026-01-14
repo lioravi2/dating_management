@@ -57,44 +57,78 @@ export default function RootLayout({
                         if (style && style.parentNode) {
                           style.parentNode.removeChild(style);
                           removed = true;
+                          return true;
                         } else if (style) {
                           style.remove();
                           removed = true;
+                          return true;
                         }
                       } catch (e) {
-                        // If removal fails, try to override with visible style
-                        try {
-                          var style = document.getElementById('amplitude-anti-flicker');
-                          if (style) {
-                            style.innerHTML = '* { visibility: visible !important; }';
-                            removed = true;
-                          }
-                        } catch (e2) {
-                          // Last resort: remove via style tag manipulation
-                          try {
-                            var styles = document.getElementsByTagName('style');
-                            for (var i = 0; i < styles.length; i++) {
-                              if (styles[i].id === 'amplitude-anti-flicker') {
-                                styles[i].parentNode.removeChild(styles[i]);
-                                removed = true;
-                                break;
-                              }
-                            }
-                          } catch (e3) {
-                            // Force visibility as absolute last resort
-                            try {
-                              document.documentElement.style.setProperty('visibility', 'visible', 'important');
-                              removed = true;
-                            } catch (e4) {
-                              console.error('Failed to remove anti-flicker:', e4);
-                            }
-                          }
+                        // Continue to fallback methods
+                      }
+                      
+                      // If removal failed, try to override with visible style
+                      try {
+                        var style = document.getElementById('amplitude-anti-flicker');
+                        if (style) {
+                          style.innerHTML = '* { visibility: visible !important; }';
+                          removed = true;
+                          return true;
                         }
+                      } catch (e2) {
+                        // Continue to next fallback
+                      }
+                      
+                      // Last resort: force visibility on document element
+                      try {
+                        document.documentElement.style.setProperty('visibility', 'visible', 'important');
+                        removed = true;
+                        return true;
+                      } catch (e3) {
+                        console.error('Failed to remove anti-flicker:', e3);
+                        return false;
                       }
                     }
                     
-                    // Remove immediately on script execution (before any async operations)
-                    // This ensures page is visible even if there are errors
+                    // Wait for style tag to exist before trying to remove it
+                    function waitAndRemove() {
+                      var attempts = 0;
+                      var maxAttempts = 50; // 500ms max wait (50 * 10ms)
+                      
+                      function tryRemove() {
+                        attempts++;
+                        var style = document.getElementById('amplitude-anti-flicker');
+                        
+                        if (style) {
+                          // Style exists, remove it
+                          if (removeAntiFlicker()) {
+                            return; // Successfully removed
+                          }
+                        }
+                        
+                        // If style doesn't exist yet and we haven't exceeded max attempts, try again
+                        if (attempts < maxAttempts) {
+                          setTimeout(tryRemove, 10);
+                        } else {
+                          // Max attempts reached, force visibility anyway
+                          removeAntiFlicker();
+                        }
+                      }
+                      
+                      tryRemove();
+                    }
+                    
+                    // Use requestAnimationFrame to ensure DOM is ready
+                    if (typeof requestAnimationFrame !== 'undefined') {
+                      requestAnimationFrame(function() {
+                        waitAndRemove();
+                      });
+                    } else {
+                      // Fallback for older browsers
+                      waitAndRemove();
+                    }
+                    
+                    // Also try immediate removal (in case DOM is already ready)
                     removeAntiFlicker();
                     
                     var amplitudeApiKey = '${amplitudeApiKey}';
@@ -102,9 +136,10 @@ export default function RootLayout({
                       return;
                     }
                     
-                    // Multiple fallback timers to ensure removal (in case first attempt failed)
-                    setTimeout(removeAntiFlicker, 100);  // Very fast fallback
-                    setTimeout(removeAntiFlicker, 300);  // Fast fallback
+                    // Multiple fallback timers to ensure removal
+                    setTimeout(removeAntiFlicker, 50);   // Very fast fallback
+                    setTimeout(removeAntiFlicker, 100);  // Fast fallback
+                    setTimeout(removeAntiFlicker, 300);  // Medium fallback
                     setTimeout(removeAntiFlicker, 1000); // Original timeout
                     
                     // Remove on DOMContentLoaded if not already removed
@@ -121,6 +156,32 @@ export default function RootLayout({
                     // Remove on any error (including React errors)
                     window.addEventListener('error', removeAntiFlicker, { once: true });
                     window.addEventListener('unhandledrejection', removeAntiFlicker, { once: true });
+                    
+                    // Use MutationObserver to watch for style tag addition (handles React hydration)
+                    if (typeof MutationObserver !== 'undefined') {
+                      var observer = new MutationObserver(function(mutations) {
+                        mutations.forEach(function(mutation) {
+                          mutation.addedNodes.forEach(function(node) {
+                            if (node.nodeType === 1) { // Element node
+                              if (node.id === 'amplitude-anti-flicker' || 
+                                  (node.querySelector && node.querySelector('#amplitude-anti-flicker'))) {
+                                setTimeout(removeAntiFlicker, 0);
+                              }
+                            }
+                          });
+                        });
+                      });
+                      
+                      observer.observe(document.head, {
+                        childList: true,
+                        subtree: true
+                      });
+                      
+                      // Stop observing after 5 seconds to avoid memory leaks
+                      setTimeout(function() {
+                        observer.disconnect();
+                      }, 5000);
+                    }
                     
                     // Load experiment script
                     try {
