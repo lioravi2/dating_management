@@ -58,14 +58,16 @@ export default function RootLayout({
                     }
                   }
                   
-                  // Wait for DOM to be ready before loading script
-                  // This ensures client components are fully hydrated
+                  // Wait for both DOM and React hydration
+                  // This ensures client components are fully hydrated before script loads
                   if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', loadExperimentScript);
+                    document.addEventListener('DOMContentLoaded', function() {
+                      // Wait a bit more for React hydration, especially for client components
+                      setTimeout(loadExperimentScript, 100);
+                    });
                   } else {
-                    // DOM is already ready, load immediately
-                    // But also wait a bit for React hydration to complete
-                    setTimeout(loadExperimentScript, 0);
+                    // DOM ready, but wait for React hydration (especially important for client components)
+                    setTimeout(loadExperimentScript, 100);
                   }
                 })();
               `,
