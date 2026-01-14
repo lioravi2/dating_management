@@ -27,6 +27,7 @@ export default function RootLayout({
       <head>
         {/* Amplitude Web Experiments Script */}
         {/* Loads the experiment script for Visual Editor and experiments */}
+        {/* Anti-flicker is NOT used - Visual Editor requires visible elements */}
         {amplitudeApiKey && (
           <script
             dangerouslySetInnerHTML={{
