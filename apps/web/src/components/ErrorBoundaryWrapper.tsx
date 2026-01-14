@@ -4,6 +4,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import AmplitudeInit from '@/components/analytics/AmplitudeInit';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 import ExperimentInit from '@/components/experiment/ExperimentInit';
+import WebExperimentScript from '@/components/experiment/WebExperimentScript';
 import { NavigationProviderWrapper } from '@/lib/navigation/navigation-provider-wrapper';
 import VersionFooter from '@/components/VersionFooter';
 import GlobalErrorHandler from '@/components/GlobalErrorHandler';
@@ -26,6 +27,7 @@ export default function ErrorBoundaryWrapper({
     <>
       <GlobalErrorHandler />
       <ErrorBoundary>
+        <WebExperimentScript />
         <AmplitudeInit />
         <ErrorBoundary>
           <ExperimentInit />

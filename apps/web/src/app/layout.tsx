@@ -18,62 +18,11 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Get Amplitude API key at build time (available in server components)
-  // Using NEXT_PUBLIC_ prefix makes it available in both server and client
-  const amplitudeApiKey = process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY;
-
   return (
     <html lang="en">
       <head>
-        {/* Amplitude Web Experiments Script */}
-        {/* Loads the experiment script for Visual Editor and experiments */}
-        {/* Anti-flicker is NOT used - Visual Editor requires visible elements */}
-        {amplitudeApiKey && (
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `
-                (function() {
-                  var amplitudeApiKey = '${amplitudeApiKey}';
-                  if (!amplitudeApiKey) {
-                    return;
-                  }
-                  
-                  // Function to load the experiment script
-                  function loadExperimentScript() {
-                    // Check if script already exists
-                    var existingScript = document.querySelector('script[src*="' + amplitudeApiKey + '.experiment.js"]');
-                    if (existingScript) {
-                      return;
-                    }
-                    
-                    // Load experiment script
-                    try {
-                      var script = document.createElement('script');
-                      script.src = 'https://cdn.amplitude.com/script/' + amplitudeApiKey + '.experiment.js';
-                      script.async = true;
-                      script.id = 'amplitude-web-experiments';
-                      document.head.appendChild(script);
-                    } catch (e) {
-                      console.error('Failed to load Amplitude Web Experiments script:', e);
-                    }
-                  }
-                  
-                  // Wait for both DOM and React hydration
-                  // This ensures client components are fully hydrated before script loads
-                  if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', function() {
-                      // Wait a bit more for React hydration, especially for client components
-                      setTimeout(loadExperimentScript, 100);
-                    });
-                  } else {
-                    // DOM ready, but wait for React hydration (especially important for client components)
-                    setTimeout(loadExperimentScript, 100);
-                  }
-                })();
-              `,
-            }}
-          />
-        )}
+        {/* Amplitude Web Experiments Script is loaded via WebExperimentScript component */}
+        {/* This ensures the script loads after React hydration completes */}
       </head>
       <body className={inter.className}>
         <ErrorBoundaryWrapper>
