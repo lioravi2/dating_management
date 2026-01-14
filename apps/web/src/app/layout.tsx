@@ -38,21 +38,34 @@ export default function RootLayout({
                     return;
                   }
                   
-                  // Check if script already exists
-                  var existingScript = document.querySelector('script[src*="' + amplitudeApiKey + '.experiment.js"]');
-                  if (existingScript) {
-                    return;
+                  // Function to load the experiment script
+                  function loadExperimentScript() {
+                    // Check if script already exists
+                    var existingScript = document.querySelector('script[src*="' + amplitudeApiKey + '.experiment.js"]');
+                    if (existingScript) {
+                      return;
+                    }
+                    
+                    // Load experiment script
+                    try {
+                      var script = document.createElement('script');
+                      script.src = 'https://cdn.amplitude.com/script/' + amplitudeApiKey + '.experiment.js';
+                      script.async = true;
+                      script.id = 'amplitude-web-experiments';
+                      document.head.appendChild(script);
+                    } catch (e) {
+                      console.error('Failed to load Amplitude Web Experiments script:', e);
+                    }
                   }
                   
-                  // Load experiment script
-                  try {
-                    var script = document.createElement('script');
-                    script.src = 'https://cdn.amplitude.com/script/' + amplitudeApiKey + '.experiment.js';
-                    script.async = true;
-                    script.id = 'amplitude-web-experiments';
-                    document.head.appendChild(script);
-                  } catch (e) {
-                    console.error('Failed to load Amplitude Web Experiments script:', e);
+                  // Wait for DOM to be ready before loading script
+                  // This ensures client components are fully hydrated
+                  if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', loadExperimentScript);
+                  } else {
+                    // DOM is already ready, load immediately
+                    // But also wait a bit for React hydration to complete
+                    setTimeout(loadExperimentScript, 0);
                   }
                 })();
               `,
