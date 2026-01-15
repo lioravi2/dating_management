@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import Header from '@/components/Header';
 import PartnerCard from '@/components/PartnerCard';
+import AddPartnerButton from '@/components/dashboard/AddPartnerButton';
 import { Partner, PARTNER_SORT_ORDER } from '@/shared';
 import type { Metadata } from 'next';
 
@@ -79,6 +80,20 @@ export default async function DashboardPage() {
         }
       }
     }
+
+    // Fetch feature flag for "Add Partner" button visibility
+    const addPartnerVariant = await getVariant(
+      'showing-not-showing-the-add-partner-button-in-the-homepage',
+      session.user.id,
+      {
+        account_type: user?.account_type,
+        subscription_status: subscription?.status,
+      }
+    );
+    // Handle variants: 'on' = show button, 'hiding_add_partner_button' = hide button
+    // Default to showing button if flag fails to load (fallback to current behavior)
+    const showAddPartnerButton = addPartnerVariant?.value === 'on' || 
+      (addPartnerVariant === undefined && true); // Show by default if variant is undefined
 
     // Fetch recent partners (3 most recently updated)
     const { data: recentPartners, error: partnersError } = await supabase
@@ -159,13 +174,7 @@ export default async function DashboardPage() {
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Link
-                href="/partners/new"
-                className="bg-green-50 border-2 border-green-200 rounded-lg p-4 hover:bg-green-100 transition-colors"
-              >
-                <h2 className="font-semibold text-lg mb-2">Add Partner</h2>
-                <p className="text-sm text-gray-600">Add a new partner</p>
-              </Link>
+              <AddPartnerButton />
               <Link
                 href="/upload-photo"
                 className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4 hover:bg-purple-100 transition-colors"
