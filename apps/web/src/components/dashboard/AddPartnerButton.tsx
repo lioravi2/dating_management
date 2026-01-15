@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
+import { NavigationLink } from '@/lib/navigation';
 import { getVariant, setUserId as setExperimentUserId } from '@/lib/experiment/client';
 import { createSupabaseClient } from '@/lib/supabase/client';
 
@@ -73,12 +73,12 @@ export default function AddPartnerButton() {
   }
 
   return (
-    <Link
+    <NavigationLink
       href="/partners/new"
       className="bg-green-50 border-2 border-green-200 rounded-lg p-4 hover:bg-green-100 transition-colors"
     >
       <h2 className="font-semibold text-lg mb-2">Add Partner</h2>
       <p className="text-sm text-gray-600">Add a new partner</p>
-    </Link>
+    </NavigationLink>
   );
 }

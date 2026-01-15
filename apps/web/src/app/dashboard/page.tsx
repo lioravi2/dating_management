@@ -81,20 +81,6 @@ export default async function DashboardPage() {
       }
     }
 
-    // Fetch feature flag for "Add Partner" button visibility
-    const addPartnerVariant = await getVariant(
-      'showing-not-showing-the-add-partner-button-in-the-homepage',
-      session.user.id,
-      {
-        account_type: user?.account_type,
-        subscription_status: subscription?.status,
-      }
-    );
-    // Handle variants: 'on' = show button, 'hiding_add_partner_button' = hide button
-    // Default to showing button if flag fails to load (fallback to current behavior)
-    const showAddPartnerButton = addPartnerVariant?.value === 'on' || 
-      (addPartnerVariant === undefined && true); // Show by default if variant is undefined
-
     // Fetch recent partners (3 most recently updated)
     const { data: recentPartners, error: partnersError } = await supabase
       .from('partners')
